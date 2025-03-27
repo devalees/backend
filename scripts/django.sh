@@ -17,7 +17,7 @@ log_message() {
 
 # Function to check if a process is running
 check_process() {
-    pgrep -f "python manage.py runserver" > /dev/null
+    pgrep -f "runserver.*8000" > /dev/null
     return $?
 }
 
@@ -58,13 +58,16 @@ start_server() {
         return 1
     }
     
+    # Add parent directory to PYTHONPATH
+    export PYTHONPATH="$(dirname "$0")/..:$PYTHONPATH"
+    
     # Activate virtual environment if it exists
     if [ -d "venv" ]; then
         source venv/bin/activate
     fi
     
     # Start the server in the background
-    nohup python manage.py runserver > ../server.log 2>&1 &
+    nohup python manage.py runserver 8000 > ../server.log 2>&1 &
     
     # Wait for server to start
     for i in {1..5}; do
@@ -91,7 +94,7 @@ kill_server() {
     log_message "Attempting to kill existing server process..." "$YELLOW"
     
     # Find and kill the Django server process
-    pkill -f "python manage.py runserver"
+    pkill -f "runserver.*8000"
     
     # Wait for process to terminate
     for i in {1..5}; do
@@ -105,7 +108,7 @@ kill_server() {
     # If process is still running, force kill it
     if check_process; then
         log_message "Force killing server process..." "$RED"
-        pkill -9 -f "python manage.py runserver"
+        pkill -9 -f "runserver.*8000"
         sleep 2
     fi
 }
