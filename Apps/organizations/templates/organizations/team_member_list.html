@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "organizations/base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Team Members" %}{% endblock %}
@@ -7,7 +7,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>{% trans "Team Members" %}</h1>
-        <a href="{% url 'organizations:team-member-create' %}" class="btn btn-primary">
+        <a href="{% url 'organizations:team_member_create' organization.pk department.pk team.pk %}" class="btn btn-primary">
             {% trans "Add Team Member" %}
         </a>
     </div>
@@ -44,15 +44,15 @@
                     <td>{{ member.role }}</td>
                     <td>
                         <div class="btn-group">
-                            <a href="{% url 'organizations:team-member-detail' member.pk %}" 
+                            <a href="{% url 'organizations:team_member_detail' organization.pk department.pk team.pk member.pk %}" 
                                class="btn btn-sm btn-info">
                                 {% trans "View" %}
                             </a>
-                            <a href="{% url 'organizations:team-member-update' member.pk %}" 
+                            <a href="{% url 'organizations:team_member_update' organization.pk department.pk team.pk member.pk %}" 
                                class="btn btn-sm btn-warning">
                                 {% trans "Edit" %}
                             </a>
-                            <a href="{% url 'organizations:team-member-delete' member.pk %}" 
+                            <a href="{% url 'organizations:team_member_delete' organization.pk department.pk team.pk member.pk %}" 
                                class="btn btn-sm btn-danger">
                                 {% trans "Delete" %}
                             </a>

@@ -226,9 +226,14 @@ def team_create(request, org_pk, dept_pk):
         name = request.POST.get('name')
         description = request.POST.get('description')
         parent_id = request.POST.get('parent')
+        department_id = request.POST.get('department')
         
         if not name:
             return HttpResponseBadRequest('Team name is required')
+            
+        # Validate that team is being created in the correct department
+        if department_id and int(department_id) != department.pk:
+            return HttpResponseBadRequest('Team must be created in the specified department')
             
         if Team.objects.filter(name=name, department=department).exists():
             return HttpResponseBadRequest('Team with this name already exists in this department')
@@ -276,14 +281,17 @@ def team_update(request, org_pk, dept_pk, pk):
             
         parent_id = request.POST.get('parent')
         if parent_id:
-            parent = get_object_or_404(Team, pk=parent_id, department=department, is_active=True)
-            # Check for circular reference
-            current = parent
-            while current:
-                if current.parent_id == team.pk:
-                    return HttpResponseBadRequest('Circular reference in team hierarchy is not allowed')
-                current = current.parent
-            team.parent = parent
+            try:
+                parent = Team.objects.get(pk=parent_id, department=department, is_active=True)
+                # Check for circular reference
+                current = parent
+                while current:
+                    if current.parent_id == team.pk:
+                        return HttpResponseBadRequest('Circular reference in team hierarchy is not allowed')
+                    current = current.parent
+                team.parent = parent
+            except Team.DoesNotExist:
+                return HttpResponseBadRequest('Parent team not found or is not in the same department')
         else:
             team.parent = None
             

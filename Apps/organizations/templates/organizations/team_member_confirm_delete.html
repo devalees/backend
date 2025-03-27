@@ -1,72 +1,48 @@
-{% extends "base.html" %}
+{% extends "organizations/base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Delete Team Member" %}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="mb-0">{% trans "Delete Team Member" %}</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{% trans "Delete Team Member" %}</h1>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{% trans "Confirm Deletion" %}</h5>
+            <p class="card-text">
+                {% blocktrans with name=team_member.user.get_full_name|default:team_member.user.username %}
+                Are you sure you want to delete the team member "{{ name }}"?
+                {% endblocktrans %}
+            </p>
+            <p class="card-text text-danger">
+                {% trans "This action cannot be undone." %}
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-danger">
+                        {% trans "Delete" %}
+                    </button>
+                    <a href="{% url 'organizations:team_member_list' organization.pk department.pk team.pk %}" 
+                       class="btn btn-secondary">
+                        {% trans "Cancel" %}
+                    </a>
                 </div>
-                <div class="card-body">
-                    {% if messages %}
-                    <div class="messages">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <p>{% trans "Are you sure you want to delete this team member?" %}</p>
-
-                    <div class="alert alert-warning">
-                        <h4 class="alert-heading">{% trans "Warning!" %}</h4>
-                        <p>{% trans "This action cannot be undone." %}</p>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <h5 class="card-title">{% trans "Team Member Details" %}</h5>
-                            <div class="row">
-                                <div class="col-md-4 fw-bold">{% trans "Name" %}:</div>
-                                <div class="col-md-8">
-                                    {{ team_member.user.get_full_name|default:team_member.user.username }}
-                                </div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-md-4 fw-bold">{% trans "Team" %}:</div>
-                                <div class="col-md-8">{{ team_member.team.name }}</div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-md-4 fw-bold">{% trans "Department" %}:</div>
-                                <div class="col-md-8">{{ team_member.team.department.name }}</div>
-                            </div>
-                            <div class="row mt-2">
-                                <div class="col-md-4 fw-bold">{% trans "Organization" %}:</div>
-                                <div class="col-md-8">{{ team_member.team.department.organization.name }}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="d-flex justify-content-between">
-                            <a href="{% url 'organizations:team-member-detail' team_member.pk %}" 
-                               class="btn btn-secondary">
-                                {% trans "Cancel" %}
-                            </a>
-                            <button type="submit" class="btn btn-danger">
-                                {% trans "Delete" %}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>

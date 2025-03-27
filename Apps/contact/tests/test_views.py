@@ -1,24 +1,32 @@
+import pytest
 from django.test import TestCase, Client
 from django.urls import reverse
-
 from Apps.contact.models import Contact, ContactCategory
 from Apps.users.models import User
 
-class ContactViewsTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.contact_url = reverse('contact:contact_form')
-        self.category = ContactCategory.objects.create(
+@pytest.mark.django_db
+class TestContactViews:
+    @pytest.fixture
+    def client(self):
+        return Client()
+
+    @pytest.fixture
+    def contact_url(self):
+        return reverse('contact:contact_form')
+
+    @pytest.fixture
+    def category(self):
+        return ContactCategory.objects.create(
             name='Test Category',
             description='Test Description'
         )
 
-    def test_contact_form_view(self):
-        response = self.client.get(self.contact_url)
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'contact/contact_form.html')
+    def test_contact_form_view(self, client, contact_url):
+        response = client.get(contact_url)
+        assert response.status_code == 200
+        assert 'contact/contact_form.html' in [t.name for t in response.templates]
 
-    def test_contact_form_submission(self):
+    def test_contact_form_submission(self, client, contact_url, category):
         data = {
             'first_name': 'John',
             'last_name': 'Doe',
@@ -26,13 +34,13 @@ class ContactViewsTest(TestCase):
             'phone': '+1234567890',
             'company': 'Test Company',
             'message': 'Test message',
-            'category': self.category.id
+            'category': category.id
         }
-        response = self.client.post(self.contact_url, data)
-        self.assertEqual(response.status_code, 302)  # Redirect after successful submission
-        self.assertTrue(Contact.objects.filter(email='john@example.com').exists())
+        response = client.post(contact_url, data)
+        assert response.status_code == 302  # Redirect after successful submission
+        assert Contact.objects.filter(email='john@example.com').exists()
 
-    def test_contact_form_invalid_data(self):
+    def test_contact_form_invalid_data(self, client, contact_url, category):
         data = {
             'first_name': 'John',
             'last_name': 'Doe',
@@ -40,8 +48,8 @@ class ContactViewsTest(TestCase):
             'phone': 'invalid-phone',
             'company': 'Test Company',
             'message': 'Test message',
-            'category': self.category.id
+            'category': category.id
         }
-        response = self.client.post(self.contact_url, data)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Contact.objects.filter(first_name='John').exists()) 
+        response = client.post(contact_url, data)
+        assert response.status_code == 200
+        assert not Contact.objects.filter(first_name='John').exists() 

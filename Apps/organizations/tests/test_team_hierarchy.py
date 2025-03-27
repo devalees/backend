@@ -1,7 +1,6 @@
 import pytest
 from django.test import TestCase
 from django.core.exceptions import ValidationError
-
 from Apps.organizations.models import Organization, Department, Team
 from Apps.users.models import User
 
@@ -43,15 +42,21 @@ class TestTeamHierarchy:
             department=department,
             parent=parent_team
         )
-        # Try to create second level sub-team (should fail)
-        team2 = Team(
+        # Create second level sub-team (should succeed)
+        sub_team2 = Team.objects.create(
             name='Level 2 Team',
             department=department,
             parent=sub_team1
         )
+        # Try to create third level sub-team (should fail)
+        team3 = Team(
+            name='Level 3 Team',
+            department=department,
+            parent=sub_team2
+        )
         with pytest.raises(ValidationError) as exc_info:
-            team2.full_clean()
-        assert 'Team hierarchy cannot exceed 2 levels' in str(exc_info.value)
+            team3.full_clean()
+        assert "Maximum team hierarchy depth exceeded" in str(exc_info.value)
 
     def test_team_circular_reference(self, parent_team, department):
         """Test preventing circular references in team hierarchy"""

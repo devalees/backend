@@ -1,5 +1,5 @@
 import pytest
-from django.test import RequestFactory
+from django.test import RequestFactory, Client
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from Apps.organizations.middleware import OrganizationMiddleware
@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.http import HttpResponse
 from django.utils import timezone
 from Apps.users.models import User
+from django.urls import reverse
 
 User = get_user_model()
 

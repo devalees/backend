@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "organizations/base.html" %}
 {% load i18n %}
 
 {% block title %}
@@ -11,64 +11,60 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="mb-0">
-                        {% if team_member %}
-                            {% trans "Edit Team Member" %}
-                        {% else %}
-                            {% trans "Add Team Member" %}
-                        {% endif %}
-                    </h2>
-                </div>
-                <div class="card-body">
-                    {% if messages %}
-                    <div class="messages">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            {% if team_member %}
+                {% trans "Edit Team Member" %}
+            {% else %}
+                {% trans "Add Team Member" %}
+            {% endif %}
+        </h1>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="mb-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">
+                        {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.help_text %}
+                    <div class="form-text">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% if field.errors %}
+                    <div class="alert alert-danger">
+                        {{ field.errors }}
                     </div>
                     {% endif %}
-
-                    <form method="post">
-                        {% csrf_token %}
-                        
-                        {% for field in form %}
-                        <div class="mb-3">
-                            <label for="{{ field.id_for_label }}" class="form-label">
-                                {{ field.label }}
-                            </label>
-                            {{ field }}
-                            {% if field.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ field.errors }}
-                            </div>
-                            {% endif %}
-                            {% if field.help_text %}
-                            <div class="form-text">{{ field.help_text }}</div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-
-                        <div class="d-flex justify-content-between">
-                            <a href="{% url 'organizations:team-member-list' %}" class="btn btn-secondary">
-                                {% trans "Cancel" %}
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                {% if team_member %}
-                                    {% trans "Update" %}
-                                {% else %}
-                                    {% trans "Create" %}
-                                {% endif %}
-                            </button>
-                        </div>
-                    </form>
                 </div>
-            </div>
+                {% endfor %}
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-primary">
+                        {% if team_member %}
+                            {% trans "Update" %}
+                        {% else %}
+                            {% trans "Create" %}
+                        {% endif %}
+                    </button>
+                    <a href="{% url 'organizations:team_member_list' organization.pk department.pk team.pk %}" 
+                       class="btn btn-secondary">
+                        {% trans "Cancel" %}
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>

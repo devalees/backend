@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, Group
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
@@ -12,6 +12,17 @@ import re
 import random
 import string
 from django.contrib.auth.hashers import make_password, check_password
+from django.utils import timezone
+
+class UserGroup(models.Model):
+    """Through model for User-Group relationship"""
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        app_label = 'users'
+        db_table = 'users_user_groups'
+        unique_together = ('user', 'group')
 
 class CustomUserManager(BaseUserManager):
     """Custom user model manager where username is the unique identifier"""
@@ -41,16 +52,33 @@ class CustomUserManager(BaseUserManager):
 
         return self.create_user(username, email, password, **extra_fields)
 
-class User(AbstractUser):
+class User(AbstractBaseUser, PermissionsMixin):
     """Custom user model for testing"""
-    pass
 
+    class Meta:
+        app_label = 'users'
+        swappable = 'AUTH_USER_MODEL'
+        db_table = 'users_user'
+
+    username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
+    is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    date_joined = models.DateTimeField(default=timezone.now)
     two_factor_secret = models.CharField(max_length=32, null=True, blank=True)
     two_factor_enabled = models.BooleanField(default=False)
     backup_codes = models.TextField(null=True, blank=True)
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        related_name='custom_user_set',
+        related_query_name='custom_user',
+        through=UserGroup
+    )
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email']

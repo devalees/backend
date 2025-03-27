@@ -9,13 +9,14 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'two_factor_enabled')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     ordering = ('username',)
+    filter_horizontal = ('user_permissions',)
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
         (_('2FA Settings'), {'fields': ('two_factor_enabled', 'two_factor_secret')}),
         (_('Permissions'), {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'user_permissions'),
         }),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )

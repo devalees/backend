@@ -1,6 +1,12 @@
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponseForbidden
 from Apps.organizations.models import TeamMember
+from django.conf import settings
+from django.http import Http404
+from django.http import HttpResponse
+from django.utils import timezone
+from Apps.users.models import User
+from django.urls import reverse
 
 class OrganizationMiddleware:
     """Middleware to attach organization, department, and team to request"""
@@ -13,7 +19,7 @@ class OrganizationMiddleware:
         if not hasattr(request, 'user') or isinstance(request.user, AnonymousUser):
             return self.get_response(request)
 
-        # Get user's most recent active team membership
+        # Get user's first active team membership
         team_member = (
             TeamMember.objects
             .filter(
@@ -23,7 +29,7 @@ class OrganizationMiddleware:
                 team__department__is_active=True,
                 team__department__organization__is_active=True
             )
-            .order_by('-created_at')
+            .order_by('created_at')
             .first()
         )
 
@@ -34,6 +40,8 @@ class OrganizationMiddleware:
             request.team = team_member.team
         else:
             request.organization = None
+            request.department = None
+            request.team = None
 
         return self.get_response(request)
 

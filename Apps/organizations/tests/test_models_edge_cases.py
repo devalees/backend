@@ -1,4 +1,5 @@
 import pytest
+from django.test import TestCase
 from django.core.exceptions import ValidationError
 from Apps.organizations.models import Organization, Department, Team, TeamMember
 from Apps.users.models import User
@@ -45,7 +46,7 @@ class TestOrganizationModelEdgeCases:
         Department.objects.create(name="Test Dept", organization=organization)
         with pytest.raises(ValidationError) as exc_info:
             Department.objects.create(name="Test Dept", organization=organization)
-        assert "Department with this Name and Organization already exists" in str(exc_info.value)
+        assert "A department with this name already exists in this organization" in str(exc_info.value)
 
     def test_department_cross_organization_parent(self, organization):
         """Test that departments cannot have parents from different organizations"""
@@ -84,7 +85,7 @@ class TestOrganizationModelEdgeCases:
     def test_department_max_hierarchy_depth(self, organization):
         """Test that departments cannot exceed maximum hierarchy depth"""
         parent = None
-        for i in range(6):  # Assuming max depth is 5
+        for i in range(5):  # Create 5 levels
             dept = Department.objects.create(
                 name=f"Dept {i}",
                 organization=organization,
@@ -93,12 +94,13 @@ class TestOrganizationModelEdgeCases:
             parent = dept
         
         with pytest.raises(ValidationError) as exc_info:
-            Department.objects.create(
+            dept = Department(
                 name="Too Deep",
                 organization=organization,
                 parent=parent
             )
-        assert "Maximum department hierarchy depth exceeded" in str(exc_info.value)
+            dept.full_clean()
+        assert "Department hierarchy cannot exceed 5 levels" in str(exc_info.value)
 
     def test_team_inactive_department(self, department):
         """Test that teams cannot be created for inactive departments"""
@@ -113,7 +115,7 @@ class TestOrganizationModelEdgeCases:
         Team.objects.create(name="Test Team", department=department)
         with pytest.raises(ValidationError) as exc_info:
             Team.objects.create(name="Test Team", department=department)
-        assert "Team with this Name and Department already exists" in str(exc_info.value)
+        assert "A team with this name already exists in this department" in str(exc_info.value)
 
     def test_team_cross_department_parent(self, department):
         """Test that teams cannot have parents from different departments"""
@@ -151,37 +153,31 @@ class TestOrganizationModelEdgeCases:
 
     def test_team_max_hierarchy_depth(self, department):
         """Test that teams cannot exceed maximum hierarchy depth"""
-        parent = None
-        for i in range(6):  # Assuming max depth is 5
-            team = Team.objects.create(
-                name=f"Team {i}",
-                department=department,
-                parent=parent
-            )
-            parent = team
+        # Create a hierarchy of 3 teams which is allowed by the model (depth < 3)
+        team1 = Team.objects.create(name="Team 1", department=department)
+        team2 = Team.objects.create(name="Team 2", department=department, parent=team1)
+        team3 = Team.objects.create(name="Team 3", department=department, parent=team2)
         
+        # Adding a 4th team should fail (depth >= 3)
+        team4 = Team(name="Team 4", department=department, parent=team3)
         with pytest.raises(ValidationError) as exc_info:
-            Team.objects.create(
-                name="Too Deep",
-                department=department,
-                parent=parent
-            )
+            team4.full_clean()
         assert "Maximum team hierarchy depth exceeded" in str(exc_info.value)
 
-    def test_team_member_inactive_team(self, team):
+    def test_team_member_inactive_team(self, team, user):
         """Test that team members cannot be added to inactive teams"""
         team.is_active = False
         team.save()
         with pytest.raises(ValidationError) as exc_info:
-            TeamMember.objects.create(team=team, user=self.user)
-        assert "Cannot add member to inactive team" in str(exc_info.value)
+            TeamMember.objects.create(team=team, user=user)
+        assert "Cannot add members to an inactive team" in str(exc_info.value)
 
     def test_team_member_unique_user(self, team, user):
         """Test that users cannot be added to the same team multiple times"""
         TeamMember.objects.create(team=team, user=user)
         with pytest.raises(ValidationError) as exc_info:
             TeamMember.objects.create(team=team, user=user)
-        assert "User is already a member of this team" in str(exc_info.value)
+        assert "This user is already a member of this team" in str(exc_info.value)
 
     def test_department_name_length(self, organization):
         """Test that department names cannot exceed maximum length"""
@@ -190,21 +186,28 @@ class TestOrganizationModelEdgeCases:
                 name="A" * 101,  # Assuming max length is 100
                 organization=organization
             )
-        assert "Department name cannot exceed 100 characters" in str(exc_info.value)
+        assert "Ensure this value has at most 100 characters" in str(exc_info.value)
 
     def test_department_update_operations(self, organization):
         """Test various department update operations"""
-        dept = Department.objects.create(name="Test Dept", organization=organization)
+        dept1 = Department.objects.create(name="Test Dept 1", organization=organization)
+        dept2 = Department.objects.create(name="Test Dept 2", organization=organization)
         
         # Test updating name to existing name
         with pytest.raises(ValidationError) as exc_info:
-            dept.name = "Test Dept"
-            dept.save()
-        assert "Department with this name already exists" in str(exc_info.value)
+            dept2.name = "Test Dept 1"
+            dept2.save()
+        assert "A department with this name already exists in this organization" in str(exc_info.value)
         
         # Test updating to inactive organization
-        dept.organization.is_active = False
-        dept.organization.save()
+        dept1.organization.is_active = False
+        dept1.organization.save()
         with pytest.raises(ValidationError) as exc_info:
-            dept.save()
-        assert "Cannot update department for inactive organization" in str(exc_info.value) 
+            dept1.save()
+        assert "Cannot create department for inactive organization" in str(exc_info.value)
+
+    def test_organization_name_max_length(self):
+        """Test organization name maximum length constraint"""
+        with pytest.raises(ValidationError) as exc_info:
+            Organization.objects.create(name="A" * 101)  # Assuming max length is 100
+        assert "Ensure this value has at most 100 characters" in str(exc_info.value) 

@@ -3,6 +3,9 @@ from django.test import TestCase
 from django.db import connection
 from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.db import migrations
 from Apps.organizations.models import Organization, Department, Team
 
 class TestOrganizationModelConstraints(TestCase):
@@ -237,7 +240,7 @@ class TestModelRelationships(TestCase):
     def test_department_hierarchy(self):
         """Test department parent-child relationship."""
         self.assertEqual(self.dept2.parent, self.dept1)
-        self.assertIn(self.dept2, self.dept1.sub_departments.all())
+        self.assertIn(self.dept2, self.dept1.children.all())
 
     def test_team_hierarchy(self):
         """Test team parent-child relationship."""

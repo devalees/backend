@@ -20,7 +20,7 @@ class DepartmentAdmin(admin.ModelAdmin):
         }),
         ('Hierarchy', {
             'fields': ('parent',),
-            'description': 'Select a parent department to create a hierarchy. Maximum depth is 2 levels.'
+            'description': 'Select a parent department to create a hierarchy. Maximum depth is 5 levels.'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),

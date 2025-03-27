@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
-
 from Apps.organizations.models import Organization, Department, Team, TeamMember
 from Apps.users.models import User
 

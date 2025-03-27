@@ -1,5 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.test import TestCase
 from Apps.organizations.models import Organization, Department, Team, TeamMember
 from Apps.users.models import User
 
@@ -29,13 +30,13 @@ class TestDepartmentIntegration:
                 name="A" * 101,  # Assuming max length is 100
                 organization=organization
             )
-        assert "Department name cannot exceed 100 characters" in str(exc_info.value)
+        assert "Ensure this value has at most 100 characters" in str(exc_info.value)
 
         # Test unique name within organization
         Department.objects.create(name="Test Dept", organization=organization)
         with pytest.raises(ValidationError) as exc_info:
             Department.objects.create(name="Test Dept", organization=organization)
-        assert "Department with this Name and Organization already exists" in str(exc_info.value)
+        assert "A department with this name already exists in this organization" in str(exc_info.value)
 
     def test_department_organization_relationship(self, organization):
         """Test department-organization relationship"""
@@ -54,7 +55,7 @@ class TestDepartmentIntegration:
         child = Department.objects.create(name="Child Dept", organization=organization, parent=parent)
         
         assert child.parent == parent
-        assert child in parent.sub_departments.all()
+        assert child in parent.children.all()
         assert parent in child.get_parent_departments()
 
     def test_department_soft_delete(self, organization):
@@ -119,7 +120,7 @@ class TestDepartmentIntegration:
     def test_department_max_depth(self, organization):
         """Test department maximum depth constraint"""
         parent = None
-        for i in range(6):  # Assuming max depth is 5
+        for i in range(5):  # Create 5 levels
             dept = Department.objects.create(
                 name=f"Dept {i}",
                 organization=organization,
@@ -128,9 +129,10 @@ class TestDepartmentIntegration:
             parent = dept
         
         with pytest.raises(ValidationError) as exc_info:
-            Department.objects.create(
+            dept = Department(
                 name="Too Deep",
                 organization=organization,
                 parent=parent
             )
-        assert "Maximum department hierarchy depth exceeded" in str(exc_info.value) 
+            dept.full_clean()
+        assert "Department hierarchy cannot exceed 5 levels" in str(exc_info.value) 

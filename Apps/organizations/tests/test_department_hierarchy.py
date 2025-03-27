@@ -1,8 +1,8 @@
 import pytest
-from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.core.exceptions import ValidationError
 from django.utils import timezone
-
+from django.contrib.auth import get_user_model
 from Apps.organizations.models import Organization, Department
 from Apps.users.models import User
 
@@ -29,26 +29,45 @@ class TestDepartmentHierarchy:
             description='Frontend Engineering Sub-department'
         )
         assert sub_department.parent == parent_department
-        assert sub_department in parent_department.sub_departments.all()
+        assert sub_department in parent_department.children.all()
         assert str(sub_department) == 'Frontend Engineering'
 
     def test_department_hierarchy_depth(self, parent_department, organization):
         """Test department hierarchy depth limit"""
-        # Create first level sub-department (should succeed)
+        # Create first level sub-department
         sub_dept1 = Department.objects.create(
             name='Level 1 Department',
             organization=organization,
             parent=parent_department
         )
-        # Try to create second level sub-department (should fail)
-        dept2 = Department(
+        # Create second level sub-department
+        sub_dept2 = Department.objects.create(
             name='Level 2 Department',
             organization=organization,
             parent=sub_dept1
         )
+        # Create third level sub-department
+        sub_dept3 = Department.objects.create(
+            name='Level 3 Department',
+            organization=organization,
+            parent=sub_dept2
+        )
+        # Create fourth level sub-department
+        sub_dept4 = Department.objects.create(
+            name='Level 4 Department',
+            organization=organization,
+            parent=sub_dept3
+        )
+        
+        # Create fifth level sub-department - this should fail based on model validation
+        dept5 = Department(
+            name='Level 5 Department',
+            organization=organization,
+            parent=sub_dept4
+        )
         with pytest.raises(ValidationError) as exc_info:
-            dept2.full_clean()
-        assert 'Department hierarchy cannot exceed 2 levels' in str(exc_info.value)
+            dept5.full_clean()
+        assert "Department hierarchy cannot exceed 5 levels" in str(exc_info.value)
 
     def test_department_circular_reference(self, parent_department, organization):
         """Test preventing circular references in department hierarchy"""
@@ -96,7 +115,7 @@ class TestDepartmentHierarchy:
             parent=parent_department
         )
         # Test getting all sub-departments
-        assert set(parent_department.sub_departments.all()) == {sub_dept1, sub_dept2}
+        assert set(parent_department.children.all()) == {sub_dept1, sub_dept2}
         # Test getting all parent departments
         assert sub_dept1.get_parent_departments() == [parent_department]
         # Test getting root department
