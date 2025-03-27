@@ -1,0 +1,33 @@
+{% extends 'organizations/base.html' %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Organizations</h1>
+    <a href="{% url 'organizations:organization_create' %}" class="btn btn-primary">Create Organization</a>
+</div>
+
+<div class="row">
+    {% for organization in organizations %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ organization.name }}</h5>
+                <p class="card-text">{{ organization.description|truncatewords:30 }}</p>
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'organizations:organization_detail' organization.pk %}" class="btn btn-info">View Details</a>
+                    <span class="badge {% if organization.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                        {{ organization.is_active|yesno:"Active,Inactive" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p class="text-center">No organizations found.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 

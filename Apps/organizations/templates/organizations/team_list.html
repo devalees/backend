@@ -1,0 +1,41 @@
+{% extends 'organizations/base.html' %}
+
+{% block title %}Teams - {{ department.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>Teams</h1>
+        <p class="text-muted">{{ organization.name }} - {{ department.name }}</p>
+    </div>
+    <a href="{% url 'organizations:team_create' organization.pk department.pk %}" class="btn btn-primary">Create Team</a>
+</div>
+
+<div class="row">
+    {% for team in teams %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ team.name }}</h5>
+                <p class="card-text">{{ team.description|truncatewords:30 }}</p>
+                {% if team.parent %}
+                <p class="card-text">
+                    <small class="text-muted">Parent: {{ team.parent.name }}</small>
+                </p>
+                {% endif %}
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'organizations:team_detail' organization.pk department.pk team.pk %}" class="btn btn-info">View Details</a>
+                    <span class="badge {% if team.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                        {{ team.is_active|yesno:"Active,Inactive" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p class="text-center">No teams found.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 

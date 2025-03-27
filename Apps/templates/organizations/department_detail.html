@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ department.name }} - {{ organization.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'organizations:organization-list' %}">Organizations</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'organizations:organization-detail' organization.pk %}">{{ organization.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'organizations:department-list' organization.pk %}">Departments</a></li>
+        <li class="breadcrumb-item active">{{ department.name }}</li>
+    </ol>
+</nav>
+
+<div class="row mb-4">
+    <div class="col">
+        <h1>{{ department.name }}</h1>
+        <p class="lead">{{ department.description }}</p>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'admin:organizations_department_change' department.pk %}" class="btn btn-primary">Edit Department</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <h2>Teams</h2>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'admin:organizations_team_add' %}" class="btn btn-primary">Add Team</a>
+    </div>
+</div>
+
+<div class="row">
+    {% for team in department.teams.all %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ team.name }}</h5>
+                    <p class="card-text">{{ team.description|truncatewords:30 }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'organizations:team-detail' organization.pk department.pk team.pk %}" class="btn btn-primary">View Details</a>
+                        <small class="text-muted">Members: {{ team.members.count }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col">
+            <div class="alert alert-info">
+                No teams found.
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h3>Department Details</h3>
+        <table class="table">
+            <tr>
+                <th>Organization</th>
+                <td>{{ department.organization.name }}</td>
+            </tr>
+            <tr>
+                <th>Parent Department</th>
+                <td>{{ department.parent.name|default:"None" }}</td>
+            </tr>
+            <tr>
+                <th>Created</th>
+                <td>{{ department.created_at }}</td>
+            </tr>
+            <tr>
+                <th>Last Updated</th>
+                <td>{{ department.updated_at }}</td>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <td>
+                    {% if department.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %} 

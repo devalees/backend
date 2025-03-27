@@ -1,0 +1,62 @@
+{% extends 'organizations/base.html' %}
+
+{% block title %}{{ department.name }} - {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>{{ department.name }}</h1>
+        <p class="text-muted">{{ organization.name }}</p>
+    </div>
+    <div>
+        <a href="{% url 'organizations:department_update' organization.pk department.pk %}" class="btn btn-primary">Edit</a>
+        <a href="{% url 'organizations:department_delete' organization.pk department.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Department Details</h5>
+        <p class="card-text">{{ department.description }}</p>
+        {% if department.parent %}
+        <p class="card-text">
+            <strong>Parent Department:</strong>
+            <a href="{% url 'organizations:department_detail' organization.pk department.parent.pk %}">
+                {{ department.parent.name }}
+            </a>
+        </p>
+        {% endif %}
+        <p class="card-text">
+            <strong>Status:</strong>
+            <span class="badge {% if department.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                {{ department.is_active|yesno:"Active,Inactive" }}
+            </span>
+        </p>
+        <p class="card-text">
+            <strong>Created:</strong> {{ department.created_at|date:"F j, Y" }}
+        </p>
+        <p class="card-text">
+            <strong>Last Updated:</strong> {{ department.updated_at|date:"F j, Y" }}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Teams</h5>
+        <div class="list-group">
+            {% for team in department.teams.all %}
+            <a href="{% url 'organizations:team_detail' organization.pk department.pk team.pk %}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ team.name }}</h6>
+                    <small>{{ team.created_at|date:"F j, Y" }}</small>
+                </div>
+                <p class="mb-1">{{ team.description|truncatewords:20 }}</p>
+            </a>
+            {% empty %}
+            <p class="text-center">No teams found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

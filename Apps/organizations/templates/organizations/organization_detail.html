@@ -1,0 +1,51 @@
+{% extends 'organizations/base.html' %}
+
+{% block title %}{{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>{{ organization.name }}</h1>
+    <div>
+        <a href="{% url 'organizations:organization_update' organization.pk %}" class="btn btn-primary">Edit</a>
+        <a href="{% url 'organizations:organization_delete' organization.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Organization Details</h5>
+        <p class="card-text">{{ organization.description }}</p>
+        <p class="card-text">
+            <strong>Status:</strong>
+            <span class="badge {% if organization.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                {{ organization.is_active|yesno:"Active,Inactive" }}
+            </span>
+        </p>
+        <p class="card-text">
+            <strong>Created:</strong> {{ organization.created_at|date:"F j, Y" }}
+        </p>
+        <p class="card-text">
+            <strong>Last Updated:</strong> {{ organization.updated_at|date:"F j, Y" }}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Departments</h5>
+        <div class="list-group">
+            {% for department in organization.departments.all %}
+            <a href="{% url 'organizations:department_detail' organization.pk department.pk %}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ department.name }}</h6>
+                    <small>{{ department.created_at|date:"F j, Y" }}</small>
+                </div>
+                <p class="mb-1">{{ department.description|truncatewords:20 }}</p>
+            </a>
+            {% empty %}
+            <p class="text-center">No departments found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

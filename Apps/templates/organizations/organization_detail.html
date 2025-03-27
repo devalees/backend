@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>{{ organization.name }}</h1>
+        <p class="lead">{{ organization.description }}</p>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'admin:organizations_organization_change' organization.pk %}" class="btn btn-primary">Edit Organization</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <h2>Departments</h2>
+    </div>
+    <div class="col text-end">
+        <a href="{% url 'admin:organizations_department_add' %}" class="btn btn-primary">Add Department</a>
+    </div>
+</div>
+
+<div class="row">
+    {% for department in organization.departments.all %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ department.name }}</h5>
+                    <p class="card-text">{{ department.description|truncatewords:30 }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'organizations:department-detail' organization.pk department.pk %}" class="btn btn-primary">View Details</a>
+                        <small class="text-muted">Teams: {{ department.teams.count }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col">
+            <div class="alert alert-info">
+                No departments found.
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="row mt-4">
+    <div class="col">
+        <h3>Organization Details</h3>
+        <table class="table">
+            <tr>
+                <th>Created</th>
+                <td>{{ organization.created_at }}</td>
+            </tr>
+            <tr>
+                <th>Last Updated</th>
+                <td>{{ organization.updated_at }}</td>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <td>
+                    {% if organization.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %} 

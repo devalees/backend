@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Two-Factor Authentication</h2>
+    
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not user.two_factor_enabled %}
+        {% if not qr_code %}
+            <form method="post" action="{% url 'setup_2fa' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Setup 2FA</button>
+            </form>
+        {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Scan QR Code</h5>
+                    <p class="card-text">Scan this QR code with your authenticator app:</p>
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="2FA QR Code" class="img-fluid mb-3">
+                    {% if secret %}
+                    <p class="card-text">Secret key (for manual entry): <code>{{ secret }}</code></p>
+                    {% endif %}
+                    <form method="post" action="{% url 'verify_2fa' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Enter verification code:</label>
+                            <input type="text" class="form-control" id="code" name="code" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Verify</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">2FA Status</h5>
+                <p class="card-text">Two-factor authentication is currently enabled.</p>
+                
+                {% if backup_codes %}
+                <div class="alert alert-warning">
+                    <h6>Backup Codes</h6>
+                    <p>Save these backup codes in a secure place. They can be used to access your account if you lose your authenticator device:</p>
+                    <ul>
+                    {% for code in backup_codes %}
+                        <li><code>{{ code }}</code></li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'generate_backup_codes' %}" class="mb-3">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning">Generate New Backup Codes</button>
+                </form>
+
+                <form method="post" action="{% url 'disable_2fa' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Disable 2FA</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

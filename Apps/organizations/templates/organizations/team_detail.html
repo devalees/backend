@@ -1,0 +1,62 @@
+{% extends 'organizations/base.html' %}
+
+{% block title %}{{ team.name }} - {{ department.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>{{ team.name }}</h1>
+        <p class="text-muted">{{ organization.name }} - {{ department.name }}</p>
+    </div>
+    <div>
+        <a href="{% url 'organizations:team_update' organization.pk department.pk team.pk %}" class="btn btn-primary">Edit</a>
+        <a href="{% url 'organizations:team_delete' organization.pk department.pk team.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Team Details</h5>
+        <p class="card-text">{{ team.description }}</p>
+        {% if team.parent %}
+        <p class="card-text">
+            <strong>Parent Team:</strong>
+            <a href="{% url 'organizations:team_detail' organization.pk department.pk team.parent.pk %}">
+                {{ team.parent.name }}
+            </a>
+        </p>
+        {% endif %}
+        <p class="card-text">
+            <strong>Status:</strong>
+            <span class="badge {% if team.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                {{ team.is_active|yesno:"Active,Inactive" }}
+            </span>
+        </p>
+        <p class="card-text">
+            <strong>Created:</strong> {{ team.created_at|date:"F j, Y" }}
+        </p>
+        <p class="card-text">
+            <strong>Last Updated:</strong> {{ team.updated_at|date:"F j, Y" }}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Team Members</h5>
+        <div class="list-group">
+            {% for member in team.members.all %}
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ member.user.username }}</h6>
+                    <small>{{ member.role }}</small>
+                </div>
+                <p class="mb-1">Joined: {{ member.created_at|date:"F j, Y" }}</p>
+            </div>
+            {% empty %}
+            <p class="text-center">No team members found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %} 
