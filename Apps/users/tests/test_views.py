@@ -8,8 +8,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from rest_framework.test import APITestCase
-from rest_framework import status
 from unittest.mock import patch, MagicMock
 from Apps.users.models import User
 

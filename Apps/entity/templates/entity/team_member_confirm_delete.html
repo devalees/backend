@@ -1,0 +1,49 @@
+{% extends "entity/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Delete Team Member" %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{% trans "Delete Team Member" %}</h1>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">{% trans "Confirm Deletion" %}</h5>
+            <p class="card-text">
+                {% blocktrans with name=team_member.user.get_full_name|default:team_member.user.username %}
+                Are you sure you want to delete the team member "{{ name }}"?
+                {% endblocktrans %}
+            </p>
+            <p class="card-text text-danger">
+                {% trans "This action cannot be undone." %}
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-danger">
+                        {% trans "Delete" %}
+                    </button>
+                    <a href="{% url 'entity:team_member_list' organization.pk department.pk team.pk %}" 
+                       class="btn btn-secondary">
+                        {% trans "Cancel" %}
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

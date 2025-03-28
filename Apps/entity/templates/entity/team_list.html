@@ -1,0 +1,61 @@
+{% extends 'entity/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ department.name }} - Teams{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-list' %}">Entities</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-detail' organization.pk %}">{{ organization.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:department-list' organization.pk %}">Departments</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:department-detail' organization.pk department.pk %}">{{ department.name }}</a></li>
+            <li class="breadcrumb-item active">Teams</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Teams</h1>
+        <a href="{% url 'admin:entity_team_add' %}" class="btn btn-primary">Add Team</a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        {% for team in teams %}
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ team.name }}</h5>
+                    <p class="card-text">{{ team.description|truncatewords:30 }}</p>
+                    {% if team.parent %}
+                    <p class="card-text">
+                        <small class="text-muted">Parent Team: {{ team.parent.name }}</small>
+                    </p>
+                    {% endif %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'entity:team-detail' organization.pk department.pk team.pk %}" class="btn btn-primary">View Details</a>
+                        <span class="badge {% if team.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ team.is_active|yesno:"Active,Inactive" }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-center">No teams found.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

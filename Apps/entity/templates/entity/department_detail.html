@@ -1,0 +1,89 @@
+{% extends 'entity/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ department.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-list' %}">Entities</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-detail' organization.pk %}">{{ organization.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:department-list' organization.pk %}">Departments</a></li>
+            <li class="breadcrumb-item active">{{ department.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ department.name }}</h1>
+        <div class="btn-group">
+            <a href="{% url 'admin:entity_department_change' department.pk %}" class="btn btn-primary">Edit Department</a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Department Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Name:</strong> {{ department.name }}</p>
+                    <p><strong>Description:</strong> {{ department.description }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge {% if department.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ department.is_active|yesno:"Active,Inactive" }}
+                        </span>
+                    </p>
+                    {% if department.parent %}
+                    <p><strong>Parent Department:</strong> 
+                        <a href="{% url 'entity:department-detail' organization.pk department.parent.pk %}">
+                            {{ department.parent.name }}
+                        </a>
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Created:</strong> {{ department.created_at|date:"F j, Y" }}</p>
+                    <p><strong>Last Updated:</strong> {{ department.updated_at|date:"F j, Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title">Teams</h5>
+                <a href="{% url 'admin:entity_team_add' %}" class="btn btn-primary">Add Team</a>
+            </div>
+
+            {% if department.teams.exists %}
+            <div class="list-group">
+                {% for team in department.teams.all %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ team.name }}</h6>
+                            <p class="mb-1">{{ team.description|truncatewords:30 }}</p>
+                        </div>
+                        <a href="{% url 'entity:team-detail' organization.pk department.pk team.pk %}" class="btn btn-primary">View Details</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center">No teams found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

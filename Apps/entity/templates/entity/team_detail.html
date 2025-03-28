@@ -1,0 +1,140 @@
+{% extends 'entity/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ team.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-list' %}">Entities</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-detail' organization.pk %}">{{ organization.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:department-list' organization.pk %}">Departments</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:department-detail' organization.pk department.pk %}">{{ department.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'entity:team-list' organization.pk department.pk %}">Teams</a></li>
+            <li class="breadcrumb-item active">{{ team.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ team.name }}</h1>
+        <div class="btn-group">
+            <a href="{% url 'admin:entity_team_change' team.pk %}" class="btn btn-primary">Edit Team</a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Team Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Name:</strong> {{ team.name }}</p>
+                    <p><strong>Description:</strong> {{ team.description }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge {% if team.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ team.is_active|yesno:"Active,Inactive" }}
+                        </span>
+                    </p>
+                    {% if team.parent %}
+                    <p><strong>Parent Team:</strong> 
+                        <a href="{% url 'entity:team-detail' organization.pk department.pk team.parent.pk %}">
+                            {{ team.parent.name }}
+                        </a>
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Created:</strong> {{ team.created_at|date:"F j, Y" }}</p>
+                    <p><strong>Last Updated:</strong> {{ team.updated_at|date:"F j, Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title">Team Members</h5>
+                <a href="{% url 'entity:team-member-create' organization.pk department.pk team.pk %}" class="btn btn-primary">Add Team Member</a>
+            </div>
+
+            {% if team.members.exists %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in team.members.all %}
+                        <tr>
+                            <td>{{ member.user.get_full_name|default:member.user.username }}</td>
+                            <td>{{ member.role }}</td>
+                            <td>
+                                <span class="badge {% if member.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ member.is_active|yesno:"Active,Inactive" }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'entity:team-member-detail' organization.pk department.pk team.pk member.pk %}" 
+                                       class="btn btn-sm btn-info">View</a>
+                                    <a href="{% url 'entity:team-member-update' organization.pk department.pk team.pk member.pk %}" 
+                                       class="btn btn-sm btn-warning">Edit</a>
+                                    <a href="{% url 'entity:team-member-delete' organization.pk department.pk team.pk member.pk %}" 
+                                       class="btn btn-sm btn-danger">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center">No team members found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title">Projects</h5>
+                <a href="{% url 'admin:entity_project_add' %}" class="btn btn-primary">Add Project</a>
+            </div>
+
+            {% if team.projects.exists %}
+            <div class="list-group">
+                {% for project in team.projects.all %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ project.name }}</h6>
+                            <p class="mb-1">{{ project.description|truncatewords:30 }}</p>
+                        </div>
+                        <a href="{% url 'admin:entity_project_change' project.pk %}" class="btn btn-primary">View Details</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center">No projects found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

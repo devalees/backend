@@ -52,6 +52,14 @@ class TestContactCategory:
 @pytest.mark.django_db
 class TestContact:
     @pytest.fixture
+    def user(self):
+        return User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+
+    @pytest.fixture
     def category(self):
         return ContactCategory.objects.create(
             name='Sales Inquiry',
@@ -59,7 +67,7 @@ class TestContact:
         )
 
     @pytest.fixture
-    def valid_contact_data(self, category):
+    def valid_contact_data(self, category, user):
         return {
             'first_name': 'John',
             'last_name': 'Doe',
@@ -67,7 +75,8 @@ class TestContact:
             'phone': '+1234567890',
             'company': 'Test Company',
             'message': 'Test message',
-            'category': category
+            'category': category,
+            'created_by': user
         }
 
     def test_create_contact_with_category(self, valid_contact_data):
@@ -79,14 +88,15 @@ class TestContact:
         expected_str = f"{contact.first_name} {contact.last_name} ({contact.email}) - {contact.category.name}"
         assert str(contact) == expected_str
 
-    def test_contact_type_enum(self, category):
+    def test_contact_type_enum(self, category, user):
         # Test creating a contact with entity type
         contact_entity = Contact.objects.create(
             first_name="John",
             last_name="Doe",
             email="john@example.com",
             contact_type="entity",
-            category=category
+            category=category,
+            created_by=user
         )
         assert contact_entity.contact_type == "entity"
         
@@ -96,7 +106,8 @@ class TestContact:
             last_name="Smith",
             email="jane@example.com",
             contact_type="individual",
-            category=category
+            category=category,
+            created_by=user
         )
         assert contact_individual.contact_type == "individual"
         
@@ -107,7 +118,8 @@ class TestContact:
                 last_name="Type",
                 email="invalid@example.com",
                 contact_type="invalid_type",
-                category=category
+                category=category,
+                created_by=user
             )
 
     def test_create_contact_without_email(self, valid_contact_data):

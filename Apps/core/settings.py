@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'Apps.organizations.apps.OrganizationsConfig',
+    'Apps.entity.apps.EntityConfig',
     'Apps.users.apps.UsersConfig',
     'Apps.contact.apps.ContactConfig',
 ]
@@ -58,7 +58,9 @@ ROOT_URLCONF = 'Apps.core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'Apps', 'templates')],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'Apps', 'templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,7 +82,11 @@ WSGI_APPLICATION = 'Apps.core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'Apps' / 'db.sqlite3',
+        'NAME': BASE_DIR / 'Database/db.sqlite3',
+    },
+    'entity': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'Database/entity.sqlite3',
     }
 }
 
@@ -149,7 +155,7 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
-        'organizations': {
+        'entity': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': True,

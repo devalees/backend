@@ -45,7 +45,7 @@ check_status "Removed existing migrations"
 # Make migrations for all apps
 print_message "$YELLOW" "Creating new migrations..."
 python manage.py makemigrations contact
-python manage.py makemigrations organizations
+python manage.py makemigrations entity
 python manage.py makemigrations users
 check_status "Created new migrations"
 

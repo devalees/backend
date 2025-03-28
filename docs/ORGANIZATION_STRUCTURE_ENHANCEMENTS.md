@@ -6,7 +6,7 @@ This document outlines recommended enhancements to the Organization & Team Struc
 ## 1. Organization Hierarchy Enhancements
 
 ### 1.1 Sub-organization Support
-- Implement support for sub-organizations/subsidiaries
+- Implement support for sub-entities/subsidiaries
 - Enable hierarchical organization structure
 - Allow organization inheritance of settings and policies
 

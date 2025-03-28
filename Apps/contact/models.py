@@ -2,6 +2,9 @@ from django.db import models
 from django.core.validators import EmailValidator, RegexValidator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class ContactType(models.TextChoices):
     ENTITY = 'entity', 'Entity'
@@ -13,6 +16,7 @@ class ContactCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_contact_categories')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -71,14 +75,14 @@ class Contact(models.Model):
     )
     company = models.CharField(max_length=200, blank=True, null=True)
     category = models.ForeignKey(
-        ContactCategory,
+        'ContactCategory',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='contacts',
-        default=ContactCategory.get_default_category
+        related_name='contacts'
     )
     message = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_contacts')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -99,6 +103,8 @@ class Contact(models.Model):
             raise ValidationError(f"Invalid contact type. Must be one of {ContactType.values}")
 
     def save(self, *args, **kwargs):
-        """Override save to ensure clean is called"""
+        """Override save to ensure clean is called and set default category"""
         self.full_clean()
+        if not self.category:
+            self.category = ContactCategory.get_default_category()
         super().save(*args, **kwargs)

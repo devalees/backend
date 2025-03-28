@@ -1,0 +1,19 @@
+{% extends "entity/base.html" %}
+
+{% block title %}{{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ organization.name }}</h1>
+    <div class="organization-details">
+        <p><strong>Description:</strong> {{ organization.description|default:'No description provided' }}</p>
+        <p><strong>Created:</strong> {{ organization.created_at }}</p>
+        <p><strong>Last Updated:</strong> {{ organization.updated_at }}</p>
+    </div>
+    <div class="actions">
+        <a href="{% url 'entity:organization_update' pk=organization.pk %}" class="btn">Edit</a>
+        <a href="{% url 'entity:organization_delete' pk=organization.pk %}" class="btn btn-danger">Delete</a>
+        <a href="{% url 'entity:department_list' org_pk=organization.pk %}" class="btn">View Departments</a>
+    </div>
+</div>
+{% endblock %} 

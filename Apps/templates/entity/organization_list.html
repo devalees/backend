@@ -1,0 +1,28 @@
+{% extends "entity/base.html" %}
+
+{% block title %}Organizations{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Organizations</h1>
+    <div class="actions">
+        <a href="{% url 'entity:organization_create' %}" class="btn">Create New Organization</a>
+    </div>
+    <div class="organization-list">
+        {% if entities %}
+            {% for organization in entities %}
+                <div class="organization-item">
+                    <h2><a href="{% url 'entity:organization_detail' pk=organization.pk %}">{{ organization.name }}</a></h2>
+                    <p>{{ organization.description|default:'No description provided'|truncatewords:30 }}</p>
+                    <div class="meta">
+                        <span>Created: {{ organization.created_at }}</span>
+                        <span>Last Updated: {{ organization.updated_at }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No organizations found.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 

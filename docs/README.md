@@ -4,12 +4,11 @@
 1. [Introduction](#introduction)
 2. [Getting Started](#getting-started)
 3. [Architecture](#architecture)
-4. [API Reference](#api-reference)
-5. [Database Schema](#database-schema)
-6. [Security](#security)
-7. [Testing](#testing)
-8. [Deployment](#deployment)
-9. [Contributing](#contributing)
+4. [Database Schema](#database-schema)
+5. [Security](#security)
+6. [Testing](#testing)
+7. [Deployment](#deployment)
+8. [Contributing](#contributing)
 
 ## Introduction
 - Project Overview
@@ -53,9 +52,8 @@ python manage.py runserver
 
 ## Architecture
 ### System Components
-1. **Backend (Django & DRF)**
+1. **Backend (Django)**
    - Core Applications
-   - API Endpoints
    - Background Tasks
    - WebSocket Services
 
@@ -71,14 +69,12 @@ python manage.py runserver
 ```
 Backend/
 ├── apps/
-│   ├── organizations/
+│   ├── entity/
 │   │   ├── models.py
-│   │   ├── serializers.py
 │   │   ├── views.py
 │   │   └── tests/
 │   ├── users/
 │   │   ├── models.py
-│   │   ├── serializers.py
 │   │   ├── views.py
 │   │   └── tests/
 │   └── ...
@@ -92,37 +88,10 @@ Backend/
 └── manage.py
 ```
 
-## API Reference
-### Authentication
-- JWT Token Authentication
-- Session Authentication
-- Two-Factor Authentication
-
-### Organizations API
-\`\`\`http
-# Create Organization
-POST /api/v1/organizations/
-
-# List Organizations
-GET /api/v1/organizations/
-
-# Get Organization Details
-GET /api/v1/organizations/{id}/
-
-# Update Organization
-PUT /api/v1/organizations/{id}/
-
-# Delete Organization
-DELETE /api/v1/organizations/{id}/
-\`\`\`
-
-### Users API
-[API endpoints documentation...]
-
 ## Database Schema
-### Organizations
+### Entities
 ```sql
-CREATE TABLE organizations (
+CREATE TABLE entities (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
@@ -149,7 +118,6 @@ CREATE TABLE users (
 
 ## Security
 ### Authentication & Authorization
-- JWT Token Configuration
 - Permission Classes
 - Role-Based Access Control
 
@@ -175,7 +143,7 @@ SESSION_COOKIE_SECURE = True
 python manage.py test
 
 # Run specific app tests
-python manage.py test apps.organizations
+python manage.py test apps.entity
 python manage.py test apps.users
 
 # Run with coverage
@@ -219,16 +187,15 @@ coverage report
 
 ### Git Commit Messages
 ```
-feat: add organization management
+feat: add entity management
 fix: resolve user authentication issue
-docs: update API documentation
-test: add organization tests
+docs: update documentation
+test: add entity tests
 ```
 
 ---
 
 ## Additional Resources
-- [API Documentation](./api.md)
 - [Development Guide](./development.md)
 - [Deployment Guide](./deployment.md)
 - [Security Guidelines](./security.md)

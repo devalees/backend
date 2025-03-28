@@ -21,12 +21,23 @@ class TestContactViews:
             description='Test Description'
         )
 
+    @pytest.fixture
+    def user(self):
+        return User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+
     def test_contact_form_view(self, client, contact_url):
         response = client.get(contact_url)
         assert response.status_code == 200
         assert 'contact/contact_form.html' in [t.name for t in response.templates]
 
-    def test_contact_form_submission(self, client, contact_url, category):
+    def test_contact_form_submission(self, client, contact_url, category, user):
+        # Log in the user
+        client.force_login(user)
+        
         data = {
             'first_name': 'John',
             'last_name': 'Doe',
@@ -38,7 +49,10 @@ class TestContactViews:
         }
         response = client.post(contact_url, data)
         assert response.status_code == 302  # Redirect after successful submission
-        assert Contact.objects.filter(email='john@example.com').exists()
+        
+        # Check that the contact was created with the correct user
+        contact = Contact.objects.get(email='john@example.com')
+        assert contact.created_by == user
 
     def test_contact_form_invalid_data(self, client, contact_url, category):
         data = {

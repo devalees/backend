@@ -1,0 +1,21 @@
+{% extends "entity/base.html" %}
+
+{% block title %}{% if organization %}Edit Organization{% else %}Create Organization{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>{% if organization %}Edit Organization{% else %}Create Organization{% endif %}</h1>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" name="name" id="name" value="{{ organization.name|default:'' }}" required>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea name="description" id="description">{{ organization.description|default:'' }}</textarea>
+        </div>
+        <button type="submit">Save</button>
+    </form>
+</div>
+{% endblock %} 

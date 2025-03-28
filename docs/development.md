@@ -137,7 +137,7 @@ class OrganizationModelTest(TestCase):
 python manage.py test
 
 # Run specific test file
-python manage.py test apps.organizations.tests.test_models
+python manage.py test apps.entity.tests.test_models
 
 # Run with coverage
 coverage run manage.py test

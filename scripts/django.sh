@@ -113,6 +113,45 @@ kill_server() {
     fi
 }
 
+# Function to force start server by killing any process on port 8000
+force_start() {
+    log_message "Force starting Django server..." "$YELLOW"
+    
+    # Kill any process using port 8000
+    lsof -i :8000 | grep LISTEN | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+    
+    # Change to the Apps directory
+    cd "$(dirname "$0")/../Apps" || {
+        log_message "Failed to change to Apps directory!" "$RED"
+        return 1
+    }
+    
+    # Add parent directory to PYTHONPATH
+    export PYTHONPATH="$(dirname "$0")/..:$PYTHONPATH"
+    
+    # Activate virtual environment if it exists
+    if [ -d "../venv" ]; then
+        source ../venv/bin/activate
+    fi
+    
+    # Start the server in the background
+    nohup python manage.py runserver 8000 > ../server.log 2>&1 &
+    
+    # Wait for server to start
+    for i in {1..5}; do
+        if check_process; then
+            log_message "Server started successfully! Showing logs..." "$GREEN"
+            # Show server logs in real-time
+            tail -f ../server.log
+            return 0
+        fi
+        sleep 1
+    done
+    
+    log_message "Failed to start server. Check server.log for details." "$RED"
+    return 1
+}
+
 # Main execution
 case "$1" in
     "start")
@@ -121,14 +160,24 @@ case "$1" in
     "stop")
         kill_server
         ;;
+    "restart")
+        log_message "Restarting Django server..." "$YELLOW"
+        kill_server
+        sleep 2  # Give the server time to fully stop
+        start_server
+        ;;
+    "force")
+        force_start
+        ;;
     "reset_db")
         reset_db
         ;;
     *)
-        echo "Usage: django {start|stop|restart|reset_db}"
+        echo "Usage: django {start|stop|restart|force|reset_db}"
         echo "  start    - Start the Django server and show logs"
         echo "  stop     - Stop the Django server"
         echo "  restart  - Restart the Django server"
+        echo "  force    - Force start by killing any process on port 8000"
         echo "  reset_db - Reset the database and create superuser"
         exit 1
         ;;

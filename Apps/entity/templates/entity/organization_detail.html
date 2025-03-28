@@ -1,0 +1,80 @@
+{% extends 'entity/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'entity:organization-list' %}">Entities</a></li>
+            <li class="breadcrumb-item active">{{ organization.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ organization.name }}</h1>
+        <div class="btn-group">
+            <a href="{% url 'admin:entity_organization_change' organization.pk %}" class="btn btn-primary">Edit Entity</a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Entity Information</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Name:</strong> {{ organization.name }}</p>
+                    <p><strong>Description:</strong> {{ organization.description }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge {% if organization.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ organization.is_active|yesno:"Active,Inactive" }}
+                        </span>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Created:</strong> {{ organization.created_at|date:"F j, Y" }}</p>
+                    <p><strong>Last Updated:</strong> {{ organization.updated_at|date:"F j, Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="card-title">Departments</h5>
+                <a href="{% url 'admin:entity_department_add' %}" class="btn btn-primary">Add Department</a>
+            </div>
+
+            {% if organization.departments.exists %}
+            <div class="list-group">
+                {% for department in organization.departments.all %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ department.name }}</h6>
+                            <p class="mb-1">{{ department.description|truncatewords:30 }}</p>
+                        </div>
+                        <a href="{% url 'entity:department-detail' organization.pk department.pk %}" class="btn btn-primary">View Details</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center">No departments found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 
