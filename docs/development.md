@@ -2,27 +2,32 @@
 
 ## Development Environment Setup
 
-### 1. Prerequisites Installation
+### 1. Global Dependencies Installation
+These dependencies should be installed globally on your system:
+
 ```bash
 # Ubuntu/Debian
 sudo apt update
 sudo apt install python3.12 python3.12-venv python3.12-dev
 sudo apt install postgresql postgresql-contrib redis-server
+sudo apt install git
 
 # macOS
-brew install python@3.12 postgresql redis
+brew install python@3.12 postgresql redis git
 
 # Windows
-# Download Python 3.12 from python.org
-# Download PostgreSQL from postgresql.org
-# Download Redis from redis.io
+# Download and install:
+# - Python 3.12 from python.org
+# - PostgreSQL from postgresql.org
+# - Redis from redis.io
+# - Git from git-scm.com
 ```
 
 ### 2. Project Setup
 ```bash
 # Clone repository
-git clone https://github.com/devalees/Project-Management.git
-cd Project-Management
+git clone https://github.com/devalees/backend.git
+cd backend
 
 # Create virtual environment
 python3.12 -m venv venv
@@ -30,14 +35,58 @@ source venv/bin/activate  # Linux/macOS
 # or
 .\venv\Scripts\activate  # Windows
 
-# Install dependencies
+# Install project dependencies in virtual environment
 pip install -r requirements.txt
-
-# Set up pre-commit hooks
-pre-commit install
 ```
 
-### 3. Environment Configuration
+### 3. Project Dependencies
+The following dependencies are managed through requirements.txt and should be installed in the virtual environment:
+
+#### Core Dependencies
+- Django 5.1.7+ - Web framework
+- Django REST Framework 3.14.0+ - API framework
+- Django Filter 23.5+ - Dynamic filtering
+- Django CORS Headers 4.3.1+ - CORS support
+- Django Allauth 0.61.1+ - Authentication
+- Django Environ 0.11.2+ - Environment variables
+- Django Extensions 3.2.3+ - Development tools
+- Django Debug Toolbar 4.3.0+ - Debugging
+- Django Redis 5.4.0+ - Redis integration
+- Django Storages 1.14.2+ - File storage
+- Django Celery Beat 2.5.0+ - Task scheduling
+- Django Celery Results 2.5.1+ - Task results
+- Django Import Export 3.3.7+ - Data import/export
+
+#### Task Queue & Cache
+- Celery 5.3.6+ - Task queue
+- Redis 5.0.1+ - Cache & message broker
+
+#### Database
+- psycopg2-binary 2.9.9+ - PostgreSQL adapter
+
+#### Image Processing
+- Pillow 10.2.0+ - Image processing
+
+#### Environment & Deployment
+- python-dotenv 1.0.1+ - Environment variables
+- gunicorn 21.2.0+ - Production server
+- whitenoise 6.6.0+ - Static files
+
+#### Authentication & Security
+- pyotp 2.9.0+ - Two-factor authentication
+- qrcode 8.0+ - QR code generation
+
+#### Testing & Coverage
+- pytest 8.3.5+ - Testing framework
+- pytest-django 4.10.0+ - Django test integration
+- pytest-cov 6.0.0+ - Coverage reporting
+- coverage 7.7.1+ - Code coverage
+
+#### Data Processing
+- openpyxl 3.1.5+ - Excel file support
+- tablib[xlsx] 3.8.0+ - Data import/export
+
+### 4. Environment Configuration
 ```bash
 # Copy example environment file
 cp .env.example .env
