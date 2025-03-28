@@ -3,6 +3,7 @@ from django.core.validators import EmailValidator, RegexValidator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from Apps.data_transfer.mixins import DynamicDownloadMixin
 
 User = get_user_model()
 
@@ -10,7 +11,7 @@ class ContactType(models.TextChoices):
     ENTITY = 'entity', 'Entity'
     INDIVIDUAL = 'individual', 'Individual'
 
-class ContactCategory(models.Model):
+class ContactCategory(DynamicDownloadMixin, models.Model):
     """Model for categorizing contacts"""
     
     name = models.CharField(max_length=100, unique=True)
@@ -20,12 +21,12 @@ class ContactCategory(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        verbose_name_plural = "Contact Categories"
-        ordering = ['name']
-
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = "Contact Category"
+        verbose_name_plural = "Contact Categories"
 
     @classmethod
     def get_default_category(cls):
@@ -46,7 +47,7 @@ class ContactCategory(models.Model):
                 raise ValidationError("A default category already exists")
         super().save(*args, **kwargs)
 
-class Contact(models.Model):
+class Contact(DynamicDownloadMixin, models.Model):
     """Contact model for storing contact form submissions"""
     
     first_name = models.CharField(max_length=100)
@@ -82,12 +83,15 @@ class Contact(models.Model):
         related_name='contacts'
     )
     message = models.TextField(blank=True, null=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_contacts')
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True,  # Allow null for system-generated contacts
+        blank=True, # Make it optional in forms
+        related_name='created_contacts'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-created_at']
 
     def __str__(self):
         category_str = f" - {self.category.name}" if self.category else ""
@@ -104,7 +108,15 @@ class Contact(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to ensure clean is called and set default category"""
-        self.full_clean()
+        # Skip full_clean in tests or when importing data
+        if not kwargs.pop('skip_validation', False):
+            self.full_clean()
+        
         if not self.category:
             self.category = ContactCategory.get_default_category()
+        
         super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Contact"
+        verbose_name_plural = "Contacts"

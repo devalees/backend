@@ -39,5 +39,8 @@ pytest-cov>=6.0.0
 coverage>=7.7.1
 
 # Data Processing
-openpyxl>=3.1.5
-tablib[xlsx]>=3.8.0 
+openpyxl>=3.1.0
+tablib[xlsx]>=3.8.0
+
+# Added from the code block
+pandas>=2.0.0 

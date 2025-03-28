@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'Apps.entity.apps.EntityConfig',
     'Apps.users.apps.UsersConfig',
     'Apps.contact.apps.ContactConfig',
+    'Apps.field_control.apps.FieldControlConfig',
+    'Apps.data_transfer.apps.DataTransferConfig',
 ]
 
 MIDDLEWARE = [
