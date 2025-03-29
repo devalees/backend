@@ -14,24 +14,41 @@ from django.urls import reverse
 from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError
 import pyotp
+import logging
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet for User model"""
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('id')  # Add default ordering
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """Filter queryset based on user permissions"""
+        logger.info(f"User requesting: {self.request.user}")
+        logger.info(f"Is authenticated: {self.request.user.is_authenticated}")
+        logger.info(f"Is superuser: {self.request.user.is_superuser}")
+        
         if self.request.user.is_superuser:
-            return User.objects.all()
+            queryset = User.objects.all().order_by('id')  # Add ordering
+            logger.info(f"Superuser access - returning all users. Count: {queryset.count()}")
+            return queryset
+        
+        logger.info(f"Regular user access - returning only user's own record")
         return User.objects.filter(id=self.request.user.id)
+
+    def list(self, request, *args, **kwargs):
+        """Override list method to add debug info"""
+        logger.info("List method called")
+        logger.info(f"Request headers: {request.headers}")
+        return super().list(request, *args, **kwargs)
 
     def get_permissions(self):
         """Get permissions based on action"""
-        if self.action in ['create', 'login', 'refresh_token', 'register', 'verify_2fa']:
+        if self.action in ['create', 'login', 'refresh_token', 'register', 'verify_2fa', 'password_reset', 'password_reset_confirm']:
             return [permissions.AllowAny()]
         return super().get_permissions()
 
@@ -296,67 +313,66 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def password_reset(self, request):
+        """Request password reset"""
         email = request.data.get('email')
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response(
-                {'detail': 'User with this email does not exist.'},
+                {'error': 'User with this email does not exist'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         # Generate password reset token
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-
-        # Create password reset link
-        reset_url = request.build_absolute_uri(
-            reverse('users:password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
-        )
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
 
         # Send password reset email
+        reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}"
+        email_body = f"Please click the following link to reset your password: {reset_url}"
+        
         send_mail(
             'Password Reset Requested',
-            f'Please click the following link to reset your password: {reset_url}',
+            email_body,
             settings.DEFAULT_FROM_EMAIL,
             [email],
             fail_silently=False,
         )
 
-        return Response(
-            {'detail': 'Password reset email has been sent.'},
-            status=status.HTTP_200_OK
-        )
+        return Response({'message': 'Password reset email has been sent'})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def password_reset_confirm(self, request):
+        """Confirm password reset"""
         uid = request.data.get('uid')
         token = request.data.get('token')
         new_password = request.data.get('new_password')
+
+        if not uid or not token or not new_password:
+            return Response(
+                {'error': 'Please provide uid, token and new password'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             uid = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return Response(
-                {'detail': 'Invalid password reset link.'},
+                {'error': 'Invalid reset link'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if not default_token_generator.check_token(user, token):
             return Response(
-                {'detail': 'Invalid password reset token.'},
+                {'error': 'Invalid or expired reset link'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Set new password
         user.set_password(new_password)
         user.save()
 
-        return Response(
-            {'detail': 'Password has been reset successfully.'},
-            status=status.HTTP_200_OK
-        )
+        return Response({'message': 'Password has been reset successfully'})
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):

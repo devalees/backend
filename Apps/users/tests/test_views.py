@@ -27,15 +27,15 @@ class TestUserViewSet:
     def test_list_users(self, authenticated_client):
         """Test listing users"""
         users = [UserFactory() for _ in range(3)]
-        url = reverse('user-list')
-        response = authenticated_client.get(url)
+        url = reverse('users:users-list')
+        response = authenticated_client.get(url, {'ordering': 'id'})
         
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['results']) >= 3
 
     def test_create_user(self, authenticated_client):
         """Test creating a user"""
-        url = reverse('user-list')
+        url = reverse('users:users-list')
         data = {
             'email': 'test@example.com',
             'username': 'testuser',
@@ -52,7 +52,7 @@ class TestUserViewSet:
     def test_retrieve_user(self, authenticated_client):
         """Test retrieving a user"""
         user = UserFactory()
-        url = reverse('user-detail', kwargs={'pk': user.pk})
+        url = reverse('users:users-detail', kwargs={'pk': user.pk})
         response = authenticated_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
@@ -61,7 +61,7 @@ class TestUserViewSet:
     def test_update_user(self, authenticated_client):
         """Test updating a user"""
         user = UserFactory()
-        url = reverse('user-detail', kwargs={'pk': user.pk})
+        url = reverse('users:users-detail', kwargs={'pk': user.pk})
         data = {'first_name': 'Updated Name'}
         response = authenticated_client.patch(url, data)
         
@@ -72,7 +72,7 @@ class TestUserViewSet:
     def test_delete_user(self, authenticated_client):
         """Test deleting a user"""
         user = UserFactory()
-        url = reverse('user-detail', kwargs={'pk': user.pk})
+        url = reverse('users:users-detail', kwargs={'pk': user.pk})
         response = authenticated_client.delete(url)
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -85,7 +85,7 @@ class TestUserViewSet:
         user.set_password('testpass123')
         user.save()
         
-        url = reverse('user-login')
+        url = reverse('users:users-login')
         data = {
             'email': user.email,
             'password': 'testpass123'
@@ -99,7 +99,7 @@ class TestUserViewSet:
 
     def test_login_invalid_credentials(self, api_client):
         """Test login with invalid credentials"""
-        url = reverse('user-login')
+        url = reverse('users:users-login')
         data = {
             'email': 'test@example.com',
             'password': 'wrongpass'
@@ -116,7 +116,7 @@ class TestUserViewSet:
         user.save()
         
         # First login to get tokens
-        login_url = reverse('user-login')
+        login_url = reverse('users:users-login')
         login_data = {
             'email': user.email,
             'password': 'testpass123'
@@ -125,7 +125,7 @@ class TestUserViewSet:
         refresh_token = login_response.data['refresh']
         
         # Then refresh the token
-        refresh_url = reverse('user-refresh-token')
+        refresh_url = reverse('users:users-refresh-token')
         refresh_data = {'refresh': refresh_token}
         response = api_client.post(refresh_url, refresh_data)
         
@@ -134,7 +134,7 @@ class TestUserViewSet:
 
     def test_refresh_token_invalid(self, api_client):
         """Test refresh token with invalid token"""
-        url = reverse('user-refresh-token')
+        url = reverse('users:users-refresh-token')
         data = {'refresh': 'invalid_token'}
         response = api_client.post(url, data)
         
@@ -148,7 +148,7 @@ class TestUserViewSet:
         user.set_password('testpass123')
         user.save()
         
-        login_url = reverse('user-login')
+        login_url = reverse('users:users-login')
         login_data = {
             'email': user.email,
             'password': 'testpass123'
@@ -157,7 +157,7 @@ class TestUserViewSet:
         refresh_token = login_response.data['refresh']
         
         # Then logout
-        logout_url = reverse('user-logout')
+        logout_url = reverse('users:users-logout')
         logout_data = {'refresh': refresh_token}
         response = authenticated_client.post(logout_url, logout_data)
         
@@ -168,20 +168,20 @@ class TestUserViewSet:
         """Test requesting a password reset."""
         user = UserFactory()
         response = authenticated_client.post(
-            reverse('users:password-reset'),
+            reverse('users:users-password-reset'),
             {'email': user.email}
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('Password Reset Requested', mail.outbox[0].subject)
+        assert response.status_code == status.HTTP_200_OK
+        assert len(mail.outbox) == 1
+        assert 'Password Reset Requested' in mail.outbox[0].subject
 
     def test_password_reset_request_invalid_email(self, authenticated_client):
         """Test requesting a password reset with invalid email."""
         response = authenticated_client.post(
-            reverse('users:password-reset'),
+            reverse('users:users-password-reset'),
             {'email': 'nonexistent@example.com'}
         )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_password_reset_confirm(self, authenticated_client):
         """Test confirming password reset."""
@@ -191,18 +191,16 @@ class TestUserViewSet:
         
         new_password = 'newpassword123'
         response = authenticated_client.post(
-            reverse('users:password-reset-confirm'),
+            reverse('users:users-password-reset-confirm'),
             {
                 'uid': uid,
                 'token': token,
                 'new_password': new_password
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        # Verify password was changed
+        assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
-        self.assertTrue(user.check_password(new_password))
+        assert user.check_password(new_password)
 
     def test_password_reset_confirm_invalid_token(self, authenticated_client):
         """Test confirming password reset with invalid token."""
@@ -210,14 +208,14 @@ class TestUserViewSet:
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         
         response = authenticated_client.post(
-            reverse('users:password-reset-confirm'),
+            reverse('users:users-password-reset-confirm'),
             {
                 'uid': uid,
                 'token': 'invalid_token',
                 'new_password': 'newpassword123'
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_login_with_2fa(self, api_client):
         """Test login flow with 2FA enabled"""
@@ -230,7 +228,7 @@ class TestUserViewSet:
         user.enable_2fa()
         
         # First login attempt
-        login_url = reverse('user-login')
+        login_url = reverse('users:users-login')
         login_data = {
             'email': user.email,
             'password': 'testpass123'
@@ -245,7 +243,7 @@ class TestUserViewSet:
         totp = pyotp.TOTP(secret)
         code = totp.now()
         
-        verify_url = reverse('user-verify-2fa')
+        verify_url = reverse('users:users-verify-2fa')
         verify_data = {
             'user_id': response.data['user_id'],
             'code': code
@@ -259,19 +257,24 @@ class TestUserViewSet:
 
     def test_enable_2fa(self, authenticated_client):
         """Test enabling 2FA"""
-        url = reverse('user-enable-2fa')
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
+        url = reverse('users:users-enable-2fa')
         response = authenticated_client.post(url)
         
         assert response.status_code == status.HTTP_200_OK
         assert 'secret' in response.data
         assert 'qr_code' in response.data
-        assert 'backup_codes' in response.data
+        assert 'instructions' in response.data
+        assert 'manual_entry_code' in response.data
         
         # Confirm 2FA
         totp = pyotp.TOTP(response.data['secret'])
         code = totp.now()
         
-        confirm_url = reverse('user-confirm-2fa')
+        confirm_url = reverse('users:users-confirm-2fa')
         confirm_data = {'code': code}
         response = authenticated_client.post(confirm_url, confirm_data)
         
@@ -279,13 +282,16 @@ class TestUserViewSet:
         assert response.data['message'] == '2FA has been enabled successfully'
         
         # Verify 2FA is enabled
-        user = User.objects.get(pk=authenticated_client.user.pk)
+        user.refresh_from_db()
         assert user.two_factor_enabled is True
 
     def test_disable_2fa(self, authenticated_client):
         """Test disabling 2FA"""
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
         # First enable 2FA
-        user = authenticated_client.user
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         
@@ -294,7 +300,7 @@ class TestUserViewSet:
         code = totp.now()
         
         # Disable 2FA
-        url = reverse('user-disable-2fa')
+        url = reverse('users:users-disable-2fa')
         data = {'code': code}
         response = authenticated_client.post(url, data)
         
@@ -309,12 +315,15 @@ class TestUserViewSet:
 
     def test_generate_backup_codes(self, authenticated_client):
         """Test generating backup codes"""
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
         # First enable 2FA
-        user = authenticated_client.user
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         
-        url = reverse('user-generate-backup-codes')
+        url = reverse('users:users-generate-backup-codes')
         response = authenticated_client.post(url)
         
         assert response.status_code == status.HTTP_200_OK
@@ -323,14 +332,17 @@ class TestUserViewSet:
 
     def test_verify_backup_code(self, authenticated_client):
         """Test verifying backup codes"""
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
         # First enable 2FA and generate backup codes
-        user = authenticated_client.user
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         backup_codes = user.generate_backup_codes()
         
         # Try to verify a backup code
-        url = reverse('user-verify-backup-code')
+        url = reverse('users:users-verify-backup-code')
         data = {'code': backup_codes[0]}
         response = authenticated_client.post(url, data)
         
@@ -343,12 +355,15 @@ class TestUserViewSet:
 
     def test_invalid_2fa_code(self, authenticated_client):
         """Test invalid 2FA code verification"""
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
         # First enable 2FA
-        user = authenticated_client.user
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         
-        url = reverse('user-disable-2fa')
+        url = reverse('users:users-disable-2fa')
         data = {'code': '000000'}  # Invalid code
         response = authenticated_client.post(url, data)
         
@@ -358,12 +373,15 @@ class TestUserViewSet:
 
     def test_rate_limiting_2fa(self, authenticated_client):
         """Test rate limiting for 2FA verification attempts"""
+        # Create and authenticate user
+        user = UserFactory()
+        authenticated_client.force_authenticate(user=user)
+        
         # First enable 2FA
-        user = authenticated_client.user
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         
-        url = reverse('user-disable-2fa')
+        url = reverse('users:users-disable-2fa')
         for _ in range(6):  # Try one more than the limit
             data = {'code': '000000'}  # Invalid code
             response = authenticated_client.post(url, data)

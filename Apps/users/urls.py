@@ -2,8 +2,13 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet
 
+app_name = 'users'  # Add app_name for namespace
+
 router = DefaultRouter()
 router.register(r'', UserViewSet, basename='users')
+
+# The router will generate URLs like:
+# users-list, users-detail, users-password-reset, etc.
 
 urlpatterns = [
     path('', include(router.urls)),

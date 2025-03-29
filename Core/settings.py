@@ -202,3 +202,6 @@ TWO_FACTOR = {
     'BACKUP_CODES_COUNT': 8,
     'BACKUP_CODES_LENGTH': 8,
 }
+
+# Frontend URL for password reset
+FRONTEND_URL = 'http://localhost:3000'
