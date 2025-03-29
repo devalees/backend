@@ -44,6 +44,7 @@ urlpatterns = [
         path('', include('Apps.data_transfer.urls')),
         path('rbac/', include('Apps.rbac.urls', namespace='rbac')),
         path('projects/', include('Apps.project.urls', namespace='project')),
+        path('time-management/', include('Apps.time_management.urls')),
     ])),
 ]
 

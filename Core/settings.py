@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'Apps.data_transfer',
     'Apps.project',
     'Apps.rbac',  # Extended Role-Based Access Control
+    'Apps.time_management',  # Time Management and Timesheet
 ]
 
 MIDDLEWARE = [
