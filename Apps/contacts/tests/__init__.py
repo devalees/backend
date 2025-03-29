@@ -1,0 +1,3 @@
+"""
+Contacts app tests package.
+""" 
