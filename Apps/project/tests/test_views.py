@@ -30,6 +30,7 @@ def user_in_organization(authenticated_client):
     dept = DepartmentFactory(organization=org)
     team = TeamFactory(department=dept)
     TeamMemberFactory(team=team, user=user)
+    client.force_authenticate(user=user)  # Re-authenticate with the updated user
     return client, user, org
 
 def test_urls():

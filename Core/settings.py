@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'Apps.contacts',
     'Apps.data_transfer',
     'Apps.project',
+    'Apps.rbac',  # Extended Role-Based Access Control
 ]
 
 MIDDLEWARE = [
@@ -201,6 +202,44 @@ TWO_FACTOR = {
     'QR_CODE_SIZE': 10,
     'BACKUP_CODES_COUNT': 8,
     'BACKUP_CODES_LENGTH': 8,
+}
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'Apps.rbac': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
 }
 
 # Frontend URL for password reset

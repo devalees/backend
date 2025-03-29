@@ -3,15 +3,17 @@ from factory import Sequence, LazyAttribute, PostGenerationMethodCall, LazyFunct
 from django.contrib.auth import get_user_model
 from Apps.core.models import BaseModel
 from django.utils import timezone
+from faker import Faker as RealFaker
 
 User = get_user_model()
+fake = RealFaker()
 
 class UserFactory(DjangoModelFactory):
     class Meta:
         model = get_user_model()
 
-    username = Sequence(lambda n: f'user{n}')
-    email = Sequence(lambda n: f'user{n}@example.com')
+    username = LazyFunction(lambda: fake.unique.user_name())
+    email = LazyFunction(lambda: fake.unique.email())
     password = 'testpass123'
     first_name = Faker('first_name')
     last_name = Faker('last_name')
@@ -44,5 +46,5 @@ class BaseModelFactory(DjangoModelFactory):
     created_at = LazyFunction(timezone.now)
     updated_at = LazyFunction(timezone.now)
     created_by = SubFactory(UserFactory)
-    updated_by = SubFactory(UserFactory)
+    updated_by = LazyAttribute(lambda o: o.created_by)
     is_active = True 

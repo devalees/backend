@@ -30,20 +30,21 @@ logger.info("Loading main URLs configuration")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include([
-        path('', include('Apps.core.urls')),
-        path('users/', include('Apps.users.urls', namespace='users')),  # Changed to have explicit prefix
-        path('', include('Apps.entity.urls')),
-        path('', include('Apps.contacts.urls')),
-        path('', include('Apps.data_transfer.urls')),
-    ])),
-    path('api/v1/', include('Apps.project.urls', namespace='project')),  # Include project URLs with namespace
-    path('api-auth/', include('rest_framework.urls')),  # Adds login to the browsable API
-    
-    # JWT endpoints
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    path('api-auth/', include('rest_framework.urls')),  # Adds login to the browsable API
+    
+    # API v1 endpoints
+    path('api/v1/', include([
+        path('', include('Apps.core.urls')),
+        path('users/', include('Apps.users.urls', namespace='users')),
+        path('', include('Apps.entity.urls')),
+        path('', include('Apps.contacts.urls')),
+        path('', include('Apps.data_transfer.urls')),
+        path('rbac/', include('Apps.rbac.urls', namespace='rbac')),
+        path('projects/', include('Apps.project.urls', namespace='project')),
+    ])),
 ]
 
 # Debug logging
