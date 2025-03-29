@@ -21,14 +21,23 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Debug logging
+logger.info("Loading main URLs configuration")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/users/', include('Apps.users.urls')),
-    path('api/core/', include('Apps.core.urls')),
-    path('api/entity/', include('Apps.entity.urls')),
-    path('api/contacts/', include('Apps.contacts.urls')),
-    path('api/data-transfer/', include('Apps.data_transfer.urls')),
+    path('api/v1/', include('Apps.project.urls', namespace='project')),  # Include project URLs with namespace
+    path('api/v1/', include([
+        path('', include('Apps.core.urls')),
+        path('', include('Apps.users.urls')),
+        path('', include('Apps.entity.urls')),
+        path('', include('Apps.contacts.urls')),
+        path('', include('Apps.data_transfer.urls')),
+    ])),
     path('api-auth/', include('rest_framework.urls')),  # Adds login to the browsable API
     
     # JWT endpoints
@@ -36,3 +45,35 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 ]
+
+# Debug logging
+logger.info("Main URLs registered:")
+for pattern in urlpatterns:
+    logger.info(f"Pattern: {pattern.pattern}")
+    if hasattr(pattern, 'url_patterns'):
+        for subpattern in pattern.url_patterns:
+            logger.info(f"  Subpattern: {subpattern.pattern}")
+            if hasattr(subpattern, 'url_patterns'):
+                for subsubpattern in subpattern.url_patterns:
+                    logger.info(f"    Subsubpattern: {subsubpattern.pattern}")
+                    if hasattr(subsubpattern, 'name'):
+                        logger.info(f"      Name: {subsubpattern.name}")
+            if hasattr(subpattern, 'name'):
+                logger.info(f"    Name: {subpattern.name}")
+    if hasattr(pattern, 'name'):
+        logger.info(f"  Name: {pattern.name}")
+
+# Debug logging for project URLs
+try:
+    from Apps.project.urls import urlpatterns as project_urls
+    logger.info("Project URLs loaded successfully:")
+    for pattern in project_urls:
+        logger.info(f"  Pattern: {pattern.pattern}")
+        if hasattr(pattern, 'name'):
+            logger.info(f"    Name: {pattern.name}")
+        if hasattr(pattern, 'callback'):
+            logger.info(f"    Callback: {pattern.callback}")
+            if hasattr(pattern.callback, 'actions'):
+                logger.info(f"      Actions: {pattern.callback.actions}")
+except Exception as e:
+    logger.error(f"Error loading project URLs: {e}")

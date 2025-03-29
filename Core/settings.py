@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'Apps.entity',
     'Apps.contacts',
     'Apps.data_transfer',
+    'Apps.project',
 ]
 
 MIDDLEWARE = [
