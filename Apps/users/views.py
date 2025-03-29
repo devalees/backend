@@ -12,6 +12,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.urls import reverse
 from rest_framework.permissions import AllowAny
+from django.core.exceptions import ValidationError
+import pyotp
 
 User = get_user_model()
 
@@ -29,7 +31,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Get permissions based on action"""
-        if self.action in ['create', 'login', 'refresh_token', 'register']:
+        if self.action in ['create', 'login', 'refresh_token', 'register', 'verify_2fa']:
             return [permissions.AllowAny()]
         return super().get_permissions()
 
@@ -58,12 +60,203 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        # Check if 2FA is enabled
+        if user.two_factor_enabled:
+            return Response({
+                'requires_2fa': True,
+                'user_id': user.id,
+                'message': '2FA verification required'
+            }, status=status.HTTP_200_OK)
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
             'user': UserSerializer(user).data
         })
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def verify_2fa(self, request):
+        """Verify 2FA code and return tokens"""
+        user_id = request.data.get('user_id')
+        code = request.data.get('code')
+
+        if not user_id or not code:
+            return Response(
+                {'error': 'Please provide both user_id and 2FA code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not user.two_factor_enabled:
+            return Response(
+                {'error': '2FA is not enabled for this user'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if user.verify_2fa_code(code):
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                    'user': UserSerializer(user).data
+                })
+            else:
+                return Response(
+                    {'error': 'Invalid 2FA code'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def enable_2fa(self, request):
+        """Enable 2FA for the current user"""
+        user = request.user
+        
+        try:
+            # Generate new 2FA secret
+            secret = user.generate_2fa_secret()
+            
+            # Generate QR code
+            qr_code = user.generate_2fa_qr_code()
+            
+            # Create TOTP URI for manual entry
+            totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+                user.username,
+                issuer_name=settings.TWO_FACTOR['ISSUER_NAME']
+            )
+            
+            return Response({
+                'secret': secret,
+                'qr_code': qr_code,
+                'totp_uri': totp_uri,
+                'manual_entry_code': secret,  # For manual entry in authenticator app
+                'message': 'Please either scan the QR code or manually enter the code in your authenticator app',
+                'instructions': [
+                    '1. Open your authenticator app (Google Authenticator, Authy, etc.)',
+                    '2. Choose to add a new account',
+                    '3. Either scan the QR code OR',
+                    '4. Manually enter the following code: ' + secret,
+                    '5. Once added, enter the 6-digit code shown in your app to confirm setup'
+                ]
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def confirm_2fa(self, request):
+        """Confirm and enable 2FA after verifying the code"""
+        user = request.user
+        code = request.data.get('code')
+
+        if not code:
+            return Response(
+                {'error': 'Please provide the 2FA code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if user.verify_2fa_code(code):
+                user.enable_2fa()
+                # Generate backup codes after enabling 2FA
+                backup_codes = user.generate_backup_codes()
+                return Response({
+                    'message': '2FA has been enabled successfully',
+                    'backup_codes': backup_codes
+                })
+            else:
+                return Response(
+                    {'error': 'Invalid 2FA code'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def disable_2fa(self, request):
+        """Disable 2FA for the current user"""
+        user = request.user
+        code = request.data.get('code')
+
+        if not code:
+            return Response(
+                {'error': 'Please provide the 2FA code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if user.verify_2fa_code(code):
+                user.disable_2fa()
+                return Response({
+                    'message': '2FA has been disabled successfully'
+                })
+            else:
+                return Response(
+                    {'error': 'Invalid 2FA code'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def generate_backup_codes(self, request):
+        """Generate new backup codes for 2FA"""
+        user = request.user
+        
+        try:
+            backup_codes = user.generate_backup_codes()
+            return Response({
+                'backup_codes': backup_codes,
+                'message': 'New backup codes have been generated. Please store them securely.'
+            })
+        except ValidationError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['post'])
+    def verify_backup_code(self, request):
+        """Verify a backup code"""
+        user = request.user
+        code = request.data.get('code')
+
+        if not code:
+            return Response(
+                {'error': 'Please provide the backup code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if user.verify_backup_code(code):
+            return Response({
+                'message': 'Backup code verified successfully'
+            })
+        else:
+            return Response(
+                {'error': 'Invalid backup code'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def refresh_token(self, request):

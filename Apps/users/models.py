@@ -13,6 +13,7 @@ import random
 import string
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
+import base64
 
 class CustomUserManager(BaseUserManager):
     """Custom user model manager where email is the unique identifier"""
@@ -157,10 +158,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         # Create image
         img = qr.make_image(fill_color="black", back_color="white")
         
-        # Convert to bytes
+        # Convert to base64
         buffer = BytesIO()
         img.save(buffer, format='PNG')
-        return buffer.getvalue()
+        qr_code_bytes = buffer.getvalue()
+        qr_code_base64 = base64.b64encode(qr_code_bytes).decode('utf-8')
+        
+        return f"data:image/png;base64,{qr_code_base64}"
 
     def generate_backup_codes(self):
         """Generate new backup codes for 2FA"""

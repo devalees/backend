@@ -8,11 +8,14 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True)
+    two_factor_enabled = serializers.BooleanField(read_only=True)
+    backup_codes = serializers.ListField(read_only=True)
 
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'password', 'password2', 'first_name', 'last_name', 
-                 'is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login')
+                 'is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login',
+                 'two_factor_enabled', 'backup_codes')
         read_only_fields = ('id', 'date_joined', 'last_login')
 
     def validate(self, attrs):

@@ -8,6 +8,7 @@ from django.core import mail
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
+import pyotp
 
 User = get_user_model()
 
@@ -216,4 +217,157 @@ class TestUserViewSet:
                 'new_password': 'newpassword123'
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST) 
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_login_with_2fa(self, api_client):
+        """Test login flow with 2FA enabled"""
+        user = UserFactory()
+        user.set_password('testpass123')
+        user.save()
+        
+        # Enable 2FA
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        
+        # First login attempt
+        login_url = reverse('user-login')
+        login_data = {
+            'email': user.email,
+            'password': 'testpass123'
+        }
+        response = api_client.post(login_url, login_data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['requires_2fa'] is True
+        assert 'user_id' in response.data
+        
+        # Verify 2FA code
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+        
+        verify_url = reverse('user-verify-2fa')
+        verify_data = {
+            'user_id': response.data['user_id'],
+            'code': code
+        }
+        response = api_client.post(verify_url, verify_data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'access' in response.data
+        assert 'refresh' in response.data
+        assert 'user' in response.data
+
+    def test_enable_2fa(self, authenticated_client):
+        """Test enabling 2FA"""
+        url = reverse('user-enable-2fa')
+        response = authenticated_client.post(url)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'secret' in response.data
+        assert 'qr_code' in response.data
+        assert 'backup_codes' in response.data
+        
+        # Confirm 2FA
+        totp = pyotp.TOTP(response.data['secret'])
+        code = totp.now()
+        
+        confirm_url = reverse('user-confirm-2fa')
+        confirm_data = {'code': code}
+        response = authenticated_client.post(confirm_url, confirm_data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == '2FA has been enabled successfully'
+        
+        # Verify 2FA is enabled
+        user = User.objects.get(pk=authenticated_client.user.pk)
+        assert user.two_factor_enabled is True
+
+    def test_disable_2fa(self, authenticated_client):
+        """Test disabling 2FA"""
+        # First enable 2FA
+        user = authenticated_client.user
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        
+        # Generate valid code
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+        
+        # Disable 2FA
+        url = reverse('user-disable-2fa')
+        data = {'code': code}
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == '2FA has been disabled successfully'
+        
+        # Verify 2FA is disabled
+        user.refresh_from_db()
+        assert user.two_factor_enabled is False
+        assert user.two_factor_secret is None
+        assert user.backup_codes == []
+
+    def test_generate_backup_codes(self, authenticated_client):
+        """Test generating backup codes"""
+        # First enable 2FA
+        user = authenticated_client.user
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        
+        url = reverse('user-generate-backup-codes')
+        response = authenticated_client.post(url)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'backup_codes' in response.data
+        assert len(response.data['backup_codes']) == 8  # As configured in settings
+
+    def test_verify_backup_code(self, authenticated_client):
+        """Test verifying backup codes"""
+        # First enable 2FA and generate backup codes
+        user = authenticated_client.user
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        backup_codes = user.generate_backup_codes()
+        
+        # Try to verify a backup code
+        url = reverse('user-verify-backup-code')
+        data = {'code': backup_codes[0]}
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['message'] == 'Backup code verified successfully'
+        
+        # Verify the code was used (removed from backup codes)
+        user.refresh_from_db()
+        assert backup_codes[0] not in user.backup_codes
+
+    def test_invalid_2fa_code(self, authenticated_client):
+        """Test invalid 2FA code verification"""
+        # First enable 2FA
+        user = authenticated_client.user
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        
+        url = reverse('user-disable-2fa')
+        data = {'code': '000000'}  # Invalid code
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert 'error' in response.data
+        assert response.data['error'] == 'Invalid 2FA code'
+
+    def test_rate_limiting_2fa(self, authenticated_client):
+        """Test rate limiting for 2FA verification attempts"""
+        # First enable 2FA
+        user = authenticated_client.user
+        secret = user.generate_2fa_secret()
+        user.enable_2fa()
+        
+        url = reverse('user-disable-2fa')
+        for _ in range(6):  # Try one more than the limit
+            data = {'code': '000000'}  # Invalid code
+            response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'error' in response.data
+        assert 'Too many verification attempts' in response.data['error'] 

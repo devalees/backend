@@ -1,10 +1,16 @@
 from rest_framework import serializers
 from .models import Organization, Department, Team, TeamMember
-from Apps.users.serializers import UserSerializer
 from rest_framework.validators import UniqueTogetherValidator
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+class SimpleUserSerializer(serializers.ModelSerializer):
+    """Simplified serializer for User model in team member context"""
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        read_only_fields = fields
 
 class OrganizationSerializer(serializers.ModelSerializer):
     """Serializer for Organization model"""
@@ -33,7 +39,7 @@ class TeamSerializer(serializers.ModelSerializer):
 
 class TeamMemberSerializer(serializers.ModelSerializer):
     """Serializer for TeamMember model"""
-    user = UserSerializer(read_only=True)
+    user = SimpleUserSerializer(read_only=True)
     user_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         write_only=True
