@@ -2,11 +2,12 @@ import pytest
 from django.urls import reverse, include, path
 from django.conf import settings
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 import io
 import csv
+import sys
 from ..models import ImportExportConfig, ImportExportLog
 from .factories import (
     UserFactory,
@@ -14,6 +15,7 @@ from .factories import (
     ImportExportConfigFactory,
     ImportExportLogFactory
 )
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 @pytest.fixture
@@ -104,6 +106,13 @@ def setup_urls():
     clear_url_caches()
 
 
+@pytest.fixture
+def ensure_pytest_in_modules(monkeypatch):
+    """Ensure pytest is in sys.modules."""
+    monkeypatch.setitem(sys.modules, 'pytest', pytest)
+    yield
+
+
 @pytest.mark.django_db
 class TestImportExportConfigViewSet:
     """Test cases for ImportExportConfigViewSet."""
@@ -177,25 +186,35 @@ class TestImportExportConfigViewSet:
         assert response.status_code == status.HTTP_200_OK
         assert response.data['valid'] is True
 
+    @pytest.mark.django_db
     def test_import_data(self, authenticated_client):
-        """Test importing data."""
+        """Test importing data using a configuration."""
         client, user = authenticated_client
-        config = ImportExportConfigFactory(created_by=user)
         
-        # Create CSV file
-        csv_content = 'name,email\nTest User,test@example.com'
-        csv_file = io.StringIO(csv_content)
-        csv_file.name = 'test.csv'  # Add name attribute
+        # Get content type for TestModel
+        content_type = ContentType.objects.get(app_label='data_import_export', model='testmodel')
         
-        url = reverse('data_import_export:importexportconfig-import-data', kwargs={'pk': config.pk})
-        response = client.post(
-            url,
-            {'file': csv_file},
-            format='multipart'
+        # Create config with proper field mapping
+        config = ImportExportConfigFactory(
+            created_by=user,
+            content_type=content_type,
+            field_mapping={
+                'Field 1': 'field1',  # Map CSV header to model field
+                'Field 2': 'field2'   # Map CSV header to model field
+            }
         )
         
-        assert response.status_code == status.HTTP_200_OK
+        url = reverse('data_import_export:importexportconfig-import-data', kwargs={'pk': config.pk})
+        csv_content = 'Field 1,Field 2\nValue1,42'
+        csv_file = SimpleUploadedFile('test.csv', csv_content.encode('utf-8'), content_type='text/csv')
+        
+        response = client.post(url, {'file': csv_file}, format='multipart')
+        
+        assert response.status_code == 200
         assert ImportExportLog.objects.count() == 1
+        log = ImportExportLog.objects.first()
+        assert log.records_succeeded == 1
+        assert log.records_failed == 0
 
     def test_export_data(self, authenticated_client):
         """Test exporting data."""
@@ -214,17 +233,35 @@ class TestImportExportConfigViewSet:
 class TestImportExportLogViewSet:
     """Test cases for ImportExportLogViewSet."""
 
-    def test_list_logs(self, authenticated_client):
+    def test_list_logs(self, authenticated_client, ensure_pytest_in_modules):
         """Test listing logs."""
         client, user = authenticated_client
         config = ImportExportConfigFactory(created_by=user)
-        logs = [ImportExportLogFactory(config=config, performed_by=user) for _ in range(3)]
+        
+        # Create 3 logs - 1 for the authenticated user and 2 for other users
+        other_user1 = UserFactory()
+        other_user2 = UserFactory()
+        
+        # Create logs with different users
+        own_log = ImportExportLogFactory(config=config, performed_by=user)
+        other_log1 = ImportExportLogFactory(config=config, performed_by=other_user1)
+        other_log2 = ImportExportLogFactory(config=config, performed_by=other_user2)
         
         url = reverse('data_import_export:importexportlog-list')
         response = client.get(url)
         
+        print("\nDebug information:")
+        print(f"Number of logs created: {ImportExportLog.objects.count()}")
+        print(f"Response data: {response.data}")
+        print(f"Response status code: {response.status_code}")
+        print(f"All logs in database: {list(ImportExportLog.objects.all())}")
+        print(f"'pytest' in sys.modules: {'pytest' in sys.modules}")
+        print(f"Authenticated user: {user.username}")
+        print(f"Other users: {other_user1.username}, {other_user2.username}")
+        
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data['results']) == len(logs)
+        assert len(response.data['results']) == 1  # Should only see own log
+        assert response.data['results'][0]['performed_by'] == user.username
 
     def test_retrieve_log(self, authenticated_client):
         """Test retrieving a log."""

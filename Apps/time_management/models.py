@@ -3,9 +3,10 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
+from Core.models.base import TaskAwareModel
 
-class TimeCategory(models.Model):
-    """Categories for time entries (e.g., Development, Meeting, Break)"""
+class TimeCategory(TaskAwareModel):
+    """Categories for time entries (e.g., Development, Meeting, Break) with task handling capabilities"""
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_billable = models.BooleanField(default=True)
@@ -20,8 +21,8 @@ class TimeCategory(models.Model):
     def __str__(self):
         return self.name
 
-class TimeEntry(models.Model):
-    """Individual time entries for tasks and projects"""
+class TimeEntry(TaskAwareModel):
+    """Individual time entries for tasks and projects with task handling capabilities"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     project = models.ForeignKey('project.Project', on_delete=models.CASCADE)
     category = models.ForeignKey(TimeCategory, on_delete=models.PROTECT)
@@ -46,11 +47,12 @@ class TimeEntry(models.Model):
         return f"{self.user.username} - {self.project.title} - {self.hours} hours"
 
     def clean(self):
+        super().clean()
         if self.end_time <= self.start_time:
             raise ValidationError(_("End time must be after start time"))
 
-class Timesheet(models.Model):
-    """Weekly or monthly timesheet for users"""
+class Timesheet(TaskAwareModel):
+    """Weekly or monthly timesheet for users with task handling capabilities"""
     STATUS_CHOICES = [
         ('draft', _('Draft')),
         ('submitted', _('Submitted')),
@@ -78,6 +80,7 @@ class Timesheet(models.Model):
         return f"{self.user.username} - {self.start_date} to {self.end_date}"
 
     def clean(self):
+        super().clean()
         if self.end_date <= self.start_date:
             raise ValidationError(_("End date must be after start date"))
 
@@ -105,8 +108,8 @@ class TimesheetEntry(models.Model):
     def __str__(self):
         return f"{self.timesheet.user.username} - {self.date} ({self.hours} hours)"
 
-class WorkSchedule(models.Model):
-    """User's work schedule and availability"""
+class WorkSchedule(TaskAwareModel):
+    """User's work schedule and availability with task handling capabilities"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=100, default="Default Schedule")
     start_time = models.TimeField()
@@ -123,5 +126,6 @@ class WorkSchedule(models.Model):
         return f"{self.user.username} - {self.name}"
 
     def clean(self):
+        super().clean()
         if self.end_time <= self.start_time:
             raise ValidationError(_("End time must be after start time"))

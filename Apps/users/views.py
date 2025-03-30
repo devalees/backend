@@ -48,9 +48,9 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Get permissions based on action"""
-        if self.action in ['create', 'login', 'refresh_token', 'register', 'verify_2fa', 'password_reset', 'password_reset_confirm']:
-            return [permissions.AllowAny()]
-        return super().get_permissions()
+        if self.action in ['login', 'refresh_token', 'password_reset', 'password_reset_confirm', 'register', 'verify_2fa']:
+            return [AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def perform_destroy(self, instance):
         """Soft delete the user"""
@@ -347,23 +347,37 @@ class UserViewSet(viewsets.ModelViewSet):
         uid = request.data.get('uid')
         token = request.data.get('token')
         new_password = request.data.get('new_password')
+        new_password2 = request.data.get('new_password2')
 
-        if not uid or not token or not new_password:
+        print(f"Debug: uid={uid}, token={token}, new_password={new_password}, new_password2={new_password2}")
+
+        if not uid or not token or not new_password or not new_password2:
+            print("Debug: Missing required fields")
             return Response(
-                {'error': 'Please provide uid, token and new password'},
+                {'error': 'Please provide uid, token, new password and password confirmation'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if new_password != new_password2:
+            print("Debug: Passwords do not match")
+            return Response(
+                {'error': 'Passwords do not match'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             uid = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=uid)
+            print(f"Debug: Found user with id={uid}")
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            print("Debug: Invalid uid or user not found")
             return Response(
                 {'error': 'Invalid reset link'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if not default_token_generator.check_token(user, token):
+            print("Debug: Token validation failed")
             return Response(
                 {'error': 'Invalid or expired reset link'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -371,6 +385,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         user.set_password(new_password)
         user.save()
+        print("Debug: Password reset successful")
 
         return Response({'message': 'Password has been reset successfully'})
 

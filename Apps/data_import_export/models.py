@@ -51,7 +51,7 @@ class ImportExportConfig(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.content_type.model})"
 
     def clean(self):
         """Validate the configuration."""
@@ -92,7 +92,7 @@ class ImportExportLog(models.Model):
     operation = models.CharField(max_length=10, choices=OPERATION_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_IN_PROGRESS)
     file_name = models.CharField(max_length=255)
-    error_message = models.TextField(blank=True)
+    error_message = models.TextField(blank=True, null=True)
     records_processed = models.IntegerField(default=0)
     records_succeeded = models.IntegerField(default=0)
     records_failed = models.IntegerField(default=0)
@@ -122,3 +122,14 @@ class ImportExportLog(models.Model):
         """Validate the log entry."""
         if self.records_succeeded + self.records_failed != self.records_processed:
             raise ValidationError(_('Sum of succeeded and failed records must equal total processed.'))
+        
+        if self.status not in dict(self.STATUS_CHOICES):
+            raise ValidationError(_('Invalid status value.'))
+            
+        # Validate status transitions
+        if self.pk:  # Only check transitions for existing records
+            old_instance = ImportExportLog.objects.get(pk=self.pk)
+            if old_instance.status == self.STATUS_COMPLETED and self.status != self.STATUS_COMPLETED:
+                raise ValidationError(_('Cannot change status of a completed log.'))
+            if old_instance.status == self.STATUS_FAILED and self.status not in [self.STATUS_FAILED, self.STATUS_IN_PROGRESS]:
+                raise ValidationError(_('Failed logs can only be retried or remain failed.'))

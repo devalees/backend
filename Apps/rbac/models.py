@@ -4,10 +4,11 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
+from Core.models.base import TaskAwareModel
 
 User = get_user_model()
 
-class Role(models.Model):
+class Role(TaskAwareModel):
     """
     Represents a role in the system that can be assigned to users.
     Roles are used to group permissions together.
@@ -38,12 +39,13 @@ class Role(models.Model):
         return self.name
 
     def clean(self):
+        super().clean()
         if not self.name:
             raise ValidationError({'name': 'Name is required.'})
 
-class Permission(models.Model):
+class Permission(TaskAwareModel):
     """
-    Model for storing permissions.
+    Model for storing permissions with task handling capabilities.
     """
     name = models.CharField(max_length=255)
     codename = models.CharField(max_length=100)
@@ -76,6 +78,7 @@ class Permission(models.Model):
         return f"{self.name} ({self.codename})"
 
     def clean(self):
+        super().clean()
         if not self.content_type:
             raise ValidationError({'content_type': 'Content type is required.'})
         if not self.codename:
@@ -83,9 +86,9 @@ class Permission(models.Model):
         if not self.name:
             raise ValidationError({'name': 'Name is required.'})
 
-class FieldPermission(models.Model):
+class FieldPermission(TaskAwareModel):
     """
-    Model for storing field-level permissions.
+    Model for storing field-level permissions with task handling capabilities.
     """
     PERMISSION_TYPES = [
         ('view', 'View'),
@@ -125,6 +128,7 @@ class FieldPermission(models.Model):
         return f"{self.field_name} - {self.get_permission_type_display()}"
 
     def clean(self):
+        super().clean()
         if not self.content_type:
             raise ValidationError({'content_type': 'Content type is required.'})
         if not self.field_name:

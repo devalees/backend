@@ -5,12 +5,13 @@ from django.utils import timezone
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import validate_email
+from Core.models.base import TaskAwareModel
 import re
 
 User = get_user_model()
 
-class Contact(models.Model):
-    """Contact model representing a person or organization"""
+class Contact(TaskAwareModel):
+    """Contact model representing a person or organization with task handling capabilities"""
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

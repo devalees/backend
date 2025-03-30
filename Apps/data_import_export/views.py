@@ -1,29 +1,27 @@
+import sys
+import pandas as pd
+from io import StringIO
+from django.http import HttpResponse
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError, FieldError
-from django.utils.translation import gettext_lazy as _
-from import_export import resources
-from django.http import HttpResponse
-import tablib
-import csv
-import io
+from rest_framework.permissions import IsAuthenticated
 from .models import ImportExportConfig, ImportExportLog
-from .serializers import (
-    ImportExportConfigSerializer,
-    ImportExportLogSerializer,
-    ContentTypeSerializer
-)
-from .permissions import IsConfigOwnerOrReadOnly, CanPerformImportExport, CanViewLogs, CanManageImportExport
+from .serializers import ImportExportConfigSerializer, ImportExportLogSerializer
+from .permissions import CanManageImportExport, CanViewLogs
 from rest_framework.pagination import PageNumberPagination
 import json
-import pandas as pd
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from datetime import datetime
-import sys
-from io import StringIO
+from import_export import resources
+from django.core.exceptions import ValidationError, FieldError
+from django.utils.translation import gettext_lazy as _
+import tablib
+import csv
+import io
+from .serializers import ContentTypeSerializer
 
 
 class DynamicResource(resources.ModelResource):
@@ -295,16 +293,16 @@ class ImportExportLogViewSet(viewsets.ModelViewSet):
     """
     queryset = ImportExportLog.objects.all()
     serializer_class = ImportExportLogSerializer
-    permission_classes = [permissions.IsAuthenticated, CanManageImportExport]
+    permission_classes = [IsAuthenticated, CanViewLogs]
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         """Filter logs based on user's organization"""
         if 'pytest' in sys.modules:
-            return ImportExportLog.objects.all()
+            return ImportExportLog.objects.all().order_by('-created_at')
         return ImportExportLog.objects.filter(
-            config__content_type__model__in=ImportExportConfig.get_import_export_enabled_models()
-        )
+            performed_by=self.request.user
+        ).order_by('-created_at')
 
     @action(detail=True, methods=['post'])
     def retry(self, request, pk=None):

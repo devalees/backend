@@ -4,11 +4,12 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from Apps.data_import_export.mixins import ImportExportMixin
+from Core.models.base import TaskAwareModel
 
 User = get_user_model()
 
-class BaseModel(ImportExportMixin, models.Model):
-    """Base model with common fields and methods"""
+class BaseModel(ImportExportMixin, TaskAwareModel):
+    """Base model with common fields, methods, and task handling capabilities"""
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -37,7 +38,7 @@ class BaseModel(ImportExportMixin, models.Model):
 
     def clean(self):
         """Base validation method"""
-        pass
+        super().clean()
 
     def save(self, *args, **kwargs):
         """Save the model with validation"""

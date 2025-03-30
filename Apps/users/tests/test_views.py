@@ -183,39 +183,52 @@ class TestUserViewSet:
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_password_reset_confirm(self, authenticated_client):
-        """Test confirming password reset."""
+    def test_password_reset_confirm(self, api_client):
+        """Test confirming password reset with valid token."""
         user = UserFactory()
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         
+        print(f"\nDebug test: Generated uid={uid} for user_id={user.pk}")
+        print(f"Debug test: Generated token={token}")
+        
         new_password = 'newpassword123'
-        response = authenticated_client.post(
-            reverse('users:users-password-reset-confirm'),
-            {
-                'uid': uid,
-                'token': token,
-                'new_password': new_password
-            }
+        data = {
+            'uid': uid,
+            'token': token,
+            'new_password': new_password,
+            'new_password2': new_password
+        }
+        print(f"Debug test: Sending data={data}")
+        
+        response = api_client.post(
+            reverse('users:password-reset-confirm'),
+            data
         )
+        print(f"Debug test: Response status={response.status_code}")
+        print(f"Debug test: Response data={response.data}")
+        
         assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
         assert user.check_password(new_password)
 
-    def test_password_reset_confirm_invalid_token(self, authenticated_client):
+    def test_password_reset_confirm_invalid_token(self, api_client):
         """Test confirming password reset with invalid token."""
         user = UserFactory()
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         
-        response = authenticated_client.post(
+        response = api_client.post(
             reverse('users:users-password-reset-confirm'),
             {
                 'uid': uid,
                 'token': 'invalid_token',
-                'new_password': 'newpassword123'
+                'new_password': 'newpassword123',
+                'new_password2': 'newpassword123'  # Add password confirmation
             }
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'Invalid or expired reset link' in response.data['error']
+        assert not user.check_password('newpassword123')
 
     def test_login_with_2fa(self, api_client):
         """Test login flow with 2FA enabled"""

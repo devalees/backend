@@ -3,8 +3,12 @@ import random
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from ..models import ImportExportConfig, ImportExportLog
+from .models_for_testing import TestModel, NonImportExportModel
+from factory.django import DjangoModelFactory
+from faker import Faker
 
 User = get_user_model()
+faker = Faker()
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -32,49 +36,41 @@ class ContentTypeFactory(factory.django.DjangoModelFactory):
         django_get_or_create = ('app_label', 'model')
 
     app_label = 'data_import_export'
-    model = 'testmodel'
+    model = factory.Iterator(['testmodel', 'nonimportexportmodel'])
 
 
-class ImportExportConfigFactory(factory.django.DjangoModelFactory):
+class ImportExportConfigFactory(DjangoModelFactory):
     """Factory for ImportExportConfig model."""
     class Meta:
         model = ImportExportConfig
+        django_get_or_create = ('name',)
+        skip_postgeneration_save = True
 
     name = factory.Sequence(lambda n: f'Config {n}')
-    description = factory.Faker('text', max_nb_chars=200, locale='en_US')
     content_type = factory.SubFactory(ContentTypeFactory)
-    field_mapping = factory.SubFactory(factory.DictFactory,
-        source_field='target_field',
-        name='name',
-        email='email'
-    )
-    is_active = True
-    created_by = factory.SubFactory(UserFactory)
-    updated_by = factory.SelfAttribute('created_by')
+    description = factory.Faker('sentence')
+    field_mapping = factory.Dict({
+        'field1': 'Field 1',
+        'field2': 'Field 2'
+    })
 
 
-class ImportExportLogFactory(factory.django.DjangoModelFactory):
+class ImportExportLogFactory(DjangoModelFactory):
     """Factory for ImportExportLog model."""
     class Meta:
         model = ImportExportLog
+        django_get_or_create = ('config',)
+        skip_postgeneration_save = True
 
     config = factory.SubFactory(ImportExportConfigFactory)
-    operation = 'import'
-    status = 'completed'
-    file_name = factory.Sequence(lambda n: f'test_file_{n}.csv')
-    records_processed = factory.LazyFunction(lambda: random.randint(0, 1000))
-    records_succeeded = factory.LazyAttribute(
-        lambda obj: obj.records_processed if not hasattr(obj, '_records_succeeded') else obj._records_succeeded
-    )
-    records_failed = factory.LazyAttribute(
-        lambda obj: obj.records_processed - obj.records_succeeded if not hasattr(obj, '_records_failed') else obj._records_failed
-    )
-    error_message = factory.Maybe(
-        'records_failed',
-        factory.Faker('text', max_nb_chars=200, locale='en_US'),
-        ''
-    )
-    performed_by = factory.SubFactory(UserFactory)
+    performed_by = factory.SubFactory('Apps.users.tests.factories.UserFactory')
+    operation = factory.Iterator(['import', 'export'])
+    status = factory.Iterator(['in_progress', 'completed', 'failed'])
+    records_succeeded = factory.Faker('random_int', min=0, max=500)
+    records_failed = factory.Faker('random_int', min=0, max=500)
+    records_processed = factory.LazyAttribute(lambda obj: obj.records_succeeded + obj.records_failed)
+    error_message = factory.LazyAttribute(lambda obj: faker.sentence() if obj.status == 'failed' else None)
+    file_name = factory.django.FileField(filename='test.csv', null=True)
 
     @factory.post_generation
     def validate(self, create, extracted, **kwargs):

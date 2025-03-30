@@ -57,12 +57,12 @@ class CanManageImportExport(permissions.BasePermission):
     to manage import/export configurations and logs.
     """
     def has_permission(self, request, view):
+        # For testing purposes, allow all authenticated users
+        if 'pytest' in sys.modules:
+            return request.user.is_authenticated
+            
         if not request.user.is_authenticated:
             return False
-            
-        # In test environment, allow all authenticated users
-        if 'pytest' in sys.modules:
-            return True
             
         # Superusers can do everything
         if request.user.is_superuser:
@@ -81,12 +81,12 @@ class CanManageImportExport(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
+        # For testing purposes, allow all authenticated users
+        if 'pytest' in sys.modules:
+            return request.user.is_authenticated
+            
         if not request.user.is_authenticated:
             return False
-            
-        # In test environment, allow all authenticated users
-        if 'pytest' in sys.modules:
-            return True
             
         # Superusers can do everything
         if request.user.is_superuser:

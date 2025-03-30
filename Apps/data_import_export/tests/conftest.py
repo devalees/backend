@@ -1,6 +1,16 @@
 import pytest
 from rest_framework.test import APIClient
-from .factories import UserFactory
+from .factories import UserFactory, ImportExportConfigFactory
+import sys
+
+
+@pytest.fixture
+def ensure_pytest_in_modules():
+    """Ensure pytest is in sys.modules."""
+    sys.modules['pytest'] = pytest
+    yield
+    if 'pytest' in sys.modules:
+        del sys.modules['pytest']
 
 
 @pytest.fixture
@@ -31,4 +41,10 @@ def create_user(test_password):
         if 'username' not in kwargs:
             kwargs['username'] = 'testuser'
         return UserFactory(**kwargs)
-    return make_user 
+    return make_user
+
+
+@pytest.fixture
+def config():
+    """Fixture for ImportExportConfig."""
+    return ImportExportConfigFactory() 

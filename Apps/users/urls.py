@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet
+from rest_framework import permissions
 
 app_name = 'users'  # Add app_name for namespace
 
@@ -14,7 +15,9 @@ urlpatterns = [
     path('', include(router.urls)),
     path('register/', UserViewSet.as_view({'post': 'register'}), name='register'),
     path('password-reset/', UserViewSet.as_view({'post': 'password_reset'}), name='password-reset'),
-    path('password-reset-confirm/', UserViewSet.as_view({'post': 'password_reset_confirm'}), name='password-reset-confirm'),
+    path('password-reset-confirm/', UserViewSet.as_view({
+        'post': 'password_reset_confirm'
+    }, permission_classes=[permissions.AllowAny]), name='password-reset-confirm'),
     # 2FA endpoints
     path('verify-2fa/', UserViewSet.as_view({'post': 'verify_2fa'}), name='verify-2fa'),
     path('enable-2fa/', UserViewSet.as_view({'post': 'enable_2fa'}), name='enable-2fa'),
