@@ -185,7 +185,12 @@ class TestUserViewSet:
 
     def test_password_reset_confirm(self, api_client):
         """Test confirming password reset with valid token."""
+        # Create user with a known password
         user = UserFactory()
+        user.set_password('oldpassword123')
+        user.save()
+        
+        # Generate reset token
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         
@@ -202,7 +207,7 @@ class TestUserViewSet:
         print(f"Debug test: Sending data={data}")
         
         response = api_client.post(
-            reverse('users:password-reset-confirm'),
+            reverse('users:users-password-reset-confirm'),
             data
         )
         print(f"Debug test: Response status={response.status_code}")

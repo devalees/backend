@@ -24,7 +24,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """ViewSet for User model"""
     queryset = User.objects.all().order_by('id')  # Add default ordering
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = []  # Remove default permission class
 
     def get_queryset(self):
         """Filter queryset based on user permissions"""
@@ -366,10 +366,11 @@ class UserViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            uid = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=uid)
-            print(f"Debug: Found user with id={uid}")
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            # Decode the base64 UID
+            decoded_uid = urlsafe_base64_decode(uid).decode()
+            user = User.objects.get(pk=decoded_uid)
+            print(f"Debug: Found user with id={decoded_uid}")
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist, UnicodeDecodeError):
             print("Debug: Invalid uid or user not found")
             return Response(
                 {'error': 'Invalid reset link'},
