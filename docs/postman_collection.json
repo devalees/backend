@@ -1,0 +1,2052 @@
+{
+  "info": {
+    "_postman_id": "b5e8f9d9-9f9f-9f9f-9f9f-9f9f9f9f9f9f",
+    "name": "Project Management API",
+    "description": "Complete API collection for the Project Management System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "login", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"your_password\"\n}"
+            },
+            "description": "Login user and get JWT tokens"
+          }
+        },
+        {
+          "name": "Verify 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/verify-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "verify-2fa", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": 1,\n    \"code\": \"123456\"\n}"
+            },
+            "description": "Verify 2FA code and get tokens"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/refresh-token/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "refresh-token", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"your_refresh_token\"\n}"
+            },
+            "description": "Refresh access token using refresh token"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/logout/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "logout", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"your_refresh_token\"\n}"
+            },
+            "description": "Logout user (invalidate refresh token)"
+          }
+        },
+        {
+          "name": "Enable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/enable-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "enable-2fa", ""]
+            },
+            "description": "Enable 2FA for current user"
+          }
+        },
+        {
+          "name": "Confirm 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/confirm-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "confirm-2fa", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"123456\"\n}"
+            },
+            "description": "Confirm and enable 2FA after verifying code"
+          }
+        },
+        {
+          "name": "Disable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/disable-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "disable-2fa", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"123456\"\n}"
+            },
+            "description": "Disable 2FA for current user"
+          }
+        },
+        {
+          "name": "Generate Backup Codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/generate-backup-codes/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "generate-backup-codes", ""]
+            },
+            "description": "Generate new backup codes for 2FA"
+          }
+        },
+        {
+          "name": "Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/password-reset/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "password-reset", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"user@example.com\"\n}"
+            },
+            "description": "Request password reset"
+          }
+        },
+        {
+          "name": "Password Reset Confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/password-reset-confirm/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "password-reset-confirm", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"uid\": \"MQ\",\n    \"token\": \"your_reset_token\",\n    \"new_password\": \"new_secure_password\"\n}"
+            },
+            "description": "Confirm password reset"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", ""]
+            },
+            "description": "List all users"
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"newuser\",\n    \"email\": \"user@example.com\",\n    \"password\": \"secure_password\",\n    \"password2\": \"secure_password\",\n    \"first_name\": \"Optional First\",\n    \"last_name\": \"Optional Last\"\n}"
+            },
+            "description": "Create a new user"
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", ""]
+            },
+            "description": "Get current user details"
+          }
+        },
+        {
+          "name": "Get User Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}", ""]
+            },
+            "description": "Get user details by ID"
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Updated First\",\n    \"last_name\": \"Updated Last\",\n    \"email\": \"updated@example.com\"\n}"
+            },
+            "description": "Update user details"
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}", ""]
+            },
+            "description": "Delete a user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Project Management",
+      "item": [
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", ""]
+            },
+            "description": "List all accessible projects"
+          }
+        },
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Project Name\",\n    \"start_date\": \"2024-03-29\",\n    \"end_date\": \"2024-04-29\",\n    \"organization_id\": 1,\n    \"owner_id\": 1,\n    \"description\": \"Optional project description\"\n}"
+            },
+            "description": "Create a new project"
+          }
+        },
+        {
+          "name": "Get Project Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "{{project_id}}", ""]
+            },
+            "description": "Get project details"
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "{{project_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Updated Project Name\",\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update project details"
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "{{project_id}}", ""]
+            },
+            "description": "Delete a project"
+          }
+        },
+        {
+          "name": "Add Team Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/{{project_id}}/add_team_members/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "{{project_id}}", "add_team_members", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_ids\": [1, 2, 3]\n}"
+            },
+            "description": "Add team members to project"
+          }
+        },
+        {
+          "name": "Remove Team Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/{{project_id}}/remove_team_members/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "{{project_id}}", "remove_team_members", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_ids\": [1, 2, 3]\n}"
+            },
+            "description": "Remove team members from project"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Task Management",
+      "item": [
+        {
+          "name": "List Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", ""]
+            },
+            "description": "List all accessible tasks"
+          }
+        },
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Task Name\",\n    \"due_date\": \"2024-04-01\",\n    \"project\": 1,\n    \"description\": \"Optional task description\",\n    \"priority\": \"medium\"\n}"
+            },
+            "description": "Create a new task"
+          }
+        },
+        {
+          "name": "Get Task Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/{{task_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", "{{task_id}}", ""]
+            },
+            "description": "Get task details"
+          }
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/{{task_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", "{{task_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Updated Task Name\",\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update task details"
+          }
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/{{task_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", "{{task_id}}", ""]
+            },
+            "description": "Delete a task"
+          }
+        },
+        {
+          "name": "Assign Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/{{task_id}}/assign/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", "{{task_id}}", "assign", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": 1\n}"
+            },
+            "description": "Assign task to a user"
+          }
+        },
+        {
+          "name": "Change Task Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tasks/{{task_id}}/change_status/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tasks", "{{task_id}}", "change_status", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"done\"\n}"
+            },
+            "description": "Update task status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Time Management",
+      "item": [
+        {
+          "name": "List Time Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-categories/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-categories", ""]
+            },
+            "description": "List all time categories"
+          }
+        },
+        {
+          "name": "Create Time Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-categories/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-categories", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Development\",\n    \"description\": \"Time spent on development tasks\"\n}"
+            },
+            "description": "Create a new time category"
+          }
+        },
+        {
+          "name": "List Time Entries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-entries/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-entries", ""]
+            },
+            "description": "List all time entries"
+          }
+        },
+        {
+          "name": "Create Time Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-entries/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-entries", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"task\": 1,\n    \"category\": 1,\n    \"hours\": 2.5,\n    \"date\": \"2024-03-20\",\n    \"description\": \"Worked on feature implementation\"\n}"
+            },
+            "description": "Create a new time entry"
+          }
+        },
+        {
+          "name": "Get Time Entry Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-entries/{{time_entry_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-entries", "{{time_entry_id}}", ""]
+            },
+            "description": "Get time entry details"
+          }
+        },
+        {
+          "name": "Update Time Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-entries/{{time_entry_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-entries", "{{time_entry_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"hours\": 3.0,\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update time entry details"
+          }
+        },
+        {
+          "name": "Delete Time Entry",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/time-entries/{{time_entry_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "time-entries", "{{time_entry_id}}", ""]
+            },
+            "description": "Delete a time entry"
+          }
+        },
+        {
+          "name": "List Timesheets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/timesheets/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "timesheets", ""]
+            },
+            "description": "List all timesheets"
+          }
+        },
+        {
+          "name": "Create Timesheet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/timesheets/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "timesheets", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"start_date\": \"2024-03-01\",\n    \"end_date\": \"2024-03-15\",\n    \"status\": \"draft\"\n}"
+            },
+            "description": "Create a new timesheet"
+          }
+        },
+        {
+          "name": "Get Timesheet Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/timesheets/{{timesheet_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "timesheets", "{{timesheet_id}}", ""]
+            },
+            "description": "Get timesheet details"
+          }
+        },
+        {
+          "name": "Submit Timesheet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/timesheets/{{timesheet_id}}/submit/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "timesheets", "{{timesheet_id}}", "submit", ""]
+            },
+            "description": "Submit a timesheet for approval"
+          }
+        },
+        {
+          "name": "Approve Timesheet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/timesheets/{{timesheet_id}}/approve/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "timesheets", "{{timesheet_id}}", "approve", ""]
+            },
+            "description": "Approve a submitted timesheet"
+          }
+        }
+      ]
+    },
+    {
+      "name": "RBAC",
+      "item": [
+        {
+          "name": "List Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", ""]
+            },
+            "description": "List all permissions"
+          }
+        },
+        {
+          "name": "Create Permission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Edit User\",\n    \"codename\": \"edit_user\",\n    \"description\": \"Can edit user details\"\n}"
+            },
+            "description": "Create a new permission"
+          }
+        },
+        {
+          "name": "List Field Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/field-permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "field-permissions", ""]
+            },
+            "description": "List all field-level permissions"
+          }
+        },
+        {
+          "name": "Create Field Permission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/field-permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "field-permissions", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"content_type_id\": 1,\n    \"field_name\": \"email\",\n    \"permission_type\": \"read\"\n}"
+            },
+            "description": "Create a new field-level permission"
+          }
+        },
+        {
+          "name": "Get Available Fields",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/field-permissions/available_fields/?content_type_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "field-permissions", "available_fields"],
+              "query": [
+                {
+                  "key": "content_type_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Get available fields for a specific model"
+          }
+        },
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/roles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "roles", ""]
+            },
+            "description": "List all roles"
+          }
+        },
+        {
+          "name": "Create Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/roles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "roles", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Editor\",\n    \"description\": \"Content editor role\",\n    \"permission_ids\": [1, 2],\n    \"field_permission_ids\": [1]\n}"
+            },
+            "description": "Create a new role"
+          }
+        },
+        {
+          "name": "Assign Permissions to Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/roles/{{role_id}}/assign_permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "roles", "{{role_id}}", "assign_permissions", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"permission_ids\": [1, 2],\n    \"field_permission_ids\": [1]\n}"
+            },
+            "description": "Assign permissions to a role"
+          }
+        },
+        {
+          "name": "List Role Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/role-permissions/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "role-permissions", ""]
+            },
+            "description": "List all role-permission relationships"
+          }
+        },
+        {
+          "name": "List User Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user-roles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user-roles", ""]
+            },
+            "description": "List all user-role assignments"
+          }
+        },
+        {
+          "name": "Create User Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user-roles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user-roles", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user\": 1,\n    \"role\": 1\n}"
+            },
+            "description": "Assign a role to a user"
+          }
+        },
+        {
+          "name": "Get Current User's Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user-roles/my_roles/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user-roles", "my_roles", ""]
+            },
+            "description": "Get roles assigned to the current user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organization Management",
+      "item": [
+        {
+          "name": "List Organizations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/organizations/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "organizations", ""]
+            },
+            "description": "List all accessible organizations"
+          }
+        },
+        {
+          "name": "Create Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/organizations/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "organizations", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Organization Name\",\n    \"description\": \"Organization description\",\n    \"website\": \"https://example.com\",\n    \"address\": \"123 Main St\",\n    \"phone\": \"+1234567890\"\n}"
+            },
+            "description": "Create a new organization"
+          }
+        },
+        {
+          "name": "Get Organization Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "organizations", "{{organization_id}}", ""]
+            },
+            "description": "Get organization details"
+          }
+        },
+        {
+          "name": "Update Organization",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "organizations", "{{organization_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Organization Name\",\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update organization details"
+          }
+        },
+        {
+          "name": "Delete Organization",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "organizations", "{{organization_id}}", ""]
+            },
+            "description": "Delete an organization"
+          }
+        },
+        {
+          "name": "List Departments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/departments/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "departments", ""]
+            },
+            "description": "List all departments"
+          }
+        },
+        {
+          "name": "Create Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/departments/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "departments", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Department Name\",\n    \"organization\": 1,\n    \"description\": \"Department description\",\n    \"manager_id\": 1\n}"
+            },
+            "description": "Create a new department"
+          }
+        },
+        {
+          "name": "Get Department Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/departments/{{department_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "departments", "{{department_id}}", ""]
+            },
+            "description": "Get department details"
+          }
+        },
+        {
+          "name": "Update Department",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/departments/{{department_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "departments", "{{department_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Department Name\",\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update department details"
+          }
+        },
+        {
+          "name": "Delete Department",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/departments/{{department_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "departments", "{{department_id}}", ""]
+            },
+            "description": "Delete a department"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Team Management",
+      "item": [
+        {
+          "name": "List Teams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ""]
+            },
+            "description": "List all teams"
+          }
+        },
+        {
+          "name": "Create Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Team Name\",\n    \"organization\": 1,\n    \"description\": \"Team description\",\n    \"leader_id\": 1,\n    \"member_ids\": [2, 3, 4]\n}"
+            },
+            "description": "Create a new team"
+          }
+        },
+        {
+          "name": "Get Team Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", ""]
+            },
+            "description": "Get team details"
+          }
+        },
+        {
+          "name": "Update Team",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Updated Team Name\",\n    \"description\": \"Updated description\"\n}"
+            },
+            "description": "Update team details"
+          }
+        },
+        {
+          "name": "Delete Team",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", ""]
+            },
+            "description": "Delete a team"
+          }
+        },
+        {
+          "name": "Add Team Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/add_members/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", "add_members", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_ids\": [1, 2, 3]\n}"
+            },
+            "description": "Add members to team"
+          }
+        },
+        {
+          "name": "Remove Team Members",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/remove_members/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", "remove_members", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_ids\": [1, 2, 3]\n}"
+            },
+            "description": "Remove members from team"
+          }
+        },
+        {
+          "name": "Change Team Leader",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/{{team_id}}/change_leader/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "{{team_id}}", "change_leader", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"new_leader_id\": 1\n}"
+            },
+            "description": "Change team leader"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contact Management",
+      "item": [
+        {
+          "name": "List Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", ""]
+            },
+            "description": "List all contacts"
+          }
+        },
+        {
+          "name": "Create Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"+1234567890\",\n    \"organization\": 1,\n    \"position\": \"Manager\",\n    \"notes\": \"Important contact\"\n}"
+            },
+            "description": "Create a new contact"
+          }
+        },
+        {
+          "name": "Get Contact Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+            },
+            "description": "Get contact details"
+          }
+        },
+        {
+          "name": "Update Contact",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"first_name\": \"Updated First\",\n    \"last_name\": \"Updated Last\",\n    \"notes\": \"Updated notes\"\n}"
+            },
+            "description": "Update contact details"
+          }
+        },
+        {
+          "name": "Delete Contact",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+            },
+            "description": "Delete a contact"
+          }
+        },
+        {
+          "name": "Import Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/import/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", "import", ""]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/contacts.csv"
+                }
+              ]
+            },
+            "description": "Import contacts from CSV file"
+          }
+        },
+        {
+          "name": "Export Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/contacts/export/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "contacts", "export", ""]
+            },
+            "description": "Export contacts to CSV file"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Data Transfer",
+      "item": [
+        {
+          "name": "Import Project Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/import/project/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "import", "project", ""]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/project_data.json"
+                }
+              ]
+            },
+            "description": "Import project data from JSON file"
+          }
+        },
+        {
+          "name": "Export Project Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/export/project/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "export", "project", "{{project_id}}", ""]
+            },
+            "description": "Export project data to JSON file"
+          }
+        },
+        {
+          "name": "Import Task Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/import/task/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "import", "task", ""]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/task_data.json"
+                }
+              ]
+            },
+            "description": "Import task data from JSON file"
+          }
+        },
+        {
+          "name": "Export Task Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/export/task/{{task_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "export", "task", "{{task_id}}", ""]
+            },
+            "description": "Export task data to JSON file"
+          }
+        },
+        {
+          "name": "Import Organization Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/import/organization/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "import", "organization", ""]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/organization_data.json"
+                }
+              ]
+            },
+            "description": "Import organization data from JSON file"
+          }
+        },
+        {
+          "name": "Export Organization Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/export/organization/{{organization_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "export", "organization", "{{organization_id}}", ""]
+            },
+            "description": "Export organization data to JSON file"
+          }
+        },
+        {
+          "name": "Bulk Import Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/bulk-import/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "bulk-import", ""]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/bulk_data.json"
+                }
+              ]
+            },
+            "description": "Import multiple data types in a single operation"
+          }
+        },
+        {
+          "name": "Bulk Export Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/data/bulk-export/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "data", "bulk-export", ""]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"projects\": [1, 2],\n    \"tasks\": [1, 2, 3],\n    \"organizations\": [1]\n}"
+            },
+            "description": "Export multiple data types in a single operation"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "your_access_token_here",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "project_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "task_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "time_entry_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "timesheet_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "role_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "organization_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "department_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "team_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "contact_id",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+} 
