@@ -3,10 +3,11 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from Apps.data_import_export.mixins import ImportExportMixin
 
 User = get_user_model()
 
-class BaseModel(models.Model):
+class BaseModel(ImportExportMixin, models.Model):
     """Base model with common fields and methods"""
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,6 +30,10 @@ class BaseModel(models.Model):
 
     class Meta:
         abstract = True
+
+    # Import/Export configuration
+    import_export_enabled = True  # Enable import/export by default for all models
+    import_export_fields = None  # Use all non-relation fields by default
 
     def clean(self):
         """Base validation method"""

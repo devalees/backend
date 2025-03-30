@@ -1985,6 +1985,117 @@
           }
         }
       ]
+    },
+    {
+      "name": "Data Import/Export",
+      "item": [
+        {
+          "name": "Import/Export Configurations",
+          "item": [
+            {
+              "name": "List Configurations",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/import-export/configs/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Create Configuration",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/import-export/configs/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"content_type\": \"project/project\",\n    \"name\": \"Project Import/Export\",\n    \"description\": \"Configuration for importing and exporting projects\",\n    \"field_mapping\": {\n        \"title\": \"Title\",\n        \"description\": \"Description\",\n        \"start_date\": \"Start Date\",\n        \"end_date\": \"End Date\",\n        \"status\": \"Status\",\n        \"priority\": \"Priority\",\n        \"owner\": \"Owner ID\",\n        \"organization\": \"Organization ID\"\n    }\n}"
+                }
+              }
+            },
+            {
+              "name": "Import Data",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/import-export/configs/{{config_id}}/import_data/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Export Data",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/import-export/configs/{{config_id}}/export_data/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import/Export Logs",
+          "item": [
+            {
+              "name": "List Logs",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/import-export/logs/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Get Log Details",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/import-export/logs/{{log_id}}/",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

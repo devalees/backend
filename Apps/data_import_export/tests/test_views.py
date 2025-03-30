@@ -3,6 +3,8 @@ from django.urls import reverse, include, path
 from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 import io
 import csv
 from ..models import ImportExportConfig, ImportExportLog
@@ -22,8 +24,53 @@ def api_client():
 
 @pytest.fixture
 def authenticated_client(api_client):
-    """Fixture for authenticated API client."""
+    """Fixture for authenticated API client with import/export permissions."""
     user = UserFactory()
+    
+    # Add necessary permissions for import/export operations
+    content_type = ContentType.objects.get_for_model(ImportExportConfig)
+    
+    # Get or create permissions for ImportExportConfig
+    config_permissions = [
+        'add_importexportconfig',
+        'change_importexportconfig',
+        'view_importexportconfig',
+        'delete_importexportconfig',
+    ]
+    
+    for codename in config_permissions:
+        permission = Permission.objects.filter(
+            content_type=content_type,
+            codename=codename
+        ).first()
+        if permission:
+            user.user_permissions.add(permission)
+    
+    # Get or create permissions for ImportExportLog
+    log_content_type = ContentType.objects.get_for_model(ImportExportLog)
+    log_permissions = [
+        'view_importexportlog',
+        'change_importexportlog',
+        'add_importexportlog',
+        'delete_importexportlog',
+    ]
+    
+    for codename in log_permissions:
+        permission = Permission.objects.filter(
+            content_type=log_content_type,
+            codename=codename
+        ).first()
+        if permission:
+            user.user_permissions.add(permission)
+    
+    # Add custom permission for managing import/export
+    custom_permission = Permission.objects.filter(
+        content_type=content_type,
+        codename='can_manage_import_export'
+    ).first()
+    if custom_permission:
+        user.user_permissions.add(custom_permission)
+    
     api_client.force_authenticate(user=user)
     return api_client, user
 

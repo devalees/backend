@@ -1,6 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
 from ..models import ImportExportConfig, ImportExportLog
 from .factories import (
     UserFactory,
@@ -8,6 +9,18 @@ from .factories import (
     ImportExportConfigFactory,
     ImportExportLogFactory
 )
+
+
+class TestModel(models.Model):
+    """Test model for import/export functionality."""
+    name = models.CharField(max_length=100)
+    
+    class Meta:
+        app_label = 'data_import_export'
+        
+    @classmethod
+    def is_import_export_enabled(cls):
+        return True
 
 
 @pytest.mark.django_db
@@ -38,11 +51,12 @@ class TestImportExportConfig:
     def test_unique_name_per_content_type(self):
         """Test that names must be unique per content type."""
         config1 = ImportExportConfigFactory()
+        config2 = ImportExportConfigFactory.build(
+            name=config1.name,
+            content_type=config1.content_type
+        )
         with pytest.raises(ValidationError):
-            ImportExportConfigFactory(
-                name=config1.name,
-                content_type=config1.content_type
-            )
+            config2.full_clean()
 
     def test_str_representation(self):
         """Test string representation of config."""
@@ -101,11 +115,13 @@ class TestImportExportLog:
 
     def test_records_validation(self):
         """Test records count validation."""
+        log = ImportExportLogFactory.build(
+            records_processed=50,
+            records_succeeded=75,
+            records_failed=0
+        )
         with pytest.raises(ValidationError):
-            ImportExportLogFactory(
-                records_processed=50,
-                records_succeeded=75
-            ).full_clean()
+            log.full_clean()
 
     @pytest.mark.parametrize('status,expected_is_failed', [
         (ImportExportLog.STATUS_FAILED, True),

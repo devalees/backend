@@ -31,7 +31,7 @@ class ContentTypeFactory(factory.django.DjangoModelFactory):
         model = ContentType
         django_get_or_create = ('app_label', 'model')
 
-    app_label = 'testapp'
+    app_label = 'data_import_export'
     model = 'testmodel'
 
 
@@ -64,14 +64,20 @@ class ImportExportLogFactory(factory.django.DjangoModelFactory):
     file_name = factory.Sequence(lambda n: f'test_file_{n}.csv')
     records_processed = factory.LazyFunction(lambda: random.randint(0, 1000))
     records_succeeded = factory.LazyAttribute(
-        lambda obj: random.randint(0, obj.records_processed)
+        lambda obj: obj.records_processed if not hasattr(obj, '_records_succeeded') else obj._records_succeeded
     )
     records_failed = factory.LazyAttribute(
-        lambda obj: obj.records_processed - obj.records_succeeded
+        lambda obj: obj.records_processed - obj.records_succeeded if not hasattr(obj, '_records_failed') else obj._records_failed
     )
     error_message = factory.Maybe(
         'records_failed',
         factory.Faker('text', max_nb_chars=200, locale='en_US'),
         ''
     )
-    performed_by = factory.SubFactory(UserFactory) 
+    performed_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def validate(self, create, extracted, **kwargs):
+        if not create:
+            return
+        self.full_clean() 

@@ -6,8 +6,8 @@ app_name = 'data_import_export'
 
 # Create a router and register our viewsets with it
 router = DefaultRouter()
-router.register('configs', ImportExportConfigViewSet, basename='importexportconfig')
-router.register('logs', ImportExportLogViewSet, basename='importexportlog')
+router.register(r'configs', ImportExportConfigViewSet, basename='importexportconfig')
+router.register(r'logs', ImportExportLogViewSet, basename='importexportlog')
 
 # The API URLs are now determined automatically by the router
 urlpatterns = [
