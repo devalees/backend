@@ -10,7 +10,8 @@ fake = RealFaker()
 
 class UserFactory(DjangoModelFactory):
     class Meta:
-        model = get_user_model()
+        model = User
+        skip_postgeneration_save = True
 
     username = LazyFunction(lambda: fake.unique.user_name())
     email = LazyFunction(lambda: fake.unique.email())

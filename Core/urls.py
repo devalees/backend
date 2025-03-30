@@ -46,6 +46,7 @@ urlpatterns = [
         path('projects/', include('Apps.project.urls', namespace='project')),
         path('time-management/', include('Apps.time_management.urls')),
     ])),
+    path('api/import-export/', include('Apps.data_import_export.urls', namespace='data_import_export')),
 ]
 
 # Debug logging

@@ -7,6 +7,7 @@ from Apps.entity.models import Organization
 class ProjectFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Project
+        skip_postgeneration_save = True
 
     title = factory.Faker('sentence', nb_words=4)
     description = factory.Faker('paragraph')

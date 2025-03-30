@@ -100,6 +100,7 @@ class TimesheetEntry(models.Model):
     class Meta:
         verbose_name_plural = "Timesheet Entries"
         unique_together = ['timesheet', 'time_entry']
+        ordering = ['-date', '-created_at']
 
     def __str__(self):
         return f"{self.timesheet.user.username} - {self.date} ({self.hours} hours)"

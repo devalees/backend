@@ -19,6 +19,7 @@ class Organization(BaseModel):
     description = models.TextField(blank=True, null=True)
 
     class Meta:
+        ordering = ['name']
         verbose_name = 'Entity'
         verbose_name_plural = 'Entities'
 
@@ -59,6 +60,10 @@ class Organization(BaseModel):
         # Check name length
         if len(self.name) > 255:
             raise ValidationError({"name": ["Organization name cannot exceed 255 characters"]})
+
+        # Check name uniqueness
+        if Organization.objects.exclude(pk=self.pk).filter(name=self.name).exists():
+            raise ValidationError({"name": ["Organization with this name already exists"]})
 
 class Department(BaseModel):
     """Department model representing a division within an organization"""
@@ -173,6 +178,7 @@ class TeamMember(BaseModel):
         unique_together = ('team', 'user')
         verbose_name = 'Team Member'
         verbose_name_plural = 'Team Members'
+        ordering = ['team__name', 'user__username']
 
     def __str__(self):
         return f"{self.user.username} - {self.team.name} ({self.role})"

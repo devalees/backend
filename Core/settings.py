@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'import_export',  # Django Import Export base package
     'Apps.core',
     'Apps.users',
     'Apps.entity',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'Apps.project',
     'Apps.rbac',  # Extended Role-Based Access Control
     'Apps.time_management',  # Time Management and Timesheet
+    'Apps.data_import_export',  # New Import Export functionality
 ]
 
 MIDDLEWARE = [
