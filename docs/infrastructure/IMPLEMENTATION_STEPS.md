@@ -1,16 +1,16 @@
 # Core Services Infrastructure Implementation Steps
 
 1. **Celery Background Task Configuration**
-   - [ ] Set up Celery with Django
-   - [ ] Configure Celery broker (Redis/RabbitMQ)
-   - [ ] Set up Celery workers
-   - [ ] Configure task routing
-   - [ ] Implement task monitoring
-   - [ ] Set up task retry policies
-   - [ ] Configure task timeouts
-   - [ ] Implement task prioritization
-   - [ ] Set up task result backend
-   - [ ] Configure task logging
+   - [x] Set up Celery with Django
+   - [x] Configure Celery broker (Redis/RabbitMQ)
+   - [x] Set up Celery workers
+   - [x] Configure task routing
+   - [x] Implement task monitoring
+   - [x] Set up task retry policies
+   - [x] Configure task timeouts
+   - [x] Implement task prioritization
+   - [x] Set up task result backend
+   - [x] Configure task logging
 
 2. **WebSocket Setup with Django Channels**
    - [ ] Install and configure Django Channels
