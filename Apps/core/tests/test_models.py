@@ -76,28 +76,35 @@ class TestBaseModel(TestCase):
 
 @pytest.mark.django_db
 class TestUser:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.user = UserFactory()
+        self.superuser = UserFactory(is_superuser=True, is_staff=True)
+
     def test_create_user(self):
-        """Test creating a regular user"""
-        user = UserFactory()
-        assert user.username is not None
-        assert user.email is not None
+        """Test creating a new user."""
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        assert user.email == 'test@example.com'
+        assert user.username == 'testuser'
         assert user.check_password('testpass123')
         assert not user.is_staff
         assert not user.is_superuser
 
     def test_create_superuser(self):
         """Test creating a superuser"""
-        admin_user = UserFactory(is_superuser=True, is_staff=True)
-        assert admin_user.username is not None
-        assert admin_user.email is not None
-        assert admin_user.check_password('testpass123')
-        assert admin_user.is_staff
-        assert admin_user.is_superuser
+        assert self.superuser.username is not None
+        assert self.superuser.email is not None
+        assert self.superuser.check_password('testpass123')
+        assert self.superuser.is_staff
+        assert self.superuser.is_superuser
 
     def test_user_str(self):
         """Test the string representation of the user"""
-        user = UserFactory()
-        assert str(user) == user.username
+        assert str(self.user) == self.user.username
 
     def test_user_email_normalized(self):
         """Test that email is normalized when creating a user"""
@@ -117,14 +124,13 @@ class TestUser:
 
     def test_user_permissions(self):
         """Test user permissions"""
-        user = UserFactory()
-        assert not user.is_staff
-        assert not user.is_superuser
+        assert not self.user.is_staff
+        assert not self.user.is_superuser
 
-        user.is_staff = True
-        user.save()
-        assert user.is_staff
+        self.user.is_staff = True
+        self.user.save()
+        assert self.user.is_staff
 
-        user.is_superuser = True
-        user.save()
-        assert user.is_superuser 
+        self.user.is_superuser = True
+        self.user.save()
+        assert self.user.is_superuser 

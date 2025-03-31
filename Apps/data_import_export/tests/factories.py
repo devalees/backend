@@ -67,6 +67,7 @@ class ImportExportLogFactory(DjangoModelFactory):
     """Factory for ImportExportLog model."""
     class Meta:
         model = ImportExportLog
+        skip_postgeneration_save = True
 
     config = factory.SubFactory(ImportExportConfigFactory)
     operation = factory.Iterator([ImportExportLog.OPERATION_IMPORT, ImportExportLog.OPERATION_EXPORT])
