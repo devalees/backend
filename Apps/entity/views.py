@@ -9,7 +9,7 @@ from .serializers import OrganizationSerializer, DepartmentSerializer, TeamSeria
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     """ViewSet for Organization model"""
-    queryset = Organization.objects.all()
+    queryset = Organization.all_objects.all()
     serializer_class = OrganizationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -25,13 +25,13 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     def team_member(self, request, pk=None):
         """Get all team members for an organization"""
         organization = self.get_object()
-        team_members = TeamMember.objects.filter(team__department__organization=organization)
+        team_members = TeamMember.all_objects.filter(team__department__organization=organization)
         serializer = TeamMemberSerializer(team_members, many=True)
         return Response(serializer.data)
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     """ViewSet for Department model"""
-    queryset = Department.objects.all()
+    queryset = Department.all_objects.all()
     serializer_class = DepartmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -39,7 +39,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         """Filter departments by organization"""
         organization_id = self.request.query_params.get('organization', None)
         parent_id = self.request.query_params.get('parent', None)
-        queryset = Department.objects.all()
+        queryset = Department.all_objects.all()
 
         if organization_id:
             queryset = queryset.filter(organization_id=organization_id)
@@ -60,7 +60,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     def team_member(self, request, pk=None):
         """Get all team members for a department"""
         department = self.get_object()
-        team_members = TeamMember.objects.filter(team__department=department)
+        team_members = TeamMember.all_objects.filter(team__department=department)
         serializer = TeamMemberSerializer(team_members, many=True)
         return Response(serializer.data)
 
@@ -74,7 +74,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
 class TeamViewSet(viewsets.ModelViewSet):
     """ViewSet for Team model"""
-    queryset = Team.objects.all()
+    queryset = Team.all_objects.all()
     serializer_class = TeamSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -82,7 +82,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         """Filter teams by department"""
         department_id = self.request.query_params.get('department', None)
         organization_id = self.request.query_params.get('organization', None)
-        queryset = Team.objects.all()
+        queryset = Team.all_objects.all()
 
         if department_id:
             queryset = queryset.filter(department_id=department_id)
@@ -101,7 +101,7 @@ class TeamViewSet(viewsets.ModelViewSet):
 
 class TeamMemberViewSet(viewsets.ModelViewSet):
     """ViewSet for TeamMember model"""
-    queryset = TeamMember.objects.all()
+    queryset = TeamMember.all_objects.all()
     serializer_class = TeamMemberSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -110,7 +110,7 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
         team_id = self.request.query_params.get('team', None)
         department_id = self.request.query_params.get('department', None)
         organization_id = self.request.query_params.get('organization', None)
-        queryset = TeamMember.objects.all()
+        queryset = TeamMember.all_objects.all()
 
         if team_id:
             queryset = queryset.filter(team_id=team_id)

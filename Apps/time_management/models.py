@@ -3,7 +3,11 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from Core.models.base import TaskAwareModel
+from Apps.core.models import TaskAwareModel
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+User = get_user_model()
 
 class TimeCategory(TaskAwareModel):
     """Categories for time entries (e.g., Development, Meeting, Break) with task handling capabilities"""

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from Apps.core.models import BaseModel
 from Apps.core.tests.factories import UserFactory, BaseModelFactory
-from datetime import timedelta
+import time
 
 User = get_user_model()
 
@@ -15,46 +15,64 @@ class TestModel(BaseModel):
     class Meta:
         db_table = 'test_model'
 
+    def __str__(self):
+        return self.name
+
 class TestBaseModel(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = UserFactory()
+    """Test cases for BaseModel."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
 
     def test_created_at_auto_now_add(self):
-        """Test that created_at is automatically set when object is created"""
-        with transaction.atomic():
-            connection.disable_constraint_checking()
-            try:
-                obj = TestModel.objects.create(name="Test Object", created_by=self.user, updated_by=self.user)
-                assert obj.created_at is not None
-            finally:
-                connection.enable_constraint_checking()
+        """Test created_at is set automatically on creation."""
+        model = TestModel.objects.create(name='Test')
+        self.assertIsNotNone(model.created_at)
+        self.assertTrue(timezone.is_aware(model.created_at))
 
     def test_updated_at_auto_now(self):
-        """Test that updated_at is automatically updated when object is modified"""
-        with transaction.atomic():
-            connection.disable_constraint_checking()
-            try:
-                obj = TestModel.objects.create(name="Test Object", created_by=self.user, updated_by=self.user)
-                initial_updated_at = obj.updated_at
-                obj.save()
-                assert obj.updated_at > initial_updated_at
-            finally:
-                connection.enable_constraint_checking()
+        """Test updated_at is updated automatically."""
+        model = TestModel.objects.create(name='Test')
+        original_updated_at = model.updated_at
+        time.sleep(0.1)  # Ensure time difference
+        model.name = 'Updated'
+        model.save()
+        self.assertGreater(model.updated_at, original_updated_at)
 
-    def test_created_by_auto_set(self):
-        """Test that created_by is automatically set when object is created"""
-        obj = TestModel.objects.create(name="Test Object", created_by=self.user)
-        assert obj.created_by == self.user
+    def test_created_by_updated_by(self):
+        """Test created_by and updated_by fields."""
+        model = TestModel.objects.create(name='Test', created_by=self.user, updated_by=self.user)
+        self.assertEqual(model.created_by, self.user)
+        self.assertEqual(model.updated_by, self.user)
 
-    def test_updated_by_auto_set(self):
-        """Test that updated_by is automatically set when object is modified"""
-        obj = TestModel.objects.create(name="Test Object", created_by=self.user)
-        obj.name = "Updated Name"
-        obj.updated_by = self.user
-        obj.save()
-        assert obj.updated_by == self.user
+        new_user = UserFactory()
+        model.updated_by = new_user
+        model.save()
+        assert model.updated_by == new_user
+
+    def test_is_active_default(self):
+        """Test is_active default value."""
+        model = TestModel.objects.create(name='Test')
+        self.assertTrue(model.is_active)
+
+    def test_soft_delete(self):
+        """Test soft delete functionality."""
+        model = TestModel.objects.create(name='Test')
+        model.is_active = False
+        model.save()
+        self.assertFalse(model.is_active)
+        self.assertFalse(TestModel.objects.filter(pk=model.pk).exists())
+        self.assertTrue(TestModel.all_objects.filter(pk=model.pk).exists())
+
+    def test_str_representation(self):
+        """Test string representation."""
+        model = TestModel.objects.create(name='Test')
+        self.assertEqual(str(model), 'Test')
 
 @pytest.mark.django_db
 class TestUser:

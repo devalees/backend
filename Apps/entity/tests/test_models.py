@@ -22,11 +22,16 @@ class TestOrganization:
         assert str(org) == org.name
 
     def test_organization_soft_delete(self):
-        """Test soft delete functionality"""
+        """Test soft delete functionality."""
         org = OrganizationFactory()
+        org_id = org.id
         org.delete()
-        assert not org.is_active
-        assert Organization.objects.filter(id=org.id).exists()
+        
+        # Check that the object is not in the default queryset
+        assert not Organization.objects.filter(id=org_id).exists()
+        
+        # Check that the object still exists in all_objects
+        assert Organization.all_objects.filter(id=org_id).exists()
 
     def test_organization_hard_delete(self):
         """Test hard delete functionality"""
@@ -133,11 +138,16 @@ class TestTeam:
         assert str(team) == f"{team.name} ({team.department.name})"
 
     def test_team_soft_delete(self):
-        """Test soft delete functionality"""
+        """Test soft delete functionality."""
         team = TeamFactory()
+        team_id = team.id
         team.delete()
-        assert not team.is_active
-        assert Team.objects.filter(id=team.id).exists()
+        
+        # Check that the object is not in the default queryset
+        assert not Team.objects.filter(id=team_id).exists()
+        
+        # Check that the object still exists in all_objects
+        assert Team.all_objects.filter(id=team_id).exists()
 
     def test_team_hard_delete(self):
         """Test hard delete functionality"""
@@ -180,11 +190,16 @@ class TestTeamMember:
         assert str(member) == f"{member.user.username} - {member.team.name} ({member.role})"
 
     def test_team_member_soft_delete(self):
-        """Test soft delete functionality"""
+        """Test soft delete functionality."""
         member = TeamMemberFactory()
+        member_id = member.id
         member.delete()
-        assert not member.is_active
-        assert TeamMember.objects.filter(id=member.id).exists()
+        
+        # Check that the object is not in the default queryset
+        assert not TeamMember.objects.filter(id=member_id).exists()
+        
+        # Check that the object still exists in all_objects
+        assert TeamMember.all_objects.filter(id=member_id).exists()
 
     def test_team_member_hard_delete(self):
         """Test hard delete functionality"""

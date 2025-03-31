@@ -228,9 +228,14 @@ class UserViewSet(viewsets.ModelViewSet):
             else:
                 return Response(
                     {'error': 'Invalid 2FA code'},
-                    status=status.HTTP_401_UNAUTHORIZED
+                    status=status.HTTP_400_BAD_REQUEST
                 )
         except ValidationError as e:
+            if 'Too many verification attempts' in str(e):
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST

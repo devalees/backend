@@ -9,6 +9,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 import pyotp
+from django.conf import settings
 
 User = get_user_model()
 
@@ -372,38 +373,30 @@ class TestUserViewSet:
         assert backup_codes[0] not in user.backup_codes
 
     def test_invalid_2fa_code(self, authenticated_client):
-        """Test invalid 2FA code verification"""
-        # Create and authenticate user
+        """Test disabling 2FA with invalid code"""
         user = UserFactory()
+        user.generate_2fa_secret()  # Generate secret first
+        user.enable_2fa()
         authenticated_client.force_authenticate(user=user)
         
-        # First enable 2FA
-        secret = user.generate_2fa_secret()
-        user.enable_2fa()
-        
         url = reverse('users:users-disable-2fa')
-        data = {'code': '000000'}  # Invalid code
-        response = authenticated_client.post(url, data)
-        
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert 'error' in response.data
-        assert response.data['error'] == 'Invalid 2FA code'
-
-    def test_rate_limiting_2fa(self, authenticated_client):
-        """Test rate limiting for 2FA verification attempts"""
-        # Create and authenticate user
-        user = UserFactory()
-        authenticated_client.force_authenticate(user=user)
-        
-        # First enable 2FA
-        secret = user.generate_2fa_secret()
-        user.enable_2fa()
-        
-        url = reverse('users:users-disable-2fa')
-        for _ in range(6):  # Try one more than the limit
-            data = {'code': '000000'}  # Invalid code
-            response = authenticated_client.post(url, data)
+        response = authenticated_client.post(url, {'code': '000000'})
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert 'error' in response.data
+        assert 'Invalid 2FA code' in response.data['error']
+
+    def test_rate_limiting_2fa(self, authenticated_client):
+        """Test rate limiting for 2FA verification"""
+        user = UserFactory()
+        user.generate_2fa_secret()  # Generate secret first
+        user.enable_2fa()
+        authenticated_client.force_authenticate(user=user)
+        
+        url = reverse('users:users-disable-2fa')
+        
+        # Make multiple attempts with invalid codes
+        for _ in range(settings.TWO_FACTOR['MAX_VERIFICATION_ATTEMPTS'] + 1):
+            response = authenticated_client.post(url, {'code': '000000'})
+        
+        assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
         assert 'Too many verification attempts' in response.data['error'] 

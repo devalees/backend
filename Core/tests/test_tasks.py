@@ -10,10 +10,12 @@ class TestModel(models.Model):
     task_status = models.CharField(max_length=20)
     error_message = models.TextField(null=True, blank=True)
     extra_field = models.CharField(max_length=100, null=True)
+    description = models.TextField(blank=True)
     objects = Mock()
 
     class Meta:
         app_label = 'core'
+        db_table = 'task_test_model'
 
 class TestBaseTaskWithRetry(TestCase):
     def setUp(self):

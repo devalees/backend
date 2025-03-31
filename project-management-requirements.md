@@ -65,13 +65,13 @@ Comprehensive Project Management System Requirements
 [ ] Team performance metrics
 3.2 Time Management
 [ ] Automated time tracking
-[ ] Approval workflows
-[ ] Utilization reporting
-[ ] Timesheet management
-[ ] Overtime tracking
-[ ] Leave management
-[ ] Holiday calendar integration
-[ ] Time-off requests
+[ -] Approval workflows
+[ -] Utilization reporting
+[ -] Timesheet management
+[ -] Overtime tracking
+[ -] Leave management
+[ -] Holiday calendar integration
+[ -] Time-off requests
 4. Document Management
 4.1 Advanced Document System
 [ ] Version control implementation

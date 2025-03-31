@@ -8,9 +8,11 @@ from datetime import timedelta
 class TestModel(TaskAwareModel):
     name = models.CharField(max_length=100)
     extra_field = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(blank=True)
 
     class Meta:
         app_label = 'core'
+        db_table = 'task_aware_test_model'
 
 class CustomConfigModel(TaskAwareModel):
     name = models.CharField(max_length=100)

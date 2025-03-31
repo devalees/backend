@@ -160,6 +160,9 @@ class ImportExportConfigViewSet(viewsets.ModelViewSet):
             # Get model class
             model_class = config.content_type.model_class()
             
+            if not model_class or not hasattr(model_class, 'supports_import_export'):
+                raise ValidationError('Model does not support import/export operations')
+            
             # Process each row
             success_count = 0
             error_count = 0
@@ -200,10 +203,10 @@ class ImportExportConfigViewSet(viewsets.ModelViewSet):
             log.save()
 
             return Response({
-                'message': f'Successfully imported {success_count} records. {error_count} records failed.',
+                'message': 'Import completed successfully',
                 'success_count': success_count,
                 'error_count': error_count
-            })
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             if 'log' in locals():
@@ -297,12 +300,10 @@ class ImportExportLogViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        """Filter logs based on user's organization"""
+        """Filter logs based on user's permissions."""
         if 'pytest' in sys.modules:
-            return ImportExportLog.objects.all().order_by('-created_at')
-        return ImportExportLog.objects.filter(
-            performed_by=self.request.user
-        ).order_by('-created_at')
+            return ImportExportLog.objects.filter(performed_by=self.request.user)
+        return ImportExportLog.objects.filter(performed_by=self.request.user)
 
     @action(detail=True, methods=['post'])
     def retry(self, request, pk=None):

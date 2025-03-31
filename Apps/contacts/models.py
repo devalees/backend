@@ -5,8 +5,11 @@ from django.utils import timezone
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import validate_email
-from Core.models.base import TaskAwareModel
+from Apps.core.models import TaskAwareModel
+from Apps.entity.models import Organization, Department, Team
 import re
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 User = get_user_model()
 

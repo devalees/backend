@@ -8,7 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 import io
 import csv
 import sys
-from ..models import ImportExportConfig, ImportExportLog
+from ..models import ImportExportConfig, ImportExportLog, TestModel
 from .factories import (
     UserFactory,
     ContentTypeFactory,
@@ -68,7 +68,7 @@ def authenticated_client(api_client):
     # Add custom permission for managing import/export
     custom_permission = Permission.objects.filter(
         content_type=content_type,
-        codename='can_manage_import_export'
+        codename='manage_import_export'
     ).first()
     if custom_permission:
         user.user_permissions.add(custom_permission)
@@ -188,24 +188,22 @@ class TestImportExportConfigViewSet:
 
     @pytest.mark.django_db
     def test_import_data(self, authenticated_client):
-        """Test importing data using a configuration."""
+        """Test importing data."""
         client, user = authenticated_client
         
-        # Get content type for TestModel
-        content_type = ContentType.objects.get(app_label='data_import_export', model='testmodel')
-        
-        # Create config with proper field mapping
+        # Create a test model instance
+        content_type = ContentType.objects.get_for_model(TestModel)
         config = ImportExportConfigFactory(
             created_by=user,
             content_type=content_type,
             field_mapping={
-                'Field 1': 'field1',  # Map CSV header to model field
-                'Field 2': 'field2'   # Map CSV header to model field
+                'Field 1': 'name',  # Map CSV header to model field
+                'Field 2': 'description'   # Map CSV header to model field
             }
         )
         
         url = reverse('data_import_export:importexportconfig-import-data', kwargs={'pk': config.pk})
-        csv_content = 'Field 1,Field 2\nValue1,42'
+        csv_content = 'Field 1,Field 2\nValue1,Description1'
         csv_file = SimpleUploadedFile('test.csv', csv_content.encode('utf-8'), content_type='text/csv')
         
         response = client.post(url, {'file': csv_file}, format='multipart')
@@ -215,6 +213,11 @@ class TestImportExportConfigViewSet:
         log = ImportExportLog.objects.first()
         assert log.records_succeeded == 1
         assert log.records_failed == 0
+        
+        # Verify the data was imported correctly
+        test_model = TestModel.objects.first()
+        assert test_model.name == 'Value1'
+        assert test_model.description == 'Description1'
 
     def test_export_data(self, authenticated_client):
         """Test exporting data."""

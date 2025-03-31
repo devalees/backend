@@ -39,7 +39,7 @@ urlpatterns = [
     path('api/v1/', include([
         path('', include('Apps.core.urls')),
         path('users/', include('Apps.users.urls', namespace='users')),
-        path('', include('Apps.entity.urls')),
+        path('', include('Apps.entity.urls', namespace='entity')),
         path('', include('Apps.contacts.urls')),
         path('', include('Apps.data_transfer.urls')),
         path('rbac/', include('Apps.rbac.urls', namespace='rbac')),

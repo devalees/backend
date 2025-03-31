@@ -1,5 +1,8 @@
 from factory.django import DjangoModelFactory
-from factory import Sequence, LazyAttribute, PostGenerationMethodCall, LazyFunction, SubFactory, Faker
+from factory import (
+    Sequence, LazyAttribute, PostGenerationMethodCall, LazyFunction,
+    SubFactory, Faker, post_generation
+)
 from django.contrib.auth import get_user_model
 from Apps.core.models import BaseModel
 from django.utils import timezone

@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'Apps.project',
     'Apps.rbac',  # Extended Role-Based Access Control
     'Apps.time_management',  # Time Management and Timesheet
-    'Apps.data_import_export',  # New Import Export functionality
+    'Apps.data_import_export',  # Add the data import/export app
 ]
 
 MIDDLEWARE = [
@@ -247,3 +247,12 @@ LOGGING = {
 
 # Frontend URL for password reset
 FRONTEND_URL = 'http://localhost:3000'
+
+# Test settings
+TEST_RUNNER = 'django.test.runner.DiscoverRunner'
+TEST_DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+}

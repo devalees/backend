@@ -27,8 +27,12 @@ class TestDataTransfer:
         transfer = DataTransferFactory()
         transfer_id = transfer.id
         transfer.delete()
-        assert not transfer.is_active
-        assert DataTransfer.objects.filter(id=transfer_id).exists()
+        
+        # Check that the object is not in the default queryset
+        assert not DataTransfer.objects.filter(id=transfer_id).exists()
+        
+        # Check that the object still exists in all_objects
+        assert DataTransfer.all_objects.filter(id=transfer_id).exists()
 
     def test_data_transfer_hard_delete(self):
         """Test hard delete functionality"""
