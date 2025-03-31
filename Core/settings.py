@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'import_export',  # Django Import Export base package
+    'django_celery_results',  # Celery results backend
+    'django_celery_beat',  # Celery beat scheduler
+    'Core',  # Core app
     'Apps.core',
     'Apps.users',
     'Apps.entity',
@@ -159,6 +162,48 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+CELERY_BROKER_CONNECTION_TIMEOUT = 30
+CELERY_BROKER_HEARTBEAT = 10
+CELERY_BROKER_POOL_LIMIT = 10
+
+# Celery Task Settings
+CELERY_TASK_SOFT_TIME_LIMIT = 50 * 60  # 50 minutes
+CELERY_TASK_TIME_LIMIT = 60 * 60  # 1 hour
+CELERY_TASK_MAX_RETRIES = 3
+CELERY_TASK_RETRY_DELAY = 60  # 1 minute
+
+# Celery Result Settings
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_RESULT_EXPIRES = 3600  # 1 hour
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_RESULT_EXTENDED = True
+
+# Celery Task Routing
+CELERY_TASK_ROUTES = {
+    'Apps.*.tasks.high_priority.*': {'queue': 'high_priority'},
+    'Apps.*.tasks.low_priority.*': {'queue': 'low_priority'},
+    'Apps.*.tasks.*': {'queue': 'default'},
+}
+
+# Celery Task Default Settings
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_DEFAULT_EXCHANGE = 'default'
+CELERY_TASK_DEFAULT_ROUTING_KEY = 'default'
+
+# Celery Worker Settings
+CELERY_WORKER_CONCURRENCY = 4
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_SEND_TASK_EVENTS = True
+
+# Celery Beat Settings (for scheduled tasks)
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_MAX_LOOP_INTERVAL = 300  # 5 minutes
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),

@@ -752,29 +752,21 @@
           }
         },
         {
-          "name": "Create Generic Task",
+          "name": "Get Task Status",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/v1/tasks/celery/generic/",
+              "raw": "{{base_url}}/api/v1/tasks/celery/{{task_id}}/status/",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "tasks", "celery", "generic", ""]
+              "path": ["api", "v1", "tasks", "celery", "{{task_id}}", "status", ""]
             },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"model_path\": \"core.testmodel\",\n    \"instance_id\": 1,\n    \"kwargs\": {\n        \"param1\": \"value1\",\n        \"param2\": \"value2\"\n    }\n}"
-            },
-            "description": "Create a new generic Celery task"
+            "description": "Get the current status of a task"
           }
         },
         {
@@ -796,24 +788,6 @@
           }
         },
         {
-          "name": "Get Task Status",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/tasks/celery/{{task_id}}/status/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "tasks", "celery", "{{task_id}}", "status", ""]
-            },
-            "description": "Get the current status of a task"
-          }
-        },
-        {
           "name": "Cancel Task",
           "request": {
             "method": "POST",
@@ -829,60 +803,6 @@
               "path": ["api", "v1", "tasks", "celery", "{{task_id}}", "cancel", ""]
             },
             "description": "Cancel a running task"
-          }
-        },
-        {
-          "name": "Retry Task",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/tasks/celery/{{task_id}}/retry/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "tasks", "celery", "{{task_id}}", "retry", ""]
-            },
-            "description": "Retry a failed task"
-          }
-        },
-        {
-          "name": "List Task Results",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/tasks/celery/results/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "tasks", "celery", "results", ""]
-            },
-            "description": "List all task results"
-          }
-        },
-        {
-          "name": "Get Task Statistics",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{access_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/tasks/celery/statistics/",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "tasks", "celery", "statistics", ""]
-            },
-            "description": "Get task execution statistics"
           }
         }
       ]
