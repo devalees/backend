@@ -44,18 +44,27 @@ def generate_field_permissions(model_class):
              if not field.name.startswith('_') and field.name not in base_fields]
     
     # Define permission types
-    permission_types = ['read', 'write']
+    permission_types = ['read', 'write', 'delete']
     
     # Create field permissions
     created_permissions = []
     for field_name in fields:
         for permission_type in permission_types:
+            # Use get_or_create to avoid duplicates
             permission, created = FieldPermission.objects.get_or_create(
                 content_type=content_type,
                 field_name=field_name,
                 permission_type=permission_type
             )
             created_permissions.append(permission)
+    
+    # Delete any field permissions that shouldn't exist
+    FieldPermission.objects.filter(
+        content_type=content_type
+    ).exclude(
+        field_name__in=fields,
+        permission_type__in=permission_types
+    ).delete()
     
     return created_permissions
 

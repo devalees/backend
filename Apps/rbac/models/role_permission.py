@@ -35,9 +35,17 @@ class RolePermission(RBACModel):
     class Meta:
         verbose_name = _('role permission')
         verbose_name_plural = _('role permissions')
-        unique_together = [
-            ('role', 'permission'),
-            ('role', 'field_permission')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['role', 'permission'],
+                condition=models.Q(permission__isnull=False),
+                name='unique_role_permission'
+            ),
+            models.UniqueConstraint(
+                fields=['role', 'field_permission'],
+                condition=models.Q(field_permission__isnull=False),
+                name='unique_role_field_permission'
+            )
         ]
         ordering = ['role', 'permission']
 
@@ -57,17 +65,35 @@ class RolePermission(RBACModel):
         # Check that not both permission and field_permission are set
         if self.permission and self.field_permission:
             raise ValidationError(_('Cannot set both permission and field_permission.'))
+
+        # Check for existing role permissions
+        if self.permission:
+            existing = RolePermission.objects.filter(
+                role=self.role,
+                permission=self.permission
+            )
+            if self.pk:
+                existing = existing.exclude(pk=self.pk)
+            if existing.exists():
+                raise ValidationError(_('Role permission with this Role and Permission already exists.'))
         
-        # If field_permission is set, validate its content type matches the permission
-        if self.field_permission and self.permission:
-            if self.field_permission.content_type != self.permission.content_type:
-                raise ValidationError(_('Field permission content type must match the permission content type.'))
+        if self.field_permission:
+            existing = RolePermission.objects.filter(
+                role=self.role,
+                field_permission=self.field_permission
+            )
+            if self.pk:
+                existing = existing.exclude(pk=self.pk)
+            if existing.exists():
+                raise ValidationError(_('Role permission with this Role and Field permission already exists.'))
 
     def get_model_class(self):
         """Get the model class from permission or field permission."""
         if self.permission:
             return self.permission.content_type.model_class()
-        return self.field_permission.content_type.model_class()
+        if self.field_permission:
+            return self.field_permission.content_type.model_class()
+        return None
 
     def save(self, *args, **kwargs):
         """Save the role permission."""
@@ -75,7 +101,9 @@ class RolePermission(RBACModel):
         super().save(*args, **kwargs)
         # Invalidate permissions cache for users with this role
         from ..permissions.caching import invalidate_role_permissions
-        invalidate_role_permissions(self.role, self.get_model_class())
+        model_class = self.get_model_class()
+        if model_class:
+            invalidate_role_permissions(self.role, model_class)
 
     def delete(self, *args, **kwargs):
         """Delete the role permission."""
@@ -84,5 +112,6 @@ class RolePermission(RBACModel):
         model_class = self.get_model_class()
         super().delete(*args, **kwargs)
         # Invalidate permissions cache for users with this role
-        from ..permissions.caching import invalidate_role_permissions
-        invalidate_role_permissions(role, model_class) 
+        if model_class:
+            from ..permissions.caching import invalidate_role_permissions
+            invalidate_role_permissions(role, model_class) 

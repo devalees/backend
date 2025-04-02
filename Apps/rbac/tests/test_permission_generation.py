@@ -58,10 +58,13 @@ class AutomaticPermissionGenerationTest(TestCase):
 
     def test_permissions_are_unique(self):
         """Test that permissions are not duplicated."""
-        field_count = len([f for f in TestDocument._meta.get_fields() if not f.is_relation])
-        field_permissions = RBACPermission.objects.filter(
-            content_type=self.content_type,
-            field_name__isnull=False
+        # Get all fields from the model, excluding base model fields
+        base_fields = {'id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'created_by_id', 'updated_by_id', 'is_active'}
+        field_count = len([f for f in TestDocument._meta.get_fields() 
+                          if not f.is_relation and f.name not in base_fields])
+        
+        field_permissions = FieldPermission.objects.filter(
+            content_type=self.content_type
         ).count()
         # Each field should have read, write, and delete permissions
         self.assertEqual(field_permissions, field_count * 3) 

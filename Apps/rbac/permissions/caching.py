@@ -5,6 +5,7 @@ Permission caching functions for RBAC.
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from ..models import UserRole, RolePermission, RBACPermission, FieldPermission
 from .cache_utils import (
     _get_user_permissions_cache_key,
@@ -69,15 +70,17 @@ def get_cached_field_permissions(user, model_class, field_name=None):
                 field_permission__field_name=field_name
             )
         
-        # Build field permissions dictionary
+        # Initialize field permissions with all model fields
         field_permissions = {}
+        for field in model_class._meta.fields:
+            field_permissions[field.name] = set()
+        
+        # Add permissions from role permissions
         for role_permission in role_permissions:
-            field_name = role_permission.field_permission.field_name
-            permission_type = role_permission.field_permission.permission_type
-            
-            if field_name not in field_permissions:
-                field_permissions[field_name] = set()
-            field_permissions[field_name].add(permission_type)
+            if role_permission.field_permission:
+                field = role_permission.field_permission.field_name
+                permission_type = role_permission.field_permission.permission_type
+                field_permissions[field].add(permission_type)
         
         # Cache the field permissions
         cache.set(cache_key, field_permissions, timeout=300)  # Cache for 5 minutes

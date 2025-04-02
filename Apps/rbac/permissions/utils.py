@@ -79,20 +79,28 @@ def get_field_perms(user, model):
     
     if result is None:
         # Import RolePermission here to avoid circular imports
-        from ..models import RolePermission
+        from ..models import RolePermission, FieldPermission
+        
+        content_type = ContentType.objects.get_for_model(model)
         
         # Get all field permissions for the user's roles in a single query
         field_perms = RolePermission.objects.filter(
             role__user_roles__user=user,
-            field_permission__content_type=ContentType.objects.get_for_model(model)
-        ).values_list('field_permission__field_name', 'field_permission__permission_type')
+            role__user_roles__is_active=True,
+            field_permission__content_type=content_type
+        ).select_related('field_permission')
         
-        # Convert to dictionary format
+        # Initialize result with all fields from the model
         result = {}
-        for field_name, perm_type in field_perms:
-            if field_name not in result:
-                result[field_name] = set()
-            result[field_name].add(perm_type)
+        for field in model._meta.fields:
+            result[field.name] = set()
+        
+        # Add permissions from role permissions
+        for role_perm in field_perms:
+            if role_perm.field_permission:
+                field_name = role_perm.field_permission.field_name
+                perm_type = role_perm.field_permission.permission_type
+                result[field_name].add(perm_type)
         
         cache.set(cache_key, result, timeout=300)  # Cache for 5 minutes
     

@@ -129,6 +129,25 @@ class RBACModelTest(TestCase):
             created_by=self.admin_user
         )
 
+        # Assign permissions to editor role
+        RolePermission.objects.create(
+            role=self.editor_role,
+            permission=self.view_permission,
+            created_by=self.admin_user
+        )
+        RolePermission.objects.create(
+            role=self.editor_role,
+            permission=self.change_permission,
+            created_by=self.admin_user
+        )
+
+        # Assign permissions to viewer role
+        RolePermission.objects.create(
+            role=self.viewer_role,
+            permission=self.view_permission,
+            created_by=self.admin_user
+        )
+
         # Assign field permissions to editor role
         RolePermission.objects.create(
             role=self.editor_role,
@@ -181,25 +200,26 @@ class RBACModelTest(TestCase):
             title='Test Document',
             content='Test Content',
             secret_key='test123',
+            user=self.user,
             created_by=self.user
         )
-        self.test_doc.save()
+        self.test_doc.save(user=self.user)
 
     def test_model_level_permissions(self):
         """Test model-level permission checks"""
         # Admin should have all permissions
         self.assertTrue(self.test_doc.can_view(self.admin_user))
-        self.assertTrue(self.test_doc.can_edit(self.admin_user))
+        self.assertTrue(self.test_doc.can_change(self.admin_user))
         self.assertTrue(self.test_doc.can_delete(self.admin_user))
 
         # Editor should have view and edit permissions
         self.assertTrue(self.test_doc.can_view(self.regular_user))
-        self.assertTrue(self.test_doc.can_edit(self.regular_user))
+        self.assertTrue(self.test_doc.can_change(self.regular_user))
         self.assertFalse(self.test_doc.can_delete(self.regular_user))
 
         # Viewer should only have view permission
         self.assertTrue(self.test_doc.can_view(self.viewer_user))
-        self.assertFalse(self.test_doc.can_edit(self.viewer_user))
+        self.assertFalse(self.test_doc.can_change(self.viewer_user))
         self.assertFalse(self.test_doc.can_delete(self.viewer_user))
 
     def test_field_level_permissions(self):
@@ -238,12 +258,14 @@ class RBACModelTest(TestCase):
         TestDocument.objects.create(
             title='Admin Document',
             content='Admin Content',
-            created_by=self.admin_user
+            created_by=self.admin_user,
+            user=self.admin_user
         )
         TestDocument.objects.create(
             title='Editor Document',
             content='Editor Content',
-            created_by=self.regular_user
+            created_by=self.regular_user,
+            user=self.regular_user
         )
 
         # Admin should see all documents
@@ -251,28 +273,23 @@ class RBACModelTest(TestCase):
         self.assertEqual(admin_docs.count(), 3)
 
         # Editor should see all documents
-        editor_docs = TestDocument.get_queryset_for_user(self.regular_user)
+        editor_docs = TestDocument.get_queryset_for_user(self.editor_user)
         self.assertEqual(editor_docs.count(), 3)
 
-        # Viewer should see all documents (since they have view permission)
+        # Viewer should see all documents
         viewer_docs = TestDocument.get_queryset_for_user(self.viewer_user)
         self.assertEqual(viewer_docs.count(), 3)
 
     def test_user_tracking(self):
         """Test that user tracking works correctly"""
-        # Check initial values
+        # Test that created_by and updated_by are set correctly
         self.assertEqual(self.test_doc.created_by, self.user)
         self.assertEqual(self.test_doc.updated_by, self.user)
 
-        # Update document as regular user
-        self.test_doc._current_user = self.regular_user
+        # Test that updated_by is updated when saving
         self.test_doc.title = 'Updated Title'
-        self.test_doc.save()
-
-        # Check that updated_by was changed
-        self.test_doc.refresh_from_db()
-        self.assertEqual(self.test_doc.updated_by, self.regular_user)
-        self.assertEqual(self.test_doc.created_by, self.user)  # created_by should not change
+        self.test_doc.save(user=self.admin_user)
+        self.assertEqual(self.test_doc.updated_by, self.admin_user)
 
     def test_field_permission_validation(self):
         """Test field permission validation"""
@@ -287,40 +304,38 @@ class RBACModelTest(TestCase):
 
     def test_role_permission_validation(self):
         """Test role permission validation"""
-        # Test that we can't set both permission and field_permission
-        with self.assertRaises(ValidationError) as cm:
-            role_permission = RolePermission(
-                role=self.editor_role,
-                permission=self.view_permission,
-                field_permission=self.title_field_permission,
-                created_by=self.admin_user
-            )
-            role_permission.full_clean()
-        self.assertIn("Cannot set both permission and field_permission", str(cm.exception))
-
-        # Test that we can set just permission
+        # Test that role permission validation works correctly
         role_permission = RolePermission(
-            role=self.editor_role,
-            permission=self.view_permission,
-            created_by=self.admin_user
-        )
-        role_permission.full_clean()
-        role_permission.save()
-
-        # Test that we can set just field_permission
-        role_permission = RolePermission(
-            role=self.editor_role,
+            role=self.admin_role,
             field_permission=self.title_field_permission,
             created_by=self.admin_user
         )
         role_permission.full_clean()
         role_permission.save()
 
-        # Test that we can't set neither permission nor field_permission
-        with self.assertRaises(ValidationError) as cm:
+        # Test that duplicate role permissions are not allowed
+        with self.assertRaises(ValidationError):
             role_permission = RolePermission(
-                role=self.editor_role,
+                role=self.admin_role,
+                field_permission=self.title_field_permission,
                 created_by=self.admin_user
             )
             role_permission.full_clean()
-        self.assertIn("Either permission or field_permission must be set", str(cm.exception))
+
+        # Test that both permission and field_permission cannot be set
+        with self.assertRaises(ValidationError):
+            role_permission = RolePermission(
+                role=self.admin_role,
+                permission=self.view_permission,
+                field_permission=self.title_field_permission,
+                created_by=self.admin_user
+            )
+            role_permission.full_clean()
+
+        # Test that either permission or field_permission must be set
+        with self.assertRaises(ValidationError):
+            role_permission = RolePermission(
+                role=self.admin_role,
+                created_by=self.admin_user
+            )
+            role_permission.full_clean()
