@@ -308,7 +308,8 @@ class RBACModelTest(TestCase):
         role_permission = RolePermission(
             role=self.admin_role,
             field_permission=self.title_field_permission,
-            created_by=self.admin_user
+            created_by=self.admin_user,
+            updated_by=self.admin_user
         )
         role_permission.full_clean()
         role_permission.save()
@@ -318,7 +319,8 @@ class RBACModelTest(TestCase):
             role_permission = RolePermission(
                 role=self.admin_role,
                 field_permission=self.title_field_permission,
-                created_by=self.admin_user
+                created_by=self.admin_user,
+                updated_by=self.admin_user
             )
             role_permission.full_clean()
 
@@ -328,7 +330,8 @@ class RBACModelTest(TestCase):
                 role=self.admin_role,
                 permission=self.view_permission,
                 field_permission=self.title_field_permission,
-                created_by=self.admin_user
+                created_by=self.admin_user,
+                updated_by=self.admin_user
             )
             role_permission.full_clean()
 
@@ -336,6 +339,7 @@ class RBACModelTest(TestCase):
         with self.assertRaises(ValidationError):
             role_permission = RolePermission(
                 role=self.admin_role,
-                created_by=self.admin_user
+                created_by=self.admin_user,
+                updated_by=self.admin_user
             )
             role_permission.full_clean()

@@ -73,7 +73,8 @@ class RoleViewSet(viewsets.ModelViewSet):
             RolePermission.objects.create(
                 role=role,
                 permission=permission,
-                created_by=request.user
+                created_by=request.user,
+                updated_by=request.user
             )
         
         return Response(status=status.HTTP_200_OK)
@@ -97,10 +98,14 @@ class RBACPermissionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Create a new permission."""
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
         """Update a permission."""
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
         serializer.save(updated_by=self.request.user)
 
     def perform_destroy(self, instance):
@@ -126,28 +131,70 @@ class FieldPermissionViewSet(viewsets.ModelViewSet):
         ).distinct()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
 
-    @action(detail=False, methods=['get'])
+    def perform_update(self, serializer):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
+        serializer.save(updated_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
+        instance.delete()
+
+    @action(detail=False, methods=['get'], url_path='available-fields')
     def available_fields(self, request):
         """
         Get available fields for field permissions.
         """
+        if not request.user.is_superuser:
+            raise PermissionDenied
+            
         content_type_id = request.query_params.get('content_type')
         if not content_type_id:
-            return Response(
-                {'error': 'Content type is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            # Return all available content types with their fields
+            content_types = ContentType.objects.all()
+            result = []
+            for ct in content_types:
+                try:
+                    model_class = ct.model_class()
+                    if model_class:
+                        fields = [
+                            field.name for field in model_class._meta.get_fields()
+                            if not field.is_relation or field.many_to_one
+                        ]
+                        result.append({
+                            'id': ct.id,
+                            'app_label': ct.app_label,
+                            'model': ct.model,
+                            'fields': fields
+                        })
+                except Exception:
+                    continue
+            return Response(result)
 
         try:
             content_type = ContentType.objects.get(id=content_type_id)
             model_class = content_type.model_class()
+            if not model_class:
+                return Response(
+                    {'error': 'Model not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
             fields = [
                 field.name for field in model_class._meta.get_fields()
-                if not field.is_relation
+                if not field.is_relation or field.many_to_one
             ]
-            return Response(fields)
+            return Response({
+                'id': content_type.id,
+                'app_label': content_type.app_label,
+                'model': content_type.model,
+                'fields': fields
+            })
         except ContentType.DoesNotExist:
             return Response(
                 {'error': 'Invalid content type'},
@@ -171,15 +218,30 @@ class RolePermissionViewSet(viewsets.ModelViewSet):
         if self.request.user.is_superuser:
             return self.queryset
         return self.queryset.filter(
-            Q(role__user_roles__user=self.request.user) |
-            Q(created_by=self.request.user)
+            Q(created_by=self.request.user) |
+            Q(role__user_roles__user=self.request.user)
         ).distinct()
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        """Create a new role permission."""
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
 
     def perform_update(self, serializer):
+        """Update a role permission."""
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
         serializer.save(updated_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        """Delete a role permission."""
+        if not self.request.user.is_superuser:
+            raise PermissionDenied
+        instance.delete()
 
     @action(detail=False, methods=['get'])
     def field_permissions(self, request):

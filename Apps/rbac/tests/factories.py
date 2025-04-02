@@ -66,6 +66,7 @@ class RolePermissionFactory(factory.django.DjangoModelFactory):
             return
         if not self.created_by:
             self.created_by = self.role.created_by
+            self.updated_by = self.role.created_by
             self.save()
 
 class UserRoleFactory(factory.django.DjangoModelFactory):

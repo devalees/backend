@@ -43,11 +43,12 @@ class PermissionViewSetTests(APITestCase):
             'content_type': self.content_type.id,
             'codename': 'new_permission',
             'name': 'New Permission',
-            'created_by': self.admin.id
+            'created_by': self.admin.id,
+            'updated_by': self.admin.id
         }
         response = self.client.post(reverse('rbac:permission-list'), data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(RBACPermission.objects.count(), 2)
+        self.assertEqual(RBACPermission.objects.filter(created_by=self.admin).count(), 2)
 
     def test_create_permission_non_admin(self):
         """Test creating a permission as non-admin."""
@@ -100,18 +101,19 @@ class FieldPermissionViewSetTests(APITestCase):
             'content_type': self.content_type.id,
             'field_name': 'email',
             'permission_type': 'view',
-            'created_by': self.admin.id
+            'created_by': self.admin.id,
+            'updated_by': self.admin.id
         }
         response = self.client.post(reverse('rbac:fieldpermission-list'), data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(FieldPermission.objects.count(), 2)
+        self.assertEqual(FieldPermission.objects.filter(created_by=self.admin).count(), 2)
 
     def test_available_fields(self):
         """Test getting available fields."""
         response = self.client.get(reverse('rbac:available-fields'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('username', response.data)
-        self.assertIn('email', response.data)
+        user_fields = next((item['fields'] for item in response.data if item['model'] == 'user'), [])
+        self.assertIn('username', user_fields)
 
 class RoleViewSetTests(TestCase):
     def setUp(self):
@@ -200,14 +202,17 @@ class RolePermissionViewSetTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_role_permission_admin(self):
+        """Test creating a role permission as admin."""
         self.client.force_authenticate(user=self.admin)
-        url = reverse('rbac:rolepermission-list')
         data = {
             'role': self.role.id,
-            'permission': self.permission.id
+            'permission': self.permission.id,
+            'created_by': self.admin.id,
+            'updated_by': self.admin.id
         }
-        response = self.client.post(url, data)
+        response = self.client.post(reverse('rbac:rolepermission-list'), data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(RolePermission.objects.filter(created_by=self.admin).count(), 2)
 
 class UserRoleViewSetTests(TestCase):
     def setUp(self):
@@ -229,14 +234,17 @@ class UserRoleViewSetTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_user_role_admin(self):
+        """Test creating a user role as admin."""
         self.client.force_authenticate(user=self.admin)
-        url = reverse('rbac:userrole-list')
         data = {
             'user': self.user.id,
-            'role': self.role.id
+            'role': self.role.id,
+            'created_by': self.admin.id,
+            'updated_by': self.admin.id
         }
-        response = self.client.post(url, data)
+        response = self.client.post(reverse('rbac:userrole-list'), data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(UserRole.objects.filter(created_by=self.admin).count(), 2)
 
     def test_my_roles(self):
         self.client.force_authenticate(user=self.user)

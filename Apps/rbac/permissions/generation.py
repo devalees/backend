@@ -39,7 +39,10 @@ def generate_field_permissions(model_class):
     content_type = ContentType.objects.get_for_model(model_class)
     
     # Get all fields from the model, excluding private fields and base model fields
-    base_fields = {'id', 'created_at', 'updated_at', 'created_by', 'updated_by', 'created_by_id', 'updated_by_id', 'is_active'}
+    base_fields = {
+        'id', 'created_at', 'updated_at', 'created_by', 'updated_by', 
+        'created_by_id', 'updated_by_id', 'is_active', 'user', 'user_id'
+    }
     fields = [field.name for field in model_class._meta.fields 
              if not field.name.startswith('_') and field.name not in base_fields]
     

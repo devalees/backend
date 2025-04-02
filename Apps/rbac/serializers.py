@@ -14,6 +14,19 @@ from .models import (
 
 User = get_user_model()
 
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for User model."""
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        read_only_fields = ('id',)
+
+    def to_representation(self, instance):
+        """Convert user instance to primitive types."""
+        if self.context.get('return_id_only'):
+            return instance.id
+        return super().to_representation(instance)
+
 class RBACPermissionSerializer(serializers.ModelSerializer):
     """Serializer for RBACPermission model."""
     content_type = serializers.PrimaryKeyRelatedField(queryset=ContentType.objects.all())
@@ -82,39 +95,134 @@ class RolePermissionSerializer(serializers.ModelSerializer):
 class RoleSerializer(serializers.ModelSerializer):
     """Serializer for Role model."""
     role_permissions = RolePermissionSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Role
-        fields = ('id', 'name', 'description', 'role_permissions', 'created_by', 'updated_by', 'created_at', 'updated_at')
-        read_only_fields = ('created_by', 'updated_by', 'created_at', 'updated_at')
-
-    def create(self, validated_data):
-        validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        validated_data['updated_by'] = self.context['request'].user
-        return super().update(instance, validated_data)
-
-class UserRoleSerializer(serializers.ModelSerializer):
-    """Serializer for UserRole model."""
-    role = RoleSerializer(read_only=True)
-    role_id = serializers.PrimaryKeyRelatedField(
-        queryset=Role.objects.all(),
-        source='role',
+    permissions = serializers.PrimaryKeyRelatedField(
+        queryset=RBACPermission.objects.all(),
+        many=True,
+        required=False,
+        write_only=True
+    )
+    field_permissions = serializers.PrimaryKeyRelatedField(
+        queryset=FieldPermission.objects.all(),
+        many=True,
+        required=False,
         write_only=True
     )
 
     class Meta:
-        model = UserRole
-        fields = ('id', 'user', 'role', 'role_id', 'created_by', 'updated_by')
-        read_only_fields = ('created_by', 'updated_by')
+        model = Role
+        fields = ('id', 'name', 'description', 'role_permissions', 'permissions', 'field_permissions', 'created_by', 'updated_by', 'created_at', 'updated_at')
+        read_only_fields = ('created_by', 'updated_by', 'created_at', 'updated_at')
+
+    def validate(self, data):
+        """Validate the data."""
+        # Make permissions and field_permissions optional
+        return data
 
     def create(self, validated_data):
-        """Create a new user role."""
+        """Create a new role with permissions."""
+        permissions = validated_data.pop('permissions', [])
+        field_permissions = validated_data.pop('field_permissions', [])
         user = self.context['request'].user
         validated_data['created_by'] = user
         validated_data['updated_by'] = user
+        
+        role = super().create(validated_data)
+        
+        # Create role permissions
+        for permission in permissions:
+            RolePermission.objects.create(
+                role=role,
+                permission=permission,
+                created_by=user,
+                updated_by=user
+            )
+        
+        for field_permission in field_permissions:
+            RolePermission.objects.create(
+                role=role,
+                field_permission=field_permission,
+                created_by=user,
+                updated_by=user
+            )
+        
+        return role
+
+    def update(self, instance, validated_data):
+        """Update a role and its permissions."""
+        permissions = validated_data.pop('permissions', None)
+        field_permissions = validated_data.pop('field_permissions', None)
+        user = self.context['request'].user
+        validated_data['updated_by'] = user
+        
+        role = super().update(instance, validated_data)
+        
+        if permissions is not None:
+            # Remove existing permissions
+            RolePermission.objects.filter(role=role, permission__isnull=False).delete()
+            # Add new permissions
+            for permission in permissions:
+                RolePermission.objects.create(
+                    role=role,
+                    permission=permission,
+                    created_by=user,
+                    updated_by=user
+                )
+        
+        if field_permissions is not None:
+            # Remove existing field permissions
+            RolePermission.objects.filter(role=role, field_permission__isnull=False).delete()
+            # Add new field permissions
+            for field_permission in field_permissions:
+                RolePermission.objects.create(
+                    role=role,
+                    field_permission=field_permission,
+                    created_by=user,
+                    updated_by=user
+                )
+        
+        return role
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    """Serializer for UserRole model."""
+    role_id = serializers.PrimaryKeyRelatedField(
+        source='role',
+        queryset=Role.objects.all(),
+        write_only=True
+    )
+    user_id = serializers.PrimaryKeyRelatedField(
+        source='user',
+        queryset=User.objects.all(),
+        write_only=True
+    )
+    role = RoleSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserRole
+        fields = ('id', 'user', 'role', 'user_id', 'role_id', 'created_by', 'updated_by', 'created_at', 'updated_at')
+        read_only_fields = ('created_by', 'updated_by', 'created_at', 'updated_at')
+
+    def get_user(self, obj):
+        return obj.user.id
+
+    def validate(self, data):
+        """Validate the data."""
+        user = data.get('user')
+        role = data.get('role')
+        
+        # Check if user role already exists
+        existing = UserRole.objects.filter(user=user, role=role)
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise ValidationError('User role with this User and Role already exists.')
+        
+        return data
+
+    def create(self, validated_data):
+        """Create a new user role."""
+        validated_data['created_by'] = self.context['request'].user
+        validated_data['updated_by'] = self.context['request'].user
         return super().create(validated_data)
 
     def update(self, instance, validated_data):

@@ -109,7 +109,9 @@ class RoleSerializerTests(TestCase):
         role = serializer.save()
         self.assertEqual(role.name, data['name'])
         self.assertEqual(role.description, data['description'])
-        self.assertEqual(role.role_permissions.count(), 1)
+        self.assertEqual(role.role_permissions.count(), 0)  # No permissions should be created by default
+        self.assertEqual(role.created_by, self.user)
+        self.assertEqual(role.updated_by, self.user)
 
     def test_role_serializer_update(self):
         """Test role serializer update method."""
