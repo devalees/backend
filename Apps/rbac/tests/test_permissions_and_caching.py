@@ -143,7 +143,7 @@ class TestPermissionCaching:
         permissions = get_cached_user_permissions(test_user, User)
         
         # Invalidate role permissions
-        invalidate_role_permissions(test_role)
+        invalidate_role_permissions(test_role, User)
         
         # Get permissions again (should not use cache)
         new_permissions = get_cached_user_permissions(test_user, User)

@@ -6,19 +6,15 @@ from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from ..models import UserRole, RolePermission, RBACPermission, FieldPermission
+from .cache_utils import (
+    _get_user_permissions_cache_key,
+    _get_field_permissions_cache_key,
+    _get_role_permissions_cache_key,
+    _invalidate_user_permissions,
+    _invalidate_field_permissions
+)
 
 User = get_user_model()
-
-def _get_user_permissions_cache_key(user_id, content_type_id):
-    """Get cache key for user permissions."""
-    return f'user_permissions_{user_id}_{content_type_id}'
-
-def _get_field_permissions_cache_key(user_id, content_type_id, field_name=None):
-    """Get cache key for field permissions."""
-    key = f'field_permissions_{user_id}_{content_type_id}'
-    if field_name:
-        key += f'_{field_name}'
-    return key
 
 def get_cached_user_permissions(user, model_class):
     """Get cached user permissions."""
@@ -31,17 +27,17 @@ def get_cached_user_permissions(user, model_class):
     permissions = cache.get(cache_key)
     if permissions is None:
         # Get all roles for the user
-        user_roles = UserRole.objects.filter(user=user)
+        user_roles = UserRole.objects.filter(user=user, is_active=True)
         role_ids = user_roles.values_list('role_id', flat=True)
         
-        # Get all role permissions with model permissions
+        # Get all role permissions
         role_permissions = RolePermission.objects.filter(
             role_id__in=role_ids,
-            permission__isnull=False
-        )
+            permission__content_type=content_type
+        ).select_related('permission')
         
         # Build permissions set
-        permissions = set(role_permissions.values_list('permission__codename', flat=True))
+        permissions = {rp.permission.codename for rp in role_permissions}
         
         # Cache the permissions
         cache.set(cache_key, permissions, timeout=300)  # Cache for 5 minutes
@@ -59,14 +55,14 @@ def get_cached_field_permissions(user, model_class, field_name=None):
     field_permissions = cache.get(cache_key)
     if field_permissions is None:
         # Get all roles for the user
-        user_roles = UserRole.objects.filter(user=user)
+        user_roles = UserRole.objects.filter(user=user, is_active=True)
         role_ids = user_roles.values_list('role_id', flat=True)
         
         # Get all role permissions with field permissions
         role_permissions = RolePermission.objects.filter(
             role_id__in=role_ids,
-            field_permission__isnull=False
-        )
+            field_permission__content_type=content_type
+        ).select_related('field_permission')
         
         if field_name:
             role_permissions = role_permissions.filter(
@@ -89,43 +85,27 @@ def get_cached_field_permissions(user, model_class, field_name=None):
     return field_permissions
 
 def invalidate_permissions(user, model_class):
-    """Invalidate cached permissions for a user and model."""
-    if not user or not model_class:
-        return
-        
-    content_type = ContentType.objects.get_for_model(model_class)
-    cache_key = _get_user_permissions_cache_key(user.id, content_type.id)
-    cache.delete(cache_key)
+    """Invalidate all permission caches for a user and model."""
+    _invalidate_user_permissions(user, model_class)
 
 def invalidate_field_permissions(user, model_class, field_name=None):
-    """Invalidate cached field permissions for a user and model."""
-    if not user or not model_class:
+    """Invalidate field permission caches for a user, model, and field."""
+    _invalidate_field_permissions(user, model_class, field_name)
+
+def invalidate_role_permissions(role, model_class):
+    """Invalidate all permission caches for a role and model."""
+    if not role or not model_class:
         return
         
     content_type = ContentType.objects.get_for_model(model_class)
-    cache_key = _get_field_permissions_cache_key(user.id, content_type.id, field_name)
-    cache.delete(cache_key)
-
-def invalidate_role_permissions(role):
-    """Invalidate permissions cache for all users with a role."""
-    if not role:
-        return
     
     # Get all users with this role
-    user_ids = UserRole.objects.filter(role=role).values_list('user_id', flat=True)
+    user_ids = UserRole.objects.filter(role=role, is_active=True).values_list('user_id', flat=True)
     
     # Invalidate permissions for each user
     for user_id in user_ids:
-        try:
-            user = User.objects.get(id=user_id)
-            # Invalidate all content types
-            for content_type in ContentType.objects.all():
-                cache_key = _get_user_permissions_cache_key(user_id, content_type.id)
-                cache.delete(cache_key)
-                cache_key = _get_field_permissions_cache_key(user_id, content_type.id)
-                cache.delete(cache_key)
-        except User.DoesNotExist:
-            continue
+        _invalidate_user_permissions(user_id, model_class)
+        _invalidate_field_permissions(user_id, model_class, None)  # Pass None to invalidate all field permissions
 
 def invalidate_all_permissions():
     """Invalidate all permission caches."""

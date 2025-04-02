@@ -63,19 +63,26 @@ class RolePermission(RBACModel):
             if self.field_permission.content_type != self.permission.content_type:
                 raise ValidationError(_('Field permission content type must match the permission content type.'))
 
+    def get_model_class(self):
+        """Get the model class from permission or field permission."""
+        if self.permission:
+            return self.permission.content_type.model_class()
+        return self.field_permission.content_type.model_class()
+
     def save(self, *args, **kwargs):
         """Save the role permission."""
         self.clean()
         super().save(*args, **kwargs)
         # Invalidate permissions cache for users with this role
         from ..permissions.caching import invalidate_role_permissions
-        invalidate_role_permissions(self.role)
+        invalidate_role_permissions(self.role, self.get_model_class())
 
     def delete(self, *args, **kwargs):
         """Delete the role permission."""
-        # Store role before deletion for cache invalidation
+        # Store role and model class before deletion for cache invalidation
         role = self.role
+        model_class = self.get_model_class()
         super().delete(*args, **kwargs)
         # Invalidate permissions cache for users with this role
         from ..permissions.caching import invalidate_role_permissions
-        invalidate_role_permissions(role) 
+        invalidate_role_permissions(role, model_class) 
