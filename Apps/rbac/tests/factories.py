@@ -1,7 +1,8 @@
 import factory
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from ..models import Role, Permission, FieldPermission, RolePermission, UserRole
+from ..models import Role, RBACPermission as Permission, FieldPermission, RolePermission, UserRole
+from ..models.test_models import TestDocument
 
 User = get_user_model()
 
@@ -30,26 +31,23 @@ class PermissionFactory(factory.django.DjangoModelFactory):
         model = Permission
         django_get_or_create = ('codename',)
 
-    name = factory.Sequence(lambda n: f'permission{n}')
-    codename = factory.Sequence(lambda n: f'permission_{n}')
-    description = factory.Faker('text')
+    name = factory.Sequence(lambda n: f'Test Permission {n}')
+    codename = factory.Sequence(lambda n: f'test_permission_{n}')
+    content_type = factory.LazyAttribute(lambda _: ContentType.objects.get_for_model(User))
     created_by = factory.SubFactory(UserFactory)
     updated_by = factory.SubFactory(UserFactory)
 
 class FieldPermissionFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = FieldPermission
-        django_get_or_create = ('content_type', 'field_name', 'permission_type')
 
-    content_type = factory.SubFactory(
-        factory.django.DjangoModelFactory,
-        model=ContentType,
-        app_label='rbac',
-        model='testmodel'
+    content_type = factory.LazyAttribute(
+        lambda _: ContentType.objects.get_for_model(User)
     )
-    field_name = factory.Sequence(lambda n: f'field{n}')
-    permission_type = factory.Iterator(['read', 'write', 'create', 'delete'])
+    field_name = factory.Iterator(['username', 'email', 'first_name', 'last_name'])
+    permission_type = factory.Iterator(['read', 'write'])
     created_by = factory.SubFactory(UserFactory)
+    updated_by = factory.SubFactory(UserFactory)
 
 class RolePermissionFactory(factory.django.DjangoModelFactory):
     class Meta:
@@ -57,15 +55,32 @@ class RolePermissionFactory(factory.django.DjangoModelFactory):
         django_get_or_create = ('role', 'permission', 'field_permission')
 
     role = factory.SubFactory(RoleFactory)
-    permission = factory.SubFactory(PermissionFactory)
+    permission = factory.SubFactory(PermissionFactory, required=False)
     field_permission = None  # Optional field permission
     created_by = factory.SubFactory(UserFactory)
+    updated_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def set_created_by(self, create, extracted, **kwargs):
+        if not create:
+            return
+        if not self.created_by:
+            self.created_by = self.role.created_by
+            self.save()
 
 class UserRoleFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = UserRole
-        django_get_or_create = ('user', 'role')
 
     user = factory.SubFactory(UserFactory)
     role = factory.SubFactory(RoleFactory)
     created_by = factory.SubFactory(UserFactory)
+    updated_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def set_created_by(self, create, extracted, **kwargs):
+        if not create:
+            return
+        if not self.created_by:
+            self.created_by = self.user
+            self.save()
