@@ -14,18 +14,33 @@ import string
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 import base64
+from django.utils.translation import gettext_lazy as _
 
 class CustomUserManager(BaseUserManager):
     """Custom user model manager where email is the unique identifier"""
     
-    def create_user(self, email, username=None, password=None, **extra_fields):
+    def create_user(self, email, username=None, password=None, created_by=None, **extra_fields):
         """Create and save a User with the given email and password."""
         if not email:
             raise ValueError('The Email field must be set')
         email = self.normalize_email(email)
         username = username or email.split('@')[0]
-        user = self.model(email=email, username=username, **extra_fields)
-        user.set_password(password if password is not None else '')
+        
+        # Create the user instance
+        user = self.model(
+            email=email,
+            username=username,
+            created_by=created_by,
+            **extra_fields
+        )
+        
+        # Set password if provided
+        if password is not None:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+            
+        # Save the user
         user.save(using=self._db)
         return user
 
@@ -42,40 +57,54 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, username, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """Custom user model for testing"""
-
-    class Meta:
-        app_label = 'users'
-        swappable = 'AUTH_USER_MODEL'
-        db_table = 'users_user'
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
-        permissions = [
-            ('import_user', 'Can import user data'),
-            ('export_user', 'Can export user data'),
-        ]
-
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
-    is_staff = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    is_superuser = models.BooleanField(default=False)
-    date_joined = models.DateTimeField(default=timezone.now)
-    last_login = models.DateTimeField(null=True, blank=True)
-    two_factor_secret = models.CharField(max_length=32, null=True, blank=True)
+    """
+    Custom user model.
+    """
+    username = models.CharField(_('username'), max_length=150, unique=True)
+    email = models.EmailField(_('email address'), unique=True)
+    first_name = models.CharField(_('first name'), max_length=150, blank=True)
+    last_name = models.CharField(_('last name'), max_length=150, blank=True)
+    created_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_users')
+    is_staff = models.BooleanField(
+        _('staff status'),
+        default=False,
+        help_text=_('Designates whether the user can log into this admin site.'),
+    )
+    is_active = models.BooleanField(
+        _('active'),
+        default=True,
+        help_text=_(
+            'Designates whether this user should be treated as active. '
+            'Unselect this instead of deleting accounts.'
+        ),
+    )
+    date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    secret_key = models.CharField(max_length=32, blank=True, default=secrets.token_hex)
     two_factor_enabled = models.BooleanField(default=False)
-    backup_codes = models.JSONField(default=list, blank=True)
+    two_factor_secret = models.CharField(max_length=32, blank=True, null=True, default=None)
     verification_attempts = models.IntegerField(default=0)
     last_verification_attempt = models.DateTimeField(null=True, blank=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
-    secret_key = models.CharField(max_length=32, blank=True, null=True)
+    backup_codes = models.JSONField(null=True, blank=True, default=None)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    # RBAC fields - temporarily commented out to break circular dependency
+    # roles = models.ManyToManyField(
+    #     'rbac.Role',
+    #     through='rbac.UserRole',
+    #     through_fields=('user', 'role'),
+    #     related_name='assigned_users',
+    #     help_text=_('Roles assigned to this user.')
+    # )
 
     objects = CustomUserManager()
+
+    USERNAME_FIELD = 'username'
+    EMAIL_FIELD = 'email'
+    REQUIRED_FIELDS = ['email']
+
+    class Meta:
+        verbose_name = _('user')
+        verbose_name_plural = _('users')
 
     def __str__(self):
         return self.username
@@ -178,7 +207,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             backup_codes.append(code)
 
         # Store hashed backup codes
-        self.backup_codes = json.dumps([make_password(code) for code in backup_codes])
+        self.backup_codes = [make_password(code) for code in backup_codes]
         self.save()
 
         return backup_codes
@@ -188,15 +217,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         if not self.backup_codes:
             return False
 
-        try:
-            stored_codes = json.loads(self.backup_codes)
-            for stored_code in stored_codes:
-                if check_password(code, stored_code):
-                    # Remove used code
-                    stored_codes.remove(stored_code)
-                    self.backup_codes = json.dumps(stored_codes)
-                    self.save()
-                    return True
-            return False
-        except json.JSONDecodeError:
-            return False
+        for stored_code in self.backup_codes:
+            if check_password(code, stored_code):
+                # Remove used code
+                self.backup_codes.remove(stored_code)
+                self.save()
+                return True
+        return False

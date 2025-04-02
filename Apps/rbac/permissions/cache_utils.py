@@ -1,3 +1,7 @@
+"""
+Cache utility functions for RBAC permissions.
+"""
+
 from django.core.cache import cache
 from django.contrib.contenttypes.models import ContentType
 
@@ -12,6 +16,20 @@ def _get_cache_key(user_id, model_class, permission_type=None, field_name=None):
         return f'rbac:permission:{user_id}:{content_type.id}:{permission_type}'
     else:
         return f'rbac:permissions:{user_id}:{content_type.id}'
+
+def _get_user_permissions_cache_key(user_id, content_type_id):
+    """Get cache key for user permissions."""
+    return f'rbac:permissions:{user_id}:{content_type_id}'
+
+def _get_field_permissions_cache_key(user_id, content_type_id, field_name=None):
+    """Get cache key for field permissions."""
+    if field_name:
+        return f'rbac:field_permission:{user_id}:{content_type_id}:{field_name}'
+    return f'rbac:field_permissions:{user_id}:{content_type_id}'
+
+def _get_role_permissions_cache_key(role_id, content_type_id):
+    """Get cache key for role permissions."""
+    return f'rbac:role_permissions:{role_id}:{content_type_id}'
 
 def _invalidate_user_permissions(user, model_class):
     """Invalidate all permission caches for a user and model"""
@@ -57,13 +75,19 @@ def _invalidate_field_permissions(user, model_class, field_name):
     cache.delete_many(cache_keys)
 
 def get_cached_user_permissions(user, model_class):
-    """Get cached permissions for a user and model"""
+    """Get cached user permissions for a user and model"""
     content_type = ContentType.objects.get_for_model(model_class)
-    cache_key = f'rbac:permissions:{user.id}:{content_type.id}'
+    cache_key = _get_user_permissions_cache_key(user.id, content_type.id)
     return cache.get(cache_key, set())
 
-def get_cached_field_permissions(user, model_class):
+def get_cached_field_permissions(user, model_class, field_name=None):
     """Get cached field permissions for a user and model"""
     content_type = ContentType.objects.get_for_model(model_class)
-    cache_key = f'rbac:field_permissions:{user.id}:{content_type.id}'
-    return cache.get(cache_key, {}) 
+    cache_key = _get_field_permissions_cache_key(user.id, content_type.id, field_name)
+    return cache.get(cache_key, {})
+
+def get_cached_role_permissions(role, model_class):
+    """Get cached role permissions for a role and model"""
+    content_type = ContentType.objects.get_for_model(model_class)
+    cache_key = _get_role_permissions_cache_key(role.id, content_type.id)
+    return cache.get(cache_key, set()) 

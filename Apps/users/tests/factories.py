@@ -1,21 +1,24 @@
 import factory
 from django.contrib.auth import get_user_model
 from factory.django import DjangoModelFactory
+from Apps.users.models import User
+
+User = get_user_model()
 
 class UserFactory(DjangoModelFactory):
     class Meta:
-        model = get_user_model()
+        model = User
         django_get_or_create = ('email',)
-        skip_postgeneration_save = True
 
-    email = factory.Sequence(lambda n: f'user{n}@example.com')
     username = factory.Sequence(lambda n: f'user{n}')
-    password = factory.PostGenerationMethodCall('set_password', 'testpass123')
+    email = factory.Sequence(lambda n: f'user{n}@example.com')
+    password = factory.PostGenerationMethodCall('set_password', 'password123')
     first_name = factory.Faker('first_name')
     last_name = factory.Faker('last_name')
     is_active = True
     is_staff = False
     is_superuser = False
+    created_by = None  # Set to None by default
 
     @factory.post_generation
     def groups(self, create, extracted, **kwargs):

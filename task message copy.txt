@@ -1,0 +1,72 @@
+- please follow project rules always test first then the actual code.
+- all models must be in server/apps directory the directory is already exists @apps 
+- name the apps by requirements.
+- must follow stack chosen in project rules.
+- use the stack's related to requirement from project rules
+- always follow the stack's official document in implementation.
+- always keep server live and watch the log for errors - @monitor_server.sh  
+
+based on project rules let us implement this requirement: Restrict access to specific hours of operation in rbac Model
+
+
+
+
+- is the entire application behavior matched all the passed tests
+
+- before you start analyze and fix the errors, i noticed that there is a folder violates our project structure @tests would you agree? just give me your thought without move or edit anything
+- good go ahead and fix this issue but make sure to fix the code base related to that procedure
+
+
+
+- add the new models to admin page
+
+- please commit all changes to dev branch then push to my repo on github based on project rules
+
+- based on business logic and functionalities we have, do you have any suggestions  enhance this requirement more? 
+
+- Keep watching terminal logs if any error fix it.
+
+- please provide a list of all files or folders created not committed to dev branch.
+- please remove all Untracked Files or folders, then restore the project based on last commit on dev branch
+
+
+
+
+--- FOR TESTING
+- run  command for comprehensive test using pytest for existed tests in entire application if found any error fix them based on stack's documentation
+- what the test score of   according to pytest
+- consider creating integration tests for (existed models) to test the interaction between different components
+- consider creating Database Migration Tests
+- I want you add more test for auth, users, rbac to be 100% test coverage
+- run the existed integration tests if found any error fix them based and make them matching the existing models:
+don't implement anything related to api, we don't build the api yet.
+- run the existed performance tests and simulate 200 users use the app. produce the result please
+- run the existed load tests
+- run the existed edge case tests
+
+
+Add performance tests for critical paths
+Consider adding load tests for concurrent user scenarios
+Add more edge case tests for error conditions
+
+
+
+
+I want you to propose a PRD and RFC for Multi-layer caching strategy (Redis, Memcached)
+
+
+
+
+based on project rules and implementation steps, implement **Celery Background Task Configuration** section step by step with Test-first methodology for all features with minimum 90% coverage score
+
+
+
+Current state of contact app dose not completed relative to implementation steps what's considered please consider to followup starting from first point if it is done go to the next.
+- please follow test-driven-approach
+- please provide current state from time to time briefly. 
+
+is all implementation considered done?
+
+Please check done in the file 
+
+please make a new How To use file for celery in details with simple language

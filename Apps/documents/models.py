@@ -35,7 +35,7 @@ class Document(TimeStampedModel):
     title = models.CharField(max_length=255, blank=False)
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    file = models.FileField(upload_to='documents/%Y/%m/%d/', storage=document_storage)
+    file = models.FileField(upload_to='documents/%Y/%m/%d/', storage=document_storage, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name='documents')
     classification = models.ForeignKey('DocumentClassification', on_delete=models.SET_NULL, null=True, blank=True)
     tags = models.ManyToManyField('DocumentTag', blank=True)

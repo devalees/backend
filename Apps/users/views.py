@@ -60,16 +60,31 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
         """Login user and return tokens"""
+        username = request.data.get('username')
         email = request.data.get('email')
         password = request.data.get('password')
 
-        if not email or not password:
+        if not password:
             return Response(
-                {'error': 'Please provide both email and password'},
+                {'error': 'Please provide a password'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = authenticate(email=email, password=password)
+        if not username and not email:
+            return Response(
+                {'error': 'Please provide either username or email'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Try to authenticate with username or email
+        if username:
+            user = authenticate(username=username, password=password)
+        else:
+            try:
+                user_obj = User.objects.get(email=email)
+                user = authenticate(username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                user = None
 
         if user is None:
             return Response(

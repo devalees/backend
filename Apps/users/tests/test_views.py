@@ -27,15 +27,28 @@ def authenticated_client(api_client):
 class TestUserViewSet:
     def test_list_users(self, authenticated_client):
         """Test listing users"""
-        users = [UserFactory() for _ in range(3)]
+        # Get the authenticated user (superuser) from the client
+        superuser = authenticated_client.handler._force_user
+        
+        # Create test users with proper created_by field
+        users = [UserFactory(created_by=superuser) for _ in range(3)]
+        
         url = reverse('users:users-list')
         response = authenticated_client.get(url, {'ordering': 'id'})
         
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['results']) >= 3
+        
+        # Verify created_by field in response
+        for user_data in response.data['results']:
+            if user_data['id'] != superuser.id:  # Skip the superuser itself
+                assert user_data['created_by'] == superuser.id
 
     def test_create_user(self, authenticated_client):
         """Test creating a user"""
+        # Get the authenticated user (superuser) from the client
+        superuser = authenticated_client.handler._force_user
+        
         url = reverse('users:users-list')
         data = {
             'email': 'test@example.com',
@@ -43,12 +56,15 @@ class TestUserViewSet:
             'password': 'testpass123',
             'password2': 'testpass123',
             'first_name': 'Test',
-            'last_name': 'User'
+            'last_name': 'User',
+            'created_by': superuser.id  # Add created_by field
         }
         response = authenticated_client.post(url, data)
         
         assert response.status_code == status.HTTP_201_CREATED
         assert User.objects.filter(email=data['email']).exists()
+        created_user = User.objects.get(email=data['email'])
+        assert created_user.created_by == superuser
 
     def test_retrieve_user(self, authenticated_client):
         """Test retrieving a user"""
@@ -61,7 +77,12 @@ class TestUserViewSet:
 
     def test_update_user(self, authenticated_client):
         """Test updating a user"""
-        user = UserFactory()
+        # Get the authenticated user (superuser) from the client
+        superuser = authenticated_client.handler._force_user
+        
+        # Create a user with proper created_by field
+        user = UserFactory(created_by=superuser)
+        
         url = reverse('users:users-detail', kwargs={'pk': user.pk})
         data = {'first_name': 'Updated Name'}
         response = authenticated_client.patch(url, data)
@@ -69,16 +90,23 @@ class TestUserViewSet:
         assert response.status_code == status.HTTP_200_OK
         user.refresh_from_db()
         assert user.first_name == data['first_name']
+        assert user.created_by == superuser  # Ensure created_by wasn't changed
 
     def test_delete_user(self, authenticated_client):
         """Test deleting a user"""
-        user = UserFactory()
+        # Get the authenticated user (superuser) from the client
+        superuser = authenticated_client.handler._force_user
+        
+        # Create a user with proper created_by field
+        user = UserFactory(created_by=superuser)
+        
         url = reverse('users:users-detail', kwargs={'pk': user.pk})
         response = authenticated_client.delete(url)
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
         user = User.objects.get(pk=user.pk)
         assert not user.is_active
+        assert user.created_by == superuser  # Ensure created_by wasn't changed
 
     def test_login_success(self, api_client):
         """Test successful login"""

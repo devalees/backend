@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'Apps.contacts',
     'Apps.data_transfer',
     'Apps.project',
-    'Apps.rbac',  # Extended Role-Based Access Control
+    'Apps.rbac.apps.RbacConfig',  # Extended Role-Based Access Control
     'Apps.time_management',  # Time Management and Timesheet
     'Apps.data_import_export',  # Add the data import/export app
     'Apps.documents',  # Document Management System
