@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'Apps.rbac',  # Extended Role-Based Access Control
     'Apps.time_management',  # Time Management and Timesheet
     'Apps.data_import_export',  # Add the data import/export app
+    'Apps.documents',  # Document Management System
 ]
 
 MIDDLEWARE = [
@@ -301,3 +302,30 @@ TEST_DATABASES = {
         'NAME': ':memory:',
     }
 }
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Document Storage Settings
+DEFAULT_FILE_STORAGE = 'Apps.documents.storage.DocumentStorage'
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+FILE_UPLOAD_PERMISSIONS = 0o644
+
+# Elasticsearch Configuration
+ELASTICSEARCH_DSN = 'http://localhost:9200/'
+ELASTICSEARCH_INDEX_PREFIX = 'documents_'
+
+# Document Settings
+MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50MB
+ALLOWED_DOCUMENT_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'text/plain',
+]

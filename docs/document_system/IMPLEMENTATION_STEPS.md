@@ -8,10 +8,10 @@
 
 2. **Version Control**
    - [x] Implement version tracking
-   - [ ] Create version comparison
-   - [ ] Add version restoration
+   - [x] Create version comparison
+   - [x] Add version restoration
    - [x] Set up version history
-   - [ ] Implement version branching
+   - [x] Implement version branching
 
 3. **Document Classification**
    - [x] Set up basic classification system
@@ -122,6 +122,8 @@ Status Indicators:
 - Implemented version tracking with version numbers
 - Set up version history with metadata (created_at, updated_at)
 - Added version comments and user tracking
+- Implemented version comparison with file size, creation time, and user tracking
+- Added version restoration with proper validation and Elasticsearch index updates
 
 ### Search System
 - Implemented Elasticsearch integration with DocumentIndex and DocumentVersionIndex
