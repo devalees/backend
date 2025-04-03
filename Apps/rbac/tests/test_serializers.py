@@ -101,10 +101,14 @@ class RoleSerializerTests(TestCase):
     def test_role_serializer_create(self):
         """Test role serializer create method."""
         data = {
-            'name': 'Test Role',
-            'description': 'Test Description'
+            'name': 'New Test Role',
+            'description': 'Test Description',
+            'created_by': self.user.id,
+            'updated_by': self.user.id
         }
         serializer = RoleSerializer(data=data, context={'request': Mock(user=self.user)})
+        if not serializer.is_valid():
+            print("Validation errors:", serializer.errors)
         self.assertTrue(serializer.is_valid())
         role = serializer.save()
         self.assertEqual(role.name, data['name'])

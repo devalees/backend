@@ -63,6 +63,7 @@ class RoleViewSet(viewsets.ModelViewSet):
     def assign_permissions(self, request, pk=None):
         role = self.get_object()
         permission_ids = request.data.get('permissions', [])
+        field_permission_ids = request.data.get('field_permissions', [])
         
         # Clear existing permissions
         RolePermission.objects.filter(role=role).delete()
@@ -76,6 +77,17 @@ class RoleViewSet(viewsets.ModelViewSet):
                 created_by=request.user,
                 updated_by=request.user
             )
+        
+        # Add new field permissions only if they are specified
+        if field_permission_ids:
+            field_permissions = FieldPermission.objects.filter(id__in=field_permission_ids)
+            for field_permission in field_permissions:
+                RolePermission.objects.create(
+                    role=role,
+                    field_permission=field_permission,
+                    created_by=request.user,
+                    updated_by=request.user
+                )
         
         return Response(status=status.HTTP_200_OK)
 

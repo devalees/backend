@@ -30,25 +30,61 @@ class UserSerializer(serializers.ModelSerializer):
 class RBACPermissionSerializer(serializers.ModelSerializer):
     """Serializer for RBACPermission model."""
     content_type = serializers.PrimaryKeyRelatedField(queryset=ContentType.objects.all())
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = RBACPermission
-        fields = ('id', 'content_type', 'codename', 'name')
+        fields = ('id', 'content_type', 'codename', 'name', 'created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by')
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['created_by'] = user
+        validated_data['updated_by'] = user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data['updated_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return data
 
 class FieldPermissionSerializer(serializers.ModelSerializer):
     """Serializer for FieldPermission model."""
-    content_type = serializers.SerializerMethodField()
+    content_type = serializers.PrimaryKeyRelatedField(queryset=ContentType.objects.all(), write_only=True)
+    content_type_info = serializers.SerializerMethodField(read_only=True)
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = FieldPermission
-        fields = ('id', 'content_type', 'field_name', 'permission_type')
+        fields = ('id', 'content_type', 'content_type_info', 'field_name', 'permission_type', 'created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by', 'content_type_info')
 
-    def get_content_type(self, obj):
+    def get_content_type_info(self, obj):
         return {
             'id': obj.content_type.id,
             'app_label': obj.content_type.app_label,
             'model': obj.content_type.model
         }
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        validated_data['created_by'] = user
+        validated_data['updated_by'] = user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data['updated_by'] = self.context['request'].user
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['content_type'] = self.get_content_type_info(instance)
+        return data
 
 class RolePermissionSerializer(serializers.ModelSerializer):
     """
@@ -60,26 +96,32 @@ class RolePermissionSerializer(serializers.ModelSerializer):
         queryset=RBACPermission.objects.all(),
         source='permission',
         write_only=True,
-        required=False
+        required=False,
+        allow_null=True
     )
     field_permission_id = serializers.PrimaryKeyRelatedField(
         queryset=FieldPermission.objects.all(),
         source='field_permission',
         write_only=True,
-        required=False
+        required=False,
+        allow_null=True
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = RolePermission
-        fields = ('id', 'role', 'permission', 'field_permission', 'permission_id', 'field_permission_id', 'created_by', 'updated_by', 'created_at', 'updated_at')
-        read_only_fields = ('created_by', 'updated_by', 'created_at', 'updated_at')
+        fields = ('id', 'role', 'permission', 'field_permission', 'permission_id', 'field_permission_id', 'created_by', 'updated_by')
+        read_only_fields = ('created_by', 'updated_by')
 
     def validate(self, data):
         """Validate that either permission or field_permission is provided."""
-        if not data.get('permission') and not data.get('field_permission'):
-            raise ValidationError(_('Either permission or field_permission must be provided.'))
-        if data.get('permission') and data.get('field_permission'):
-            raise ValidationError(_('Cannot set both permission and field_permission.'))
+        permission = data.get('permission')
+        field_permission = data.get('field_permission')
+        if not permission and not field_permission:
+            raise ValidationError('Either permission_id or field_permission_id must be provided.')
+        if permission and field_permission:
+            raise ValidationError('Cannot set both permission_id and field_permission_id.')
         return data
 
     def create(self, validated_data):
@@ -123,8 +165,10 @@ class RoleSerializer(serializers.ModelSerializer):
         permissions = validated_data.pop('permissions', [])
         field_permissions = validated_data.pop('field_permissions', [])
         user = self.context['request'].user
-        validated_data['created_by'] = user
-        validated_data['updated_by'] = user
+        
+        # Set created_by and updated_by from validated_data or use the request user
+        validated_data['created_by'] = validated_data.get('created_by', user)
+        validated_data['updated_by'] = validated_data.get('updated_by', user)
         
         role = super().create(validated_data)
         
