@@ -21,14 +21,15 @@ class Workflow(BaseModel):
         max_length=20,
         choices=[
             ('pending', 'Pending'),
-            ('processing', 'Processing'),
+            ('running', 'Running'),
             ('completed', 'Completed'),
-            ('failed', 'Failed')
+            ('error', 'Error')
         ],
         default='pending'
     )
     task_result = models.JSONField(_('Task Result'), null=True, blank=True)
-    error_message = models.TextField(_('Error Message'), blank=True)
+    error_message = models.TextField(_('Error Message'), null=True, blank=True)
+    last_run = models.DateTimeField(_('Last Run'), null=True, blank=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -50,6 +51,7 @@ class Workflow(BaseModel):
         return self.name
 
     class Meta:
+        app_label = 'automation'
         verbose_name = _('Workflow')
         verbose_name_plural = _('Workflows')
         ordering = ['-created_at']
@@ -108,6 +110,7 @@ class Trigger(BaseModel):
         return self.name
 
     class Meta:
+        app_label = 'automation'
         verbose_name = _('Trigger')
         verbose_name_plural = _('Triggers')
         ordering = ['-created_at']
@@ -151,6 +154,7 @@ class Action(BaseModel):
     updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
 
     class Meta:
+        app_label = 'automation'
         verbose_name = _('Action')
         verbose_name_plural = _('Actions')
         ordering = ['-created_at']
@@ -211,6 +215,7 @@ class Rule(BaseModel):
     updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
 
     class Meta:
+        app_label = 'automation'
         verbose_name = _('Rule')
         verbose_name_plural = _('Rules')
         ordering = ['-created_at']
