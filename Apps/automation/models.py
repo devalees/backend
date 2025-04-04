@@ -10,6 +10,11 @@ from Core.models.base import TaskAwareModel
 from django.conf import settings
 from django.utils import timezone
 from typing import List, Set
+from enum import Enum
+import logging
+from django.db.models import Count
+from django.db.models.functions import TruncDate, Cast
+from django.db.models.fields import DateField
 
 User = get_user_model()
 
@@ -709,7 +714,7 @@ class Task(TaskAwareModel):
         max_length=20,
         choices=[
             ('pending', _('Pending')),
-            ('processing', _('Processing')),
+            ('generating', _('Generating')),
             ('completed', _('Completed')),
             ('failed', _('Failed'))
         ],
@@ -757,7 +762,7 @@ class Task(TaskAwareModel):
         A task's dependencies are satisfied when all dependency tasks are completed.
         """
         incomplete_deps = self.dependencies.filter(
-            dependency_task__task_status__in=['pending', 'processing', 'failed']
+            dependency_task__task_status__in=['pending', 'generating', 'failed']
         )
         return not incomplete_deps.exists()
 
@@ -791,3 +796,345 @@ class Task(TaskAwareModel):
             'result_field': 'task_result',
             'error_field': 'error_message',
         })
+
+class ReportTemplate(models.Model):
+    """Model for storing report templates"""
+    name = models.CharField(_('Name'), max_length=255)
+    description = models.TextField(_('Description'), blank=True)
+    query = models.JSONField(_('Query Definition'))
+    format = models.CharField(_('Format'), max_length=50, choices=[
+        ('pdf', 'PDF'),
+        ('excel', 'Excel'),
+        ('csv', 'CSV'),
+        ('json', 'JSON')
+    ])
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.PROTECT,
+        related_name='report_templates',
+        verbose_name=_('Created By')
+    )
+    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Report Template')
+        verbose_name_plural = _('Report Templates')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['created_at'])
+        ]
+
+    def clean(self):
+        """Validate the query structure"""
+        if not isinstance(self.query, dict):
+            raise ValidationError({'query': _('Query must be a JSON object')})
+        
+        required_fields = ['model', 'filters', 'aggregations']
+        missing_fields = [field for field in required_fields if field not in self.query]
+        if missing_fields:
+            raise ValidationError({'query': _(f'Query must contain: {", ".join(missing_fields)}')})
+        
+        if not isinstance(self.query['filters'], dict):
+            raise ValidationError({'query': _('Filters must be a JSON object')})
+        
+        if not isinstance(self.query['aggregations'], list):
+            raise ValidationError({'query': _('Aggregations must be a list')})
+        
+        # Validate model field
+        if not isinstance(self.query['model'], str):
+            raise ValidationError({'query': _('Model must be a string')})
+        
+        # Validate filter structure
+        for key, value in self.query['filters'].items():
+            if not isinstance(key, str):
+                raise ValidationError({'query': _('Filter keys must be strings')})
+            if not isinstance(value, (str, int, float, bool, list, dict)):
+                raise ValidationError({'query': _('Invalid filter value type')})
+        
+        # Validate aggregation structure
+        for agg in self.query['aggregations']:
+            if not isinstance(agg, dict):
+                raise ValidationError({'query': _('Each aggregation must be a JSON object')})
+            if 'type' not in agg or 'field' not in agg:
+                raise ValidationError({'query': _('Aggregations must contain "type" and "field"')})
+
+    def save(self, *args, **kwargs):
+        """Save the report template after validation"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+class TaskStatus(Enum):
+    PENDING = 'pending'
+    GENERATING = 'generating'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+
+class Report(TaskAwareModel):
+    """Model for individual report instances"""
+    name = models.CharField(_('Name'), max_length=255)
+    template = models.ForeignKey(
+        ReportTemplate,
+        on_delete=models.PROTECT,
+        related_name='reports',
+        verbose_name=_('Template')
+    )
+    parameters = models.JSONField(_('Parameters'))
+    status = models.CharField(
+        _('Status'),
+        max_length=20,
+        choices=[(status.value, status.name) for status in TaskStatus],
+        default=TaskStatus.PENDING.value
+    )
+    output_path = models.CharField(_('Output Path'), max_length=255, blank=True, null=True)
+    generated_at = models.DateTimeField(_('Generated At'), null=True, blank=True)
+    generation_time = models.FloatField(_('Generation Time (seconds)'), null=True, blank=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.PROTECT,
+        related_name='reports',
+        verbose_name=_('Created By')
+    )
+    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Report')
+        verbose_name_plural = _('Reports')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['generated_at'])
+        ]
+
+    def clean(self):
+        """Validate report parameters against template requirements"""
+        super().clean()
+        if not self.parameters:
+            raise ValidationError({'parameters': _('Parameters are required')})
+        
+        if not isinstance(self.parameters, dict):
+            raise ValidationError({'parameters': _('Parameters must be a JSON object')})
+        
+        required_params = ['start_date', 'end_date']
+        for param in required_params:
+            if param not in self.parameters:
+                raise ValidationError({'parameters': _(f'Parameter {param} is required')})
+
+    def start_generation(self):
+        """Mark report generation as started"""
+        self.status = TaskStatus.GENERATING.value
+        self.save()
+
+    def complete_generation(self, output_path, generation_time=None):
+        """Mark report generation as completed"""
+        self.status = TaskStatus.COMPLETED.value
+        self.output_path = output_path
+        self.generated_at = timezone.now()
+        self.generation_time = generation_time
+        self.save()
+
+    def fail_generation(self, error_message):
+        """Mark report generation as failed"""
+        self.status = TaskStatus.FAILED.value
+        self.error_message = error_message
+        self.save()
+
+    def __str__(self):
+        return self.name
+
+
+class ReportSchedule(models.Model):
+    """Model for scheduling periodic report generation"""
+    name = models.CharField(_('Name'), max_length=255)
+    template = models.ForeignKey(
+        ReportTemplate,
+        on_delete=models.PROTECT,
+        related_name='schedules',
+        verbose_name=_('Template')
+    )
+    schedule = models.JSONField(_('Schedule Configuration'))
+    parameters = models.JSONField(_('Parameters'))
+    is_active = models.BooleanField(_('Is Active'), default=True)
+    created_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.PROTECT,
+        related_name='report_schedules',
+        verbose_name=_('Created By')
+    )
+    created_at = models.DateTimeField(_('Created At'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Updated At'), auto_now=True)
+    last_run = models.DateTimeField(_('Last Run'), null=True, blank=True)
+    next_run = models.DateTimeField(_('Next Run'), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('Report Schedule')
+        verbose_name_plural = _('Report Schedules')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['next_run'])
+        ]
+
+    def clean(self):
+        """Validate schedule configuration"""
+        if not isinstance(self.schedule, dict):
+            raise ValidationError({'schedule': _('Schedule must be a JSON object')})
+        
+        required_fields = ['frequency', 'time', 'timezone']
+        for field in required_fields:
+            if field not in self.schedule:
+                raise ValidationError({'schedule': _(f'Schedule must contain {field}')})
+        
+        valid_frequencies = ['daily', 'weekly', 'monthly']
+        if self.schedule['frequency'] not in valid_frequencies:
+            raise ValidationError({'schedule': _('Invalid frequency value')})
+
+    def calculate_next_run(self):
+        """Calculate the next run time based on schedule configuration"""
+        # Implementation will be added in the next phase
+        pass
+
+    def __str__(self):
+        return self.name
+
+class ReportAnalytics(models.Model):
+    """Model for storing analytics data for reports and schedules"""
+    template = models.OneToOneField(
+        ReportTemplate,
+        on_delete=models.CASCADE,
+        related_name='analytics',
+        verbose_name=_('Template')
+    )
+    # Generation metrics
+    total_reports = models.IntegerField(_('Total Reports'), default=0)
+    successful_reports = models.IntegerField(_('Successful Reports'), default=0)
+    failed_reports = models.IntegerField(_('Failed Reports'), default=0)
+    success_rate = models.FloatField(_('Success Rate (%)'), default=0.0)
+    
+    # Performance metrics
+    average_generation_time = models.FloatField(_('Average Generation Time (seconds)'), default=0.0)
+    min_generation_time = models.FloatField(_('Minimum Generation Time (seconds)'), null=True)
+    max_generation_time = models.FloatField(_('Maximum Generation Time (seconds)'), null=True)
+    
+    # Usage patterns
+    daily_average = models.FloatField(_('Daily Average Reports'), default=0.0)
+    peak_usage_day = models.DateField(_('Peak Usage Day'), null=True)
+    peak_daily_count = models.IntegerField(_('Peak Daily Count'), default=0)
+    
+    # Schedule metrics
+    total_executions = models.IntegerField(_('Total Schedule Executions'), default=0)
+    successful_executions = models.IntegerField(_('Successful Schedule Executions'), default=0)
+    execution_success_rate = models.FloatField(_('Schedule Success Rate (%)'), default=0.0)
+    
+    last_updated = models.DateTimeField(_('Last Updated'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Report Analytics')
+        verbose_name_plural = _('Report Analytics')
+        indexes = [
+            models.Index(fields=['template']),
+            models.Index(fields=['last_updated'])
+        ]
+
+    @classmethod
+    def calculate_metrics(cls, template):
+        """Calculate and update report generation metrics"""
+        analytics, _ = cls.objects.get_or_create(template=template)
+        reports = template.reports.all()
+        analytics.total_reports = reports.count()
+        analytics.successful_reports = reports.filter(status=TaskStatus.COMPLETED.value).count()
+        analytics.failed_reports = reports.filter(status=TaskStatus.FAILED.value).count()
+        
+        if analytics.total_reports > 0:
+            analytics.success_rate = (analytics.successful_reports / analytics.total_reports) * 100
+        
+        # Calculate performance metrics for completed reports
+        completed_reports = reports.filter(
+            status=TaskStatus.COMPLETED.value,
+            generation_time__isnull=False
+        )
+        if completed_reports.exists():
+            generation_times = completed_reports.values_list('generation_time', flat=True)
+            analytics.average_generation_time = sum(generation_times) / len(generation_times)
+            analytics.min_generation_time = min(generation_times)
+            analytics.max_generation_time = max(generation_times)
+        
+        analytics.save()
+        return analytics
+
+    @classmethod
+    def calculate_schedule_metrics(cls, schedule):
+        """Calculate metrics for report schedule executions"""
+        template = schedule.template
+        analytics, _ = cls.objects.get_or_create(template=template)
+        
+        # Get all reports created by this schedule
+        reports = Report.objects.filter(
+            template=template,
+            parameters=schedule.parameters  # Only count reports with matching parameters
+        )
+        
+        # Calculate metrics
+        total_executions = reports.count()
+        successful_executions = reports.filter(status=TaskStatus.COMPLETED.value).count()
+        
+        # Update analytics
+        analytics.total_executions = total_executions
+        analytics.successful_executions = successful_executions
+        analytics.execution_success_rate = (successful_executions / total_executions * 100) if total_executions > 0 else 0
+        analytics.save()
+        
+        return analytics
+
+    @classmethod
+    def calculate_usage_patterns(cls, template):
+        """Calculate and update report usage patterns"""
+        logger = logging.getLogger(__name__)
+        analytics, _ = cls.objects.get_or_create(template=template)
+        
+        # Get all reports
+        reports = template.reports.all()
+        
+        if reports.exists():
+            # Get all reports and group by date
+            report_dates = {}
+            for report in reports.all():
+                date = report.created_at.date()
+                logger.debug("Report created_at: %s, date: %s", report.created_at, date)
+                report_dates[date] = report_dates.get(date, 0) + 1
+            
+            # Convert to list of dictionaries for consistency with previous format
+            daily_counts = [{'date': date, 'count': count} for date, count in report_dates.items()]
+            daily_counts.sort(key=lambda x: x['date'])
+            
+            # Log daily counts for debugging
+            logger.debug("Daily counts: %s", daily_counts)
+            
+            # Calculate daily average - only count days that have reports
+            total_reports = sum(day['count'] for day in daily_counts)
+            total_days = len(daily_counts)  # Number of days with reports
+            
+            logger.debug("Total reports: %d, Total days: %d", total_reports, total_days)
+            
+            analytics.daily_average = total_reports / total_days if total_days > 0 else 0
+            
+            # Find peak usage
+            peak_day = max(daily_counts, key=lambda x: x['count'])
+            analytics.peak_usage_day = peak_day['date']
+            analytics.peak_daily_count = peak_day['count']
+            
+            logger.debug("Daily average: %f, Peak day: %s, Peak count: %d", 
+                        analytics.daily_average, analytics.peak_usage_day, analytics.peak_daily_count)
+        
+        analytics.save()
+        return analytics
+
+    def __str__(self):
+        return f"Analytics for {self.template.name}"

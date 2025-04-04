@@ -4,7 +4,10 @@ from .views import (
     NodeViewSet,
     ConnectionViewSet,
     WorkflowTemplateViewSet,
-    WorkflowViewSet
+    WorkflowViewSet,
+    ReportTemplateViewSet,
+    ReportViewSet,
+    ReportScheduleViewSet
 )
 
 app_name = 'automation'
@@ -16,6 +19,9 @@ router.register(r'nodes', NodeViewSet, basename='node')
 router.register(r'connections', ConnectionViewSet, basename='connection')
 router.register(r'workflow-templates', WorkflowTemplateViewSet, basename='workflowtemplate')
 router.register(r'workflows', WorkflowViewSet, basename='workflow')
+router.register(r'report-templates', ReportTemplateViewSet, basename='reporttemplate')
+router.register(r'reports', ReportViewSet, basename='report')
+router.register(r'report-schedules', ReportScheduleViewSet, basename='reportschedule')
 
 # The router will automatically generate URLs for custom actions:
 # - PATCH /api/v1/automation/nodes/{pk}/position/ -> node-position

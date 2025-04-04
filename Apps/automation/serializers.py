@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import Node, Connection, WorkflowTemplate, Workflow
+from .models import Node, Connection, WorkflowTemplate, Workflow, ReportTemplate, Report, ReportSchedule, ReportAnalytics
 
 class NodeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -199,4 +199,34 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user:
             validated_data['created_by'] = request.user
-        return super().create(validated_data) 
+        return super().create(validated_data)
+
+class ReportTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportTemplate
+        fields = ['id', 'name', 'description', 'query', 'format', 'created_by', 'created_at', 'updated_at', 'is_active']
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+class ReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = ['id', 'template', 'parameters', 'status', 'output_path', 'error_message', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'status', 'output_path', 'error_message']
+
+class ReportScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportSchedule
+        fields = ['id', 'name', 'template', 'schedule', 'parameters', 'last_run', 'next_run', 'created_by', 'created_at', 'updated_at', 'is_active']
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'last_run', 'next_run']
+
+class ReportAnalyticsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportAnalytics
+        fields = [
+            'id', 'template', 'total_reports', 'successful_reports',
+            'failed_reports', 'success_rate', 'average_generation_time',
+            'min_generation_time', 'max_generation_time', 'daily_average',
+            'peak_usage_day', 'peak_daily_count', 'total_executions',
+            'successful_executions', 'execution_success_rate', 'last_updated'
+        ]
+        read_only_fields = fields  # All fields are read-only since they're calculated 

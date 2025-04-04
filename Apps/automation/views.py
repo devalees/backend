@@ -3,13 +3,21 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .models import Node, Connection, WorkflowTemplate, Workflow
+from .models import Node, Connection, WorkflowTemplate, Workflow, ReportTemplate, Report, ReportSchedule, ReportAnalytics
 from .serializers import (
     NodeSerializer,
     ConnectionSerializer,
-    WorkflowTemplateSerializer
+    WorkflowTemplateSerializer,
+    ReportTemplateSerializer,
+    ReportSerializer,
+    ReportScheduleSerializer,
+    ReportAnalyticsSerializer
 )
 from rest_framework.exceptions import ValidationError
+from django.utils import timezone
+from django.db.models import Count
+from datetime import timedelta
+from .tasks import generate_report
 
 class NodeViewSet(viewsets.ModelViewSet):
     """
@@ -279,4 +287,118 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         return Response({
             'is_valid': is_valid,
             'errors': validation_errors
-        }) 
+        })
+
+class ReportTemplateViewSet(viewsets.ModelViewSet):
+    queryset = ReportTemplate.objects.all()
+    serializer_class = ReportTemplateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def generate_report(self, request, pk=None):
+        template = self.get_object()
+        report = Report.objects.create(
+            template=template,
+            created_by=request.user,
+            name=request.data.get('name', f"{template.name} - {timezone.now().strftime('%Y-%m-%d %H:%M')}"),
+            description=request.data.get('description', '')
+        )
+        generate_report.delay(report.id)
+        return Response({'id': report.id, 'status': 'Report generation started'})
+
+    @action(detail=True, methods=['get'])
+    def analytics(self, request, pk=None):
+        template = self.get_object()
+        analytics, created = ReportAnalytics.objects.get_or_create(template=template)
+        
+        # Calculate usage patterns if not recently updated
+        if created or (timezone.now() - analytics.last_updated) > timedelta(hours=1):
+            self._calculate_usage_patterns(template, analytics)
+        
+        serializer = ReportAnalyticsSerializer(analytics)
+        return Response(serializer.data)
+
+    def _calculate_usage_patterns(self, template, analytics):
+        # Get reports from the last 30 days
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        reports = Report.objects.filter(
+            template=template,
+            created_at__gte=thirty_days_ago
+        )
+
+        # Calculate daily averages
+        if reports.exists():
+            total_reports = reports.count()
+            days_span = (timezone.now() - thirty_days_ago).days
+            analytics.daily_average = total_reports / days_span
+
+            # Find peak usage day
+            daily_counts = reports.annotate(
+                date=timezone.datetime.strftime('created_at', '%Y-%m-%d')
+            ).values('date').annotate(
+                count=Count('id')
+            ).order_by('-count')
+
+            if daily_counts:
+                peak_day = daily_counts.first()
+                analytics.peak_usage_day = peak_day['date']
+                analytics.peak_daily_count = peak_day['count']
+
+        analytics.last_updated = timezone.now()
+        analytics.save()
+
+    @action(detail=True, methods=['get'])
+    def schedule_analytics(self, request, pk=None):
+        """Get schedule-specific analytics for a report template"""
+        template = self.get_object()
+        schedules = template.schedules.filter(is_active=True)
+        
+        analytics_data = []
+        for schedule in schedules:
+            analytics = ReportAnalytics.calculate_schedule_metrics(schedule)
+            analytics_data.append({
+                'schedule_id': schedule.id,
+                'schedule_name': schedule.name,
+                'total_executions': analytics.total_executions,
+                'successful_executions': analytics.successful_executions,
+                'success_rate': analytics.execution_success_rate
+            })
+        
+        return Response(analytics_data)
+
+class ReportViewSet(viewsets.ModelViewSet):
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Report.objects.filter(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def retry(self, request, pk=None):
+        report = self.get_object()
+        if report.status == 'failed':
+            generate_report.delay(report.id)
+            return Response({'status': 'Report generation restarted'})
+        return Response(
+            {'error': 'Can only retry failed reports'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+class ReportScheduleViewSet(viewsets.ModelViewSet):
+    queryset = ReportSchedule.objects.all()
+    serializer_class = ReportScheduleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        schedule = self.get_object()
+        schedule.is_active = not schedule.is_active
+        schedule.save()
+        return Response({'is_active': schedule.is_active}) 

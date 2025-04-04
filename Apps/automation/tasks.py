@@ -1,10 +1,11 @@
 from celery import shared_task
 from django.utils import timezone
-from .models import Workflow, Trigger, Action
+from .models import Workflow, Trigger, Action, Report, ReportSchedule, ReportAnalytics
 from .engine import WorkflowEngine
 from celery.utils.log import get_task_logger
 from django.core.exceptions import ValidationError
 import json
+import time
 
 logger = get_task_logger(__name__)
 
@@ -127,4 +128,112 @@ def cleanup_workflows(self):
         
     except Exception as e:
         logger.error(f"Error in cleanup_workflows task: {str(e)}")
+        raise
+
+@shared_task
+def generate_report(report_id):
+    try:
+        report = Report.objects.get(id=report_id)
+        report.status = 'generating'
+        report.save()
+
+        # Record start time for performance tracking
+        start_time = time.time()
+
+        # Simulate report generation (replace with actual report generation logic)
+        time.sleep(5)  # Simulating work
+        report.status = 'completed'
+        report.output_path = f'/reports/{report.id}/output.pdf'  # Example path
+        report.save()
+
+        # Calculate generation time
+        generation_time = time.time() - start_time
+
+        # Update analytics
+        analytics, created = ReportAnalytics.objects.get_or_create(template=report.template)
+        analytics.total_reports += 1
+        analytics.successful_reports += 1
+        analytics.success_rate = (analytics.successful_reports / analytics.total_reports) * 100
+
+        # Update performance metrics
+        if analytics.average_generation_time is None:
+            analytics.average_generation_time = generation_time
+        else:
+            analytics.average_generation_time = (analytics.average_generation_time + generation_time) / 2
+
+        if analytics.min_generation_time is None or generation_time < analytics.min_generation_time:
+            analytics.min_generation_time = generation_time
+
+        if analytics.max_generation_time is None or generation_time > analytics.max_generation_time:
+            analytics.max_generation_time = generation_time
+
+        analytics.last_updated = timezone.now()
+        analytics.save()
+
+    except Exception as e:
+        if 'report' in locals():
+            report.status = 'failed'
+            report.error_message = str(e)
+            report.save()
+
+            # Update analytics for failed report
+            if 'analytics' not in locals():
+                analytics, created = ReportAnalytics.objects.get_or_create(template=report.template)
+            
+            analytics.total_reports += 1
+            analytics.failed_reports += 1
+            analytics.success_rate = (analytics.successful_reports / analytics.total_reports) * 100
+            analytics.last_updated = timezone.now()
+            analytics.save()
+
+        raise
+
+@shared_task
+def process_report_schedules():
+    try:
+        current_time = timezone.now()
+        active_schedules = ReportSchedule.objects.filter(
+            is_active=True,
+            next_run__lte=current_time
+        )
+
+        for schedule in active_schedules:
+            try:
+                # Create new report from template
+                report = Report.objects.create(
+                    template=schedule.template,
+                    name=f"{schedule.template.name} - Scheduled {current_time.strftime('%Y-%m-%d %H:%M')}",
+                    description=f"Automatically generated from schedule {schedule.id}",
+                    created_by=schedule.created_by
+                )
+
+                # Start report generation
+                generate_report.delay(report.id)
+
+                # Update schedule
+                schedule.last_run = current_time
+                schedule.next_run = schedule.calculate_next_run()
+                schedule.save()
+
+                # Update analytics
+                analytics, created = ReportAnalytics.objects.get_or_create(template=schedule.template)
+                analytics.total_executions += 1
+                analytics.successful_executions += 1
+                analytics.execution_success_rate = (analytics.successful_executions / analytics.total_executions) * 100
+                analytics.last_updated = current_time
+                analytics.save()
+
+            except Exception as e:
+                # Update analytics for failed execution
+                analytics, created = ReportAnalytics.objects.get_or_create(template=schedule.template)
+                analytics.total_executions += 1
+                analytics.execution_success_rate = (analytics.successful_executions / analytics.total_executions) * 100
+                analytics.last_updated = current_time
+                analytics.save()
+
+                # Log the error but continue processing other schedules
+                print(f"Error processing schedule {schedule.id}: {str(e)}")
+
+    except Exception as e:
+        print(f"Error in process_report_schedules: {str(e)}")
         raise 
