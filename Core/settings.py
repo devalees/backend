@@ -51,10 +51,10 @@ INSTALLED_APPS = [
     'Apps.contacts',
     'Apps.data_transfer',
     'Apps.project',
-    'Apps.rbac.apps.RbacConfig',  # Extended Role-Based Access Control
     'Apps.time_management',  # Time Management and Timesheet
     'Apps.data_import_export',  # Add the data import/export app
     'Apps.documents',  # Document Management System
+    'Apps.automation.apps.AutomationConfig',  # Workflow Automation System
 ]
 
 MIDDLEWARE = [
@@ -281,11 +281,6 @@ LOGGING = {
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
-            'propagate': False,
-        },
-        'Apps.rbac': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
             'propagate': False,
         },
     },

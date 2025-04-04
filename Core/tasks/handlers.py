@@ -4,6 +4,7 @@ from django.db import models
 from celery.utils.log import get_task_logger
 from Core.celery import app
 from Core.models.base import TaskAwareModel
+from django.utils import timezone
 
 logger = get_task_logger(__name__)
 
@@ -31,6 +32,34 @@ class ModelTaskHandler(Task):
         except Exception as e:
             logger.error(f"Error fetching {model_class.__name__} with id {instance_id}: {str(e)}")
             return None
+
+    def check_dependencies(self, instance: TaskAwareModel) -> bool:
+        """
+        Check if all dependencies are satisfied for the given task instance.
+        Returns True if all dependencies are completed, False otherwise.
+        """
+        try:
+            # Check if the instance has dependencies
+            if not hasattr(instance, 'dependencies'):
+                return True
+
+            # Get all incomplete dependencies
+            incomplete_deps = instance.dependencies.filter(
+                dependency_task__task_status__in=['pending', 'processing', 'failed']
+            )
+
+            if incomplete_deps.exists():
+                logger.info(
+                    f"Task {instance.id} has incomplete dependencies: "
+                    f"{list(incomplete_deps.values_list('dependency_task_id', flat=True))}"
+                )
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error checking dependencies for task {instance.id}: {str(e)}")
+            return False
 
     def process_instance(
         self,
@@ -76,6 +105,11 @@ class ModelTaskHandler(Task):
             instance = self.get_model_instance(model_class, instance_id)
             if not instance:
                 return False
+            
+            # Check dependencies
+            if not self.check_dependencies(instance):
+                logger.info(f"Task {instance_id} dependencies not satisfied, retrying in {self.default_retry_delay}s")
+                raise self.retry(countdown=self.default_retry_delay)
             
             # Start processing
             instance.start_processing(task_id=self.request.id)
