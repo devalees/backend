@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from bs4 import BeautifulSoup
+import uuid
 
 User = get_user_model()
 
@@ -162,4 +163,78 @@ class RichTextMessage(models.Model):
         soup = BeautifulSoup(self.content, 'html.parser')
         # Remove colons and normalize whitespace
         text = ' '.join(soup.get_text(separator=' ', strip=True).replace(':', '').split())
-        return text[:max_length] + ('...' if len(text) > max_length else '') 
+        return text[:max_length] + ('...' if len(text) > max_length else '')
+
+class EmailTemplate(models.Model):
+    """Model for storing email templates"""
+    name = models.CharField(max_length=255, unique=True)
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def render_subject(self, context):
+        """Render email subject with context variables"""
+        from django.template import Template, Context
+        template = Template(self.subject)
+        return template.render(Context(context))
+
+    def render_body(self, context):
+        """Render email body with context variables"""
+        from django.template import Template, Context
+        template = Template(self.body)
+        return template.render(Context(context))
+
+    def __str__(self):
+        return self.name
+
+class EmailTracking(models.Model):
+    """Model for tracking email delivery and status"""
+    STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('delivered', 'Delivered'),
+        ('opened', 'Opened'),
+        ('clicked', 'Clicked'),
+        ('bounced', 'Bounced'),
+        ('failed', 'Failed')
+    ]
+
+    recipient_email = models.EmailField()
+    subject = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='sent')
+    sent_at = models.DateTimeField(auto_now_add=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    clicked_at = models.DateTimeField(null=True, blank=True)
+    bounce_reason = models.TextField(null=True, blank=True)
+    tracking_id = models.UUIDField(default=uuid.uuid4, unique=True)
+
+    def __str__(self):
+        return f"{self.recipient_email} - {self.subject}"
+
+class EmailAnalytics(models.Model):
+    """Model for tracking email analytics"""
+    email_id = models.CharField(max_length=255, unique=True)
+    opens = models.IntegerField(default=0)
+    clicks = models.IntegerField(default=0)
+    bounces = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def increment_opens(self):
+        """Increment the number of opens"""
+        self.opens += 1
+        self.save()
+
+    def increment_clicks(self):
+        """Increment the number of clicks"""
+        self.clicks += 1
+        self.save()
+
+    def increment_bounces(self):
+        """Increment the number of bounces"""
+        self.bounces += 1
+        self.save()
+
+    def __str__(self):
+        return f"Analytics for {self.email_id}" 

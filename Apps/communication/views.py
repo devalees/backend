@@ -13,6 +13,11 @@ from .services.transcription import TranscriptionService
 import os
 import re
 from django.core.exceptions import ValidationError
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from Apps.communication.models import EmailTemplate, EmailTracking, EmailAnalytics
+from Apps.communication.serializers import EmailTemplateSerializer, EmailTrackingSerializer, EmailAnalyticsSerializer
+from Apps.communication.services.email_service import EmailService
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -221,4 +226,88 @@ def transcribe_audio(request):
         return Response(
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        ) 
+        )
+
+class EmailTemplateViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing email templates"""
+    queryset = EmailTemplate.objects.all()
+    serializer_class = EmailTemplateSerializer
+    
+    @action(detail=True, methods=['post'])
+    def send_test(self, request, pk=None):
+        """Send a test email using the template"""
+        template = self.get_object()
+        test_email = request.data.get('test_email')
+        context = request.data.get('context', {})
+        
+        if not test_email:
+            return Response(
+                {"error": "Test email address is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            email_service = EmailService()
+            email_service.send_templated_email(template.name, test_email, context)
+            return Response({"status": "Test email sent successfully"})
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class EmailTrackingViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing email tracking data"""
+    queryset = EmailTracking.objects.all()
+    serializer_class = EmailTrackingSerializer
+    
+    @action(detail=True, methods=['post'])
+    def track_open(self, request, pk=None):
+        """Track email open event"""
+        tracking = self.get_object()
+        try:
+            email_service = EmailService()
+            email_service.track_email_open(str(tracking.tracking_id))
+            return Response({"status": "Open tracked successfully"})
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            
+    @action(detail=True, methods=['post'])
+    def track_click(self, request, pk=None):
+        """Track email click event"""
+        tracking = self.get_object()
+        try:
+            email_service = EmailService()
+            email_service.track_email_click(str(tracking.tracking_id))
+            return Response({"status": "Click tracked successfully"})
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class EmailAnalyticsViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing email analytics"""
+    queryset = EmailAnalytics.objects.all()
+    serializer_class = EmailAnalyticsSerializer
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get summary analytics for all emails"""
+        total_emails = self.queryset.count()
+        total_opens = sum(analytics.opens for analytics in self.queryset)
+        total_clicks = sum(analytics.clicks for analytics in self.queryset)
+        total_bounces = sum(analytics.bounces for analytics in self.queryset)
+        
+        return Response({
+            "total_emails": total_emails,
+            "total_opens": total_opens,
+            "total_clicks": total_clicks,
+            "total_bounces": total_bounces,
+            "open_rate": (total_opens / total_emails * 100) if total_emails > 0 else 0,
+            "click_rate": (total_clicks / total_emails * 100) if total_emails > 0 else 0,
+            "bounce_rate": (total_bounces / total_emails * 100) if total_emails > 0 else 0
+        }) 

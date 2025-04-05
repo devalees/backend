@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import RichTextMessage
 from bs4 import BeautifulSoup
 from django.core.exceptions import ValidationError
+from Apps.communication.models import EmailTemplate, EmailTracking, EmailAnalytics
 
 class RichTextMessageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,4 +48,34 @@ class RichTextMessageSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Ensure sender is set from the request user
         validated_data['sender'] = self.context['request'].user
-        return super().create(validated_data) 
+        return super().create(validated_data)
+
+class EmailTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for EmailTemplate model"""
+    class Meta:
+        model = EmailTemplate
+        fields = ['id', 'name', 'subject', 'body', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+class EmailTrackingSerializer(serializers.ModelSerializer):
+    """Serializer for EmailTracking model"""
+    class Meta:
+        model = EmailTracking
+        fields = [
+            'id', 'tracking_id', 'recipient_email', 'subject', 'status',
+            'sent_at', 'opened_at', 'clicked_at', 'bounce_reason'
+        ]
+        read_only_fields = [
+            'tracking_id', 'sent_at', 'opened_at', 'clicked_at',
+            'bounce_reason'
+        ]
+
+class EmailAnalyticsSerializer(serializers.ModelSerializer):
+    """Serializer for EmailAnalytics model"""
+    class Meta:
+        model = EmailAnalytics
+        fields = [
+            'id', 'email_id', 'opens', 'clicks', 'bounces',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at'] 
