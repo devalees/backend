@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from .models import Contact, ContactGroup, ContactTemplate
 from Apps.entity.serializers import OrganizationSerializer, DepartmentSerializer, TeamSerializer
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -9,8 +8,9 @@ class ContactSerializer(serializers.ModelSerializer):
     team_name = serializers.CharField(source='team.name', read_only=True)
 
     class Meta:
+        from .models import Contact
         model = Contact
-        fields = ('id', 'first_name', 'last_name', 'email', 'phone', 'organization', 'organization_name',
+        fields = ('id', 'name', 'email', 'phone', 'organization', 'organization_name',
                  'department', 'department_name', 'team', 'team_name', 'is_active', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
 
@@ -21,6 +21,7 @@ class ContactGroupSerializer(serializers.ModelSerializer):
     contact_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
 
     class Meta:
+        from .models import ContactGroup
         model = ContactGroup
         fields = ('id', 'name', 'description', 'organization', 'organization_name',
                  'contacts', 'contact_ids', 'is_active', 'created_at', 'updated_at')
@@ -47,6 +48,7 @@ class ContactTemplateSerializer(serializers.ModelSerializer):
     updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
+        from .models import ContactTemplate
         model = ContactTemplate
         fields = (
             'id', 'name', 'description', 'organization', 'organization_name',

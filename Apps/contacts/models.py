@@ -7,8 +7,9 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import validate_email
 from Apps.core.models import TaskAwareModel
 from Apps.entity.models import Organization, Department, Team
+from .cache_manager import ContactCache
 import re
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 
 User = get_user_model()
@@ -72,19 +73,29 @@ class Contact(TaskAwareModel):
         if not skip_validation:
             self.full_clean()
         super().save(*args, **kwargs)
+        # Cache the contact after saving
+        ContactCache.set_contact(self, include_related=True)
 
     def hard_delete(self):
         """Hard delete the contact"""
+        org_id = self.organization_id
         self.delete(hard_delete=True)
+        # Invalidate cache after hard delete
+        ContactCache.delete_contact(self.id, org_id)
 
     def delete(self, *args, **kwargs):
         """Delete the contact"""
         hard_delete = kwargs.pop('hard_delete', False)
+        org_id = self.organization_id
         if hard_delete:
             super().delete(*args, **kwargs)
+            # Invalidate cache after hard delete
+            ContactCache.delete_contact(self.id, org_id)
         else:
             self.is_active = False
             self.save()
+            # Update cache with inactive status
+            ContactCache.set_contact(self, include_related=True)
 
     def clean(self):
         """Validate contact data"""
@@ -109,6 +120,17 @@ class Contact(TaskAwareModel):
                 raise ValidationError({'team': ['Cannot assign team without department.']})
             if self.team.department != self.department:
                 raise ValidationError({'team': ['Team must belong to the contact\'s department.']})
+
+@receiver(post_save, sender=Contact)
+def contact_post_save(sender, instance, created, **kwargs):
+    """Update cache when contact is saved"""
+    ContactCache.set_contact(instance, include_related=True)
+    ContactCache.invalidate_organization_contacts(instance.organization_id)
+
+@receiver(post_delete, sender=Contact)
+def contact_post_delete(sender, instance, **kwargs):
+    """Update cache when contact is deleted"""
+    ContactCache.delete_contact(instance.id, instance.organization_id)
 
 class ContactGroup(models.Model):
     """ContactGroup model representing a group of contacts"""

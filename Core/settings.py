@@ -335,3 +335,29 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'RETRY_ON_TIMEOUT': True,
+            'MAX_CONNECTIONS': 1000,
+            'PARSER_CLASS': 'redis.connection.HiredisParser',
+        }
+    }
+}
+
+# Contact Cache Settings
+CONTACT_CACHE_TTL = 3600  # 1 hour in seconds
+
+# Use Redis as the session backend
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+
+# Cache key prefix to avoid collisions
+CACHE_KEY_PREFIX = 'api'

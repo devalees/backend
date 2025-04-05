@@ -57,13 +57,16 @@ I want you to propose a PRD and RFC for Multi-layer caching strategy (Redis, Mem
 
 
 
-based on project rules and implementation steps, implement **Celery Background Task Configuration** section step by step with Test-first methodology for all features with minimum 90% coverage score
+based on project rules and implementation steps, implement **Celery Background Task Configuration** section step by step with Test-first methodology for all features using purest with minimum 90% coverage score
 
 
 
 Current state of contact app dose not completed relative to implementation steps what's considered please consider to followup starting from first point if it is done go to the next.
 - please follow test-driven-approach
 - please provide current state from time to time briefly. 
+
+let's implement [ ] Add contact caching
+- test-driven-approach using pytest
 
 is all implementation considered done?
 
