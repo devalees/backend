@@ -1,98 +1,107 @@
-# Deployment Guide for Django Project on Amazon EC2
+# Deployment Guide for Django Project on EC2 (Testing Version)
 
 ## Prerequisites
 
 1. AWS Account with appropriate permissions
-2. Domain name (optional but recommended)
-3. AWS CLI configured on your local machine
-4. SSH key pair for EC2 access
+2. SSH key pair for EC2 access
 
 ## Step 1: Launch EC2 Instance
 
 1. Go to AWS Console > EC2 > Launch Instance
 2. Choose Ubuntu 22.04 LTS AMI
-3. Select instance type (t2.micro for testing, t2.medium for production)
+3. Select instance type: t2.micro (for testing)
 4. Configure instance details:
-   - VPC: Default or your custom VPC
+   - VPC: Default
    - Auto-assign Public IP: Enable
 5. Add storage (minimum 8GB)
 6. Configure security group:
    - SSH (port 22)
    - HTTP (port 80)
-   - HTTPS (port 443)
    - Custom TCP (port 8000 for development)
 7. Review and launch
 8. Select your SSH key pair
 
-## Step 2: Set Up AWS Services
-
-### RDS Setup
-1. Create PostgreSQL database
-2. Note down database endpoint, username, and password
-3. Update security group to allow EC2 instance access
-
-### S3 Setup
-1. Create S3 bucket for media files
-2. Configure CORS policy
-3. Create IAM user with S3 access
-4. Note down access key and secret
-
-### Elasticache Setup (Optional)
-1. Create Redis cluster
-2. Note down endpoint and port
-3. Update security group to allow EC2 instance access
-
-## Step 3: Deploy Application
+## Step 2: Deploy Application
 
 1. SSH into your EC2 instance:
    ```bash
    ssh -i your-key.pem ubuntu@your-ec2-public-ip
    ```
 
-2. Clone your repository:
+2. Create project directory with proper permissions:
    ```bash
-   git clone https://github.com/your-repo.git /var/www/project
+   sudo mkdir -p /var/www/backend
+   sudo chown ubuntu:ubuntu /var/www/backend
    ```
 
-3. Make the deployment script executable:
+3. Clone your repository:
    ```bash
-   chmod +x scripts/deploy.sh
+   git clone https://github.com/devalees/backend.git /var/www/backend
    ```
 
-4. Run the deployment script:
+4. Make the deployment script executable:
    ```bash
-   ./scripts/deploy.sh
+   chmod +x /var/www/backend/scripts/deploy_test.sh
    ```
 
-5. Update environment variables in `/var/www/project/.env`:
-   - Replace `your_secret_key_here` with a secure secret key
-   - Update database credentials
-   - Add AWS credentials
-   - Set your domain name in ALLOWED_HOSTS
-
-## Step 4: SSL Configuration (Optional but Recommended)
-
-1. Install Certbot:
+5. Run the deployment script:
    ```bash
-   sudo apt-get install certbot python3-certbot-nginx
+   cd /var/www/backend
+   ./scripts/deploy_test.sh
    ```
 
-2. Obtain SSL certificate:
-   ```bash
-   sudo certbot --nginx -d your-domain.com
-   ```
+The deployment script will:
+- Install all required system packages
+- Set up Python virtual environment
+- Install PostgreSQL locally
+- Configure Redis locally
+- Set up Nginx as reverse proxy
+- Configure Gunicorn as application server
+- Set up supervisor for process management
+- Create necessary directories and set permissions
+- Run database migrations
+- Create a test admin user
 
-3. Configure automatic renewal:
-   ```bash
-   sudo certbot renew --dry-run
-   ```
+## Step 3: Access the Application
 
-## Step 5: Monitoring and Maintenance
+After successful deployment, you can access:
+- Admin panel: `http://your-ec2-public-ip/admin`
+- API endpoints: `http://your-ec2-public-ip/api/`
 
-1. Set up CloudWatch for monitoring
-2. Configure log rotation
-3. Set up automated backups
-4. Configure auto-scaling if needed
+Default admin credentials:
+- Username: `admin`
+- Password: `admin123`
+
+## Step 4: Testing Configuration Details
+
+The testing setup includes:
+
+### Database Configuration
+- PostgreSQL installed locally
+- Database name: `project_db`
+- Username: `project_user`
+- Password: `test_password`
+
+### Redis Configuration
+- Redis installed locally
+- Running on default port 6379
+- Used for caching and session management
+
+### File Storage
+- Media files stored locally in `/var/www/backend/media`
+- Static files collected in `/var/www/backend/static`
+
+### Environment Variables
+```
+DEBUG=True
+SECRET_KEY=test_secret_key_123
+DATABASE_URL=postgres://project_user:test_password@localhost:5432/project_db
+ALLOWED_HOSTS=localhost,127.0.0.1,ec2-public-ip
+AWS_ACCESS_KEY_ID=test_key
+AWS_SECRET_ACCESS_KEY=test_secret
+AWS_STORAGE_BUCKET_NAME=test-bucket
+REDIS_URL=redis://localhost:6379/0
+```
 
 ## Troubleshooting
 
@@ -112,34 +121,60 @@
    sudo supervisorctl status
    ```
 
-## Security Considerations
+4. Check PostgreSQL status:
+   ```bash
+   sudo systemctl status postgresql
+   ```
 
-1. Regularly update system packages
-2. Use strong passwords and keys
-3. Implement proper backup strategy
-4. Monitor for security vulnerabilities
-5. Use AWS WAF for additional protection
-6. Implement proper IAM roles and policies
+5. Check Redis status:
+   ```bash
+   sudo systemctl status redis-server
+   ```
 
-## Scaling Considerations
+## Important Notes
 
-1. Use AWS Auto Scaling Groups
-2. Implement database read replicas
-3. Use Elastic Load Balancer
-4. Configure CloudFront for CDN
-5. Implement proper caching strategy
+1. This setup is for testing purposes only and should not be used in production because:
+   - Uses test credentials and keys
+   - Has DEBUG mode enabled
+   - Stores files locally
+   - Uses less secure configurations
+   - Limited resources (t2.micro instance)
 
-## Backup and Recovery
-
-1. Set up automated database backups
-2. Configure S3 versioning for media files
-3. Document recovery procedures
-4. Test backup restoration regularly
+2. For production deployment:
+   - Use the production deployment script
+   - Set up RDS for database
+   - Configure S3 for media storage
+   - Set up proper SSL certificates
+   - Use secure credentials
+   - Use appropriate instance type
 
 ## Maintenance
 
-1. Schedule regular security updates
-2. Monitor resource usage
-3. Review and rotate credentials
-4. Update dependencies regularly
-5. Monitor application performance 
+1. Regular updates:
+   ```bash
+   sudo apt-get update
+   sudo apt-get upgrade
+   ```
+
+2. Restart services if needed:
+   ```bash
+   sudo systemctl restart nginx
+   sudo systemctl restart postgresql
+   sudo systemctl restart redis-server
+   sudo supervisorctl restart project
+   ```
+
+3. Backup database:
+   ```bash
+   pg_dump -U project_user project_db > backup.sql
+   ```
+
+4. Monitor disk space:
+   ```bash
+   df -h
+   ```
+
+5. Monitor memory usage:
+   ```bash
+   free -m
+   ``` 
