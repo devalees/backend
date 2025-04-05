@@ -69,4 +69,5 @@ INSTALLED_APPS = [
     'Apps.data_import_export',  # Add the data import/export app
     'Apps.documents',  # Document Management System
     'Apps.automation.apps.AutomationConfig',  # Workflow Automation System
+    'Apps.communication',  # Communication app
 ]
