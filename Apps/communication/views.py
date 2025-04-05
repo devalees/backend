@@ -124,3 +124,60 @@ def play_audio(request, audio_id):
     
     response['Accept-Ranges'] = 'bytes'
     return response 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def compress_audio(request, audio_id):
+    """Compress an audio file with the specified quality."""
+    try:
+        audio = Audio.objects.get(id=audio_id)
+    except Audio.DoesNotExist:
+        raise Http404("Audio file not found")
+    
+    quality = request.data.get('quality', 0.5)
+    try:
+        quality = float(quality)
+        if not 0 <= quality <= 1:
+            return Response(
+                {'error': 'Quality must be between 0.0 and 1.0'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'Invalid quality value'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    audio_service = AudioProcessingService()
+    
+    try:
+        # Get the original file size
+        original_size = audio.get_file_size()
+        
+        # Compress the audio
+        compressed_content = audio_service.compress_audio(audio.file, quality)
+        
+        # Save the compressed file
+        compressed_filename = f'compressed_{os.path.basename(audio.file.name)}'
+        compressed_file = ContentFile(compressed_content, name=compressed_filename)
+        
+        # Update the audio file with the compressed version
+        audio.file = compressed_file
+        audio.save()
+        
+        # Get the new file size
+        compressed_size = audio.get_file_size()
+        
+        return Response({
+            'message': 'Audio compressed successfully',
+            'compressed_file': audio.file.url,
+            'original_size': original_size,
+            'compressed_size': compressed_size,
+            'compression_ratio': compressed_size / original_size
+        })
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        ) 
