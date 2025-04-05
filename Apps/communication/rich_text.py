@@ -141,8 +141,47 @@ class RichTextFormatter:
         return re.sub(pattern, replace_link, content)
     
     def _format_media(self, content: str) -> str:
-        """Format media (images, etc.)"""
-        return re.sub(r'!\[(.*?)\]\((.*?)\)', r'<img src="\2" alt="\1">', content)
+        """Format media (images, videos, audio, etc.)"""
+        def replace_media(match):
+            alt_text = match.group(1)
+            url = match.group(2)
+            media_type = match.group(3) if len(match.groups()) > 2 else None
+            
+            # Clean up the URL and alt text
+            url = url.strip()
+            alt_text = alt_text.strip()
+            
+            # URL encode spaces in the URL
+            url = url.replace(' ', '%20')
+            
+            # Escape special characters in alt text
+            alt_text = html.escape(alt_text, quote=True)
+            
+            # Determine media type from URL extension if not specified
+            if not media_type:
+                ext = url.lower().split('.')[-1]
+                if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                    media_type = 'image'
+                elif ext in ['mp4', 'webm', 'ogg']:
+                    media_type = 'video'
+                elif ext in ['mp3', 'wav', 'ogg']:
+                    media_type = 'audio'
+                else:
+                    media_type = 'image'  # Default to image if unknown
+            
+            # Format based on media type
+            if media_type == 'image':
+                return f'<img src="{url}" alt="{alt_text}" class="rich-text-media">'
+            elif media_type == 'video':
+                return f'<video src="{url}" controls class="rich-text-media"><p>{alt_text}</p></video>'
+            elif media_type == 'audio':
+                return f'<audio src="{url}" controls class="rich-text-media"><p>{alt_text}</p></audio>'
+            else:
+                return f'<img src="{url}" alt="{alt_text}" class="rich-text-media">'
+        
+        # Pattern for media with optional type specification: ![alt](url) or ![alt](url){type}
+        pattern = r'!\[(.*?)\]\((.*?)(?:\{([^}]*)\})?\)'
+        return re.sub(pattern, replace_media, content)
     
     def _format_headers(self, content):
         for i in range(6, 0, -1):
@@ -162,35 +201,50 @@ class RichTextFormatter:
     def _format_code(self, content):
         return re.sub(r'`(.+?)`', r'<code>\1</code>', content)
     
+    def _escape_text_preserve_tags(self, content: str) -> str:
+        """Escape text content while preserving HTML tags"""
+        # Split content into text and HTML tags
+        parts = re.split(r'(<[^>]*>)', content)
+        escaped_parts = []
+        
+        for part in parts:
+            if part.startswith('<') and part.endswith('>'):
+                # This is an HTML tag, preserve it
+                escaped_parts.append(part)
+            else:
+                # This is text content, escape it
+                escaped_parts.append(html.escape(part, quote=True))
+        
+        return ''.join(escaped_parts)
+    
     def format(self, content: str) -> str:
         """Format the content according to rich text rules"""
         if not content:
             return ""
             
-        # Format block-level elements that shouldn't be escaped first
+        # Format block-level elements first
         formatted = content
         formatted = self._format_blockquotes(formatted)
         
-        # Now escape the content to prevent XSS attacks, but preserve quotes
-        formatted = html.escape(formatted, quote=False)
+        # Format media and links
+        formatted = self._format_media(formatted)
+        formatted = self._format_links(formatted)
         
-        # Format the remaining content
+        # Format inline elements
+        formatted = self._format_bold(formatted)
+        formatted = self._format_italic(formatted)
+        formatted = self._format_code(formatted)
         formatted = self._format_headers(formatted)
         formatted = self._format_horizontal_rules(formatted)
         formatted = self._format_tables(formatted)
         formatted = self._format_lists(formatted)
-        formatted = self._format_bold(formatted)
-        formatted = self._format_italic(formatted)
-        formatted = self._format_code(formatted)
-        formatted = self._format_media(formatted)
-        formatted = self._format_links(formatted)
         
         # Wrap in paragraph if not already wrapped in a block element
         if not any(tag in formatted for tag in ['<h1>', '<h2>', '<h3>', '<h4>', '<h5>', '<h6>', '<ul>', '<ol>', '<table>', '<blockquote>']):
             formatted = f"<p>{formatted}</p>"
         
-        # Unescape HTML tags
-        formatted = re.sub(r'&lt;(\/?(?:p|strong|em|code|a|img|ul|ol|li|table|thead|tbody|tr|th|td|blockquote|h[1-6])[^&]*)&gt;', r'<\1>', formatted)
+        # Escape text content while preserving HTML tags
+        formatted = self._escape_text_preserve_tags(formatted)
         
         return formatted
     
