@@ -1,33 +1,9 @@
 #!/bin/bash
 
-# Deployment script for Django project on EC2 (Testing Version)
+# Exit on error
+set -e
 
-# Get project name from user input
-read -p "Enter your project name (e.g., backend): " PROJECT_NAME
-
-# Get repository URL from user input
-read -p "Enter your repository URL (e.g., https://github.com/username/repo.git): " REPO_URL
-
-# Debug: Print current directory and environment
-echo "Current directory: $(pwd)"
-echo "Environment:"
-env | grep -E 'PATH|HOME|USER'
-
-# Clean up existing installations if directory exists
-if [ -d "/var/www/$PROJECT_NAME" ]; then
-    echo "Cleaning up existing installations..."
-    # Remove project directory if it exists
-    echo "Removing existing project directory: /var/www/$PROJECT_NAME"
-    sudo rm -rf "/var/www/$PROJECT_NAME"
-    
-    # Remove all potential nginx configurations
-    sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
-    sudo rm -f "/etc/nginx/sites-available/$PROJECT_NAME"
-    sudo rm -f /etc/nginx/sites-enabled/default
-
-    # Remove all potential supervisor configurations
-    sudo rm -f "/etc/supervisor/conf.d/$PROJECT_NAME.conf"
-fi
+echo "Starting deployment process..."
 
 # Update system packages
 echo "Updating system packages..."
@@ -35,167 +11,142 @@ sudo apt-get update
 sudo apt-get upgrade -y
 
 # Install required system packages
-echo "Installing required packages..."
+echo "Installing system dependencies..."
 sudo apt-get install -y \
     python3-pip \
     python3-dev \
-    nginx \
     postgresql \
     postgresql-contrib \
+    nginx \
     redis-server \
     supervisor \
     git \
     build-essential \
     libpq-dev \
-    python3-venv
+    python3-venv \
+    curl \
+    wget
 
 # Create project directory
-echo "Creating project directory..."
-sudo mkdir -p "/var/www/$PROJECT_NAME"
-sudo chown ubuntu:ubuntu "/var/www/$PROJECT_NAME"
+echo "Setting up project directory..."
+sudo mkdir -p /var/www/backend
+sudo chown ubuntu:ubuntu /var/www/backend
 
-# Clone the repository
+# Clone repository
 echo "Cloning repository..."
-cd "/var/www/$PROJECT_NAME"
-git clone "$REPO_URL" .
+git clone https://github.com/devalees/backend.git /var/www/backend
 
-# Set up Python virtual environment
+# Create and activate virtual environment
 echo "Setting up Python virtual environment..."
+cd /var/www/backend
 python3 -m venv venv
 source venv/bin/activate
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
-    # Ensure djangorestframework-simplejwt is installed even if not in requirements.txt
-    pip install djangorestframework-simplejwt
-else
-    echo "requirements.txt not found, installing basic dependencies"
-    pip install django djangorestframework gunicorn psycopg2-binary redis djangorestframework-simplejwt django-cors-headers drf-yasg
-fi
+pip install -r requirements.txt
+pip install gunicorn
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
-if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "${PROJECT_NAME}_db"; then
-    sudo -u postgres psql -c "CREATE DATABASE ${PROJECT_NAME}_db;"
-fi
+sudo -u postgres psql -c "CREATE DATABASE project_db;"
+sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';"
+sudo -u postgres psql -c "ALTER ROLE project_user SET client_encoding TO 'utf8';"
+sudo -u postgres psql -c "ALTER ROLE project_user SET default_transaction_isolation TO 'read committed';"
+sudo -u postgres psql -c "ALTER ROLE project_user SET timezone TO 'UTC';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE project_db TO project_user;"
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${PROJECT_NAME}_user'" | grep -q 1; then
-    sudo -u postgres psql -c "CREATE USER ${PROJECT_NAME}_user WITH PASSWORD 'test_password';"
-fi
+# Configure Redis
+echo "Configuring Redis..."
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
 
-sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET timezone TO 'UTC';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PROJECT_NAME}_db TO ${PROJECT_NAME}_user;"
+# Create environment file
+echo "Creating environment file..."
+cat > /var/www/backend/.env << EOL
+DEBUG=True
+SECRET_KEY=test_secret_key_123
+DATABASE_URL=postgres://project_user:test_password@localhost:5432/project_db
+ALLOWED_HOSTS=localhost,127.0.0.1,ec2-public-ip
+REDIS_URL=redis://localhost:6379/0
+EOL
 
-# Configure PostgreSQL to allow local connections
-echo "Configuring PostgreSQL connections..."
-POSTGRES_VERSION=$(ls /etc/postgresql)
-if [ -d "/etc/postgresql/$POSTGRES_VERSION/main" ]; then
-    sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/$POSTGRES_VERSION/main/postgresql.conf
-    sudo sed -i "s/local   all             all                                     peer/local   all             all                                     md5/" /etc/postgresql/$POSTGRES_VERSION/main/pg_hba.conf
-    sudo systemctl restart postgresql
-else
-    echo "Warning: PostgreSQL configuration directory not found. Please check PostgreSQL installation."
-    echo "Available PostgreSQL versions:"
-    ls /etc/postgresql
-fi
+# Set up media and static directories
+echo "Setting up media and static directories..."
+mkdir -p /var/www/backend/media
+mkdir -p /var/www/backend/static
+
+# Run database migrations
+echo "Running database migrations..."
+python manage.py migrate
+
+# Create superuser
+echo "Creating superuser..."
+echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
+
+# Configure Gunicorn
+echo "Configuring Gunicorn..."
+cat > /var/www/backend/gunicorn_config.py << EOL
+bind = "127.0.0.1:8000"
+workers = 3
+worker_class = "sync"
+timeout = 120
+EOL
+
+# Configure Supervisor
+echo "Configuring Supervisor..."
+sudo cat > /etc/supervisor/conf.d/backend.conf << EOL
+[program:backend]
+command=/var/www/backend/venv/bin/gunicorn -c /var/www/backend/gunicorn_config.py core.wsgi:application
+directory=/var/www/backend
+user=ubuntu
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/project.err.log
+stdout_logfile=/var/log/project.out.log
+environment=PYTHONPATH="/var/www/backend"
+EOL
 
 # Configure Nginx
 echo "Configuring Nginx..."
-sudo tee "/etc/nginx/sites-available/$PROJECT_NAME" << EOF
+sudo cat > /etc/nginx/sites-available/backend << EOL
 server {
     listen 80;
     server_name localhost;
 
-    location = /favicon.ico { access_log off; log_not_found off; }
     location /static/ {
-        root /var/www/$PROJECT_NAME;
+        alias /var/www/backend/static/;
     }
 
     location /media/ {
-        root /var/www/$PROJECT_NAME;
+        alias /var/www/backend/media/;
     }
 
     location / {
-        include proxy_params;
-        proxy_pass http://unix:/run/gunicorn.sock;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
-EOF
+EOL
 
-sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
-sudo ln -s "/etc/nginx/sites-available/$PROJECT_NAME" "/etc/nginx/sites-enabled"
+# Enable Nginx configuration
+sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
 
-# Configure Gunicorn
-echo "Configuring Gunicorn..."
-sudo tee "/etc/supervisor/conf.d/$PROJECT_NAME.conf" << EOF
-[program:$PROJECT_NAME]
-directory=/var/www/$PROJECT_NAME
-command=/var/www/$PROJECT_NAME/venv/bin/gunicorn Core.wsgi:application --workers 2 --bind unix:/run/gunicorn.sock
-user=ubuntu
-autostart=true
-autorestart=true
-stderr_logfile=/var/log/$PROJECT_NAME.err.log
-stdout_logfile=/var/log/$PROJECT_NAME.out.log
-EOF
-
+# Restart services
+echo "Restarting services..."
 sudo supervisorctl reread
 sudo supervisorctl update
+sudo supervisorctl restart backend
+sudo systemctl restart nginx
+sudo systemctl restart postgresql
+sudo systemctl restart redis-server
 
-# Set up environment variables
-echo "Setting up environment variables..."
-sudo tee "/var/www/$PROJECT_NAME/.env" << EOF
-DEBUG=True
-SECRET_KEY=test_secret_key_123
-DATABASE_URL=postgres://${PROJECT_NAME}_user:test_password@localhost:5432/${PROJECT_NAME}_db
-ALLOWED_HOSTS=localhost,127.0.0.1,ec2-public-ip
-AWS_ACCESS_KEY_ID=test_key
-AWS_SECRET_ACCESS_KEY=test_secret
-AWS_STORAGE_BUCKET_NAME=test-bucket
-REDIS_URL=redis://localhost:6379/0
-EOF
-
-# Set proper permissions
-echo "Setting permissions..."
-sudo chown -R ubuntu:ubuntu "/var/www/$PROJECT_NAME"
-sudo chmod -R 755 "/var/www/$PROJECT_NAME"
-
-# Create media directory
-echo "Creating media directory..."
-sudo mkdir -p "/var/www/$PROJECT_NAME/media"
-sudo chown -R ubuntu:ubuntu "/var/www/$PROJECT_NAME/media"
-
-# Check if manage.py exists
-echo "Checking for manage.py..."
-if [ ! -f "/var/www/$PROJECT_NAME/manage.py" ]; then
-    echo "Error: manage.py not found in /var/www/$PROJECT_NAME"
-    echo "Current directory contents:"
-    ls -la "/var/www/$PROJECT_NAME"
-    echo "Please make sure the repository is cloned correctly"
-    exit 1
-fi
-
-# Collect static files
-echo "Collecting static files..."
-cd "/var/www/$PROJECT_NAME"
-python manage.py collectstatic --noinput
-
-# Run migrations
-echo "Running migrations..."
-python manage.py migrate
-
-# Create superuser for testing
-echo "Creating superuser..."
-echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
-
-echo "Testing deployment completed successfully!"
-echo "You can access the admin panel at: http://your-ec2-public-ip/admin"
+echo "Deployment completed successfully!"
+echo "You can access the application at: http://localhost"
 echo "Admin credentials:"
 echo "Username: admin"
 echo "Password: admin123" 
