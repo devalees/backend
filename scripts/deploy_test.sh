@@ -9,11 +9,7 @@ env | grep -E 'PATH|HOME|USER'
 
 # Clean up existing installations
 echo "Cleaning up existing installations..."
-# Remove all potential project directories
-sudo rm -rf /var/www/backend
-sudo rm -rf /var/www/project
-
-# Remove all potential nginx configurations
+# Remove only configuration files, not the project directory
 sudo rm -f /etc/nginx/sites-enabled/backend
 sudo rm -f /etc/nginx/sites-enabled/project
 sudo rm -f /etc/nginx/sites-available/backend
@@ -44,15 +40,20 @@ sudo apt-get install -y \
     libpq-dev \
     python3-venv
 
-# Create project directory
-echo "Creating project directory..."
-sudo mkdir -p /var/www/backend
-sudo chown ubuntu:ubuntu /var/www/backend
+# Create project directory if it doesn't exist
+echo "Checking project directory..."
+if [ ! -d "/var/www/backend" ]; then
+    echo "Creating project directory..."
+    sudo mkdir -p /var/www/backend
+    sudo chown ubuntu:ubuntu /var/www/backend
+fi
 
 # Set up Python virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
-python3 -m venv venv
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
 source venv/bin/activate
 
 # Install Python dependencies
@@ -155,7 +156,7 @@ echo "Setting permissions..."
 sudo chown -R ubuntu:ubuntu /var/www/backend
 sudo chmod -R 755 /var/www/backend
 
-# Create media directory
+# Create media directory if it doesn't exist
 echo "Creating media directory..."
 sudo mkdir -p /var/www/backend/media
 sudo chown -R ubuntu:ubuntu /var/www/backend/media
