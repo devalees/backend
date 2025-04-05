@@ -1,0 +1,126 @@
+from django.http import HttpResponse, Http404, HttpResponseNotModified
+from django.views.decorators.http import require_http_methods
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.conf import settings
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Audio
+from .services.audio import AudioProcessingService
+import os
+import re
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_audio(request):
+    """Upload an audio file and process it."""
+    if 'audio_file' not in request.FILES:
+        return Response(
+            {'error': 'No audio file provided'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    audio_file = request.FILES['audio_file']
+    audio_service = AudioProcessingService()
+    
+    # Validate the audio file
+    is_valid, error_message = audio_service.validate_audio_file(audio_file)
+    if not is_valid:
+        return Response(
+            {'error': error_message},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Process the audio file
+    features = audio_service.process_audio(audio_file)
+    if not features:
+        return Response(
+            {'error': 'Failed to process audio file'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Save the audio file
+    audio = Audio.objects.create(
+        file=audio_file,
+        duration=features['duration'],
+        sample_rate=features['sample_rate'],
+        channels=features['channels']
+    )
+    
+    return Response({
+        'id': audio.id,
+        'duration': audio.duration,
+        'sample_rate': audio.sample_rate,
+        'channels': audio.channels,
+        'file_size': audio.get_file_size()
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def play_audio(request, audio_id):
+    """Stream an audio file with support for range requests."""
+    try:
+        audio = Audio.objects.get(id=audio_id)
+    except Audio.DoesNotExist:
+        raise Http404("Audio file not found")
+    
+    file_path = audio.file.path
+    file_size = int(audio.get_file_size())  # Ensure file_size is an integer
+    content_type = audio.get_content_type()
+    
+    # Handle range requests
+    range_header = request.META.get('HTTP_RANGE', '').strip()
+    range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+    
+    if range_match:
+        first_byte = int(range_match.group(1))  # Convert to integer
+        last_byte_str = range_match.group(2)
+        
+        # Handle empty last_byte_str
+        if last_byte_str:
+            last_byte = int(last_byte_str)
+            # Validate range values
+            if first_byte >= file_size or first_byte > last_byte:
+                return HttpResponse(
+                    status=416,
+                    reason='Requested range not satisfiable'
+                )
+        else:
+            last_byte = file_size - 1
+            # Validate first_byte
+            if first_byte >= file_size:
+                return HttpResponse(
+                    status=416,
+                    reason='Requested range not satisfiable'
+                )
+        
+        length = last_byte - first_byte + 1
+        # Ensure we don't read past the end of the file
+        if last_byte >= file_size:
+            last_byte = file_size - 1
+            length = file_size - first_byte
+        
+        response = HttpResponse(
+            status=206,
+            content_type=content_type
+        )
+        response['Content-Length'] = str(length)
+        response['Content-Range'] = f'bytes {first_byte}-{last_byte}/{file_size}'
+        
+        with open(file_path, 'rb') as f:
+            f.seek(first_byte)
+            response.write(f.read(length))
+    else:
+        # Full file request
+        response = HttpResponse(
+            content_type=content_type
+        )
+        response['Content-Length'] = str(file_size)
+        
+        with open(file_path, 'rb') as f:
+            response.write(f.read())
+    
+    response['Accept-Ranges'] = 'bytes'
+    return response 
