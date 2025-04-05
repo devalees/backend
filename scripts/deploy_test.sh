@@ -5,26 +5,29 @@
 # Get project name from user input
 read -p "Enter your project name (e.g., backend): " PROJECT_NAME
 
+# Get repository URL from user input
+read -p "Enter your repository URL (e.g., https://github.com/username/repo.git): " REPO_URL
+
 # Debug: Print current directory and environment
 echo "Current directory: $(pwd)"
 echo "Environment:"
 env | grep -E 'PATH|HOME|USER'
 
-# Clean up existing installations
-echo "Cleaning up existing installations..."
-# Remove project directory if it exists
+# Clean up existing installations if directory exists
 if [ -d "/var/www/$PROJECT_NAME" ]; then
+    echo "Cleaning up existing installations..."
+    # Remove project directory if it exists
     echo "Removing existing project directory: /var/www/$PROJECT_NAME"
     sudo rm -rf "/var/www/$PROJECT_NAME"
+    
+    # Remove all potential nginx configurations
+    sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
+    sudo rm -f "/etc/nginx/sites-available/$PROJECT_NAME"
+    sudo rm -f /etc/nginx/sites-enabled/default
+
+    # Remove all potential supervisor configurations
+    sudo rm -f "/etc/supervisor/conf.d/$PROJECT_NAME.conf"
 fi
-
-# Remove all potential nginx configurations
-sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
-sudo rm -f "/etc/nginx/sites-available/$PROJECT_NAME"
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# Remove all potential supervisor configurations
-sudo rm -f "/etc/supervisor/conf.d/$PROJECT_NAME.conf"
 
 # Update system packages
 echo "Updating system packages..."
@@ -51,9 +54,13 @@ echo "Creating project directory..."
 sudo mkdir -p "/var/www/$PROJECT_NAME"
 sudo chown ubuntu:ubuntu "/var/www/$PROJECT_NAME"
 
+# Clone the repository
+echo "Cloning repository..."
+cd "/var/www/$PROJECT_NAME"
+git clone "$REPO_URL" .
+
 # Set up Python virtual environment
 echo "Setting up Python virtual environment..."
-cd "/var/www/$PROJECT_NAME"
 python3 -m venv venv
 source venv/bin/activate
 
