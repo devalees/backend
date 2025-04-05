@@ -62,7 +62,7 @@ if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
 else
     echo "requirements.txt not found, installing basic dependencies"
-    pip install django djangorestframework gunicorn psycopg2-binary redis
+    pip install django djangorestframework gunicorn psycopg2-binary redis djangorestframework-simplejwt django-cors-headers drf-yasg
 fi
 
 # Configure PostgreSQL
