@@ -7,6 +7,10 @@ import numpy as np
 from scipy.io import wavfile
 import librosa
 import soundfile as sf
+from pydub import AudioSegment
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from ..models import Audio
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +18,7 @@ class AudioProcessingService:
     """Service for processing audio files and performing various audio operations."""
     
     def __init__(self):
-        self.supported_formats = ['wav', 'mp3', 'ogg']
+        self.supported_formats = ['wav', 'mp3', 'ogg', 'flac']
         self.max_file_size = 10 * 1024 * 1024  # 10MB
         self.sample_rate = 44100  # Standard sample rate
     
@@ -124,4 +128,53 @@ class AudioProcessingService:
         Returns:
             Trimmed audio data
         """
-        return librosa.effects.trim(audio_data, top_db=top_db)[0] 
+        return librosa.effects.trim(audio_data, top_db=top_db)[0]
+    
+    def compress_audio(self, audio_file, quality=0.5):
+        """Compress an audio file with the specified quality (0.0 to 1.0)."""
+        if not 0 <= quality <= 1:
+            raise ValueError("Quality must be between 0.0 and 1.0")
+        
+        # Get the file path if it's a Django FileField
+        if hasattr(audio_file, 'path'):
+            file_path = audio_file.path
+        else:
+            # If it's a file object, save it temporarily
+            temp_path = os.path.join(settings.MEDIA_ROOT, 'temp', audio_file.name)
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            
+            with open(temp_path, 'wb+') as destination:
+                for chunk in audio_file.chunks():
+                    destination.write(chunk)
+            file_path = temp_path
+        
+        try:
+            # Load the audio file
+            audio = AudioSegment.from_file(file_path)
+            
+            # Calculate target bitrate based on quality
+            # For MP3, typical bitrates are 32kbps to 320kbps
+            min_bitrate = 32
+            max_bitrate = 320
+            target_bitrate = int(min_bitrate + (max_bitrate - min_bitrate) * quality)
+            
+            # Export with compression
+            compressed_path = os.path.splitext(file_path)[0] + '_compressed.mp3'
+            audio.export(
+                compressed_path,
+                format='mp3',
+                bitrate=f'{target_bitrate}k'
+            )
+            
+            # Read the compressed file
+            with open(compressed_path, 'rb') as f:
+                compressed_content = f.read()
+            
+            return compressed_content
+            
+        finally:
+            # Clean up temporary files
+            if not hasattr(audio_file, 'path'):
+                os.remove(file_path)
+            if os.path.exists(compressed_path):
+                os.remove(compressed_path) 

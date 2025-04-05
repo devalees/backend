@@ -1,0 +1,3 @@
+"""
+Communication app package initialization.
+""" 

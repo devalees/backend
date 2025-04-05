@@ -1,0 +1,3 @@
+"""
+Communication tests package initialization.
+""" 
