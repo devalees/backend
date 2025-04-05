@@ -2,6 +2,9 @@
 
 # Deployment script for Django project on EC2 (Testing Version)
 
+# Get project name from user input
+read -p "Enter your project name (e.g., backend): " PROJECT_NAME
+
 # Debug: Print current directory and environment
 echo "Current directory: $(pwd)"
 echo "Environment:"
@@ -9,16 +12,19 @@ env | grep -E 'PATH|HOME|USER'
 
 # Clean up existing installations
 echo "Cleaning up existing installations..."
-# Remove only configuration files, not the project directory
-sudo rm -f /etc/nginx/sites-enabled/backend
-sudo rm -f /etc/nginx/sites-enabled/project
-sudo rm -f /etc/nginx/sites-available/backend
-sudo rm -f /etc/nginx/sites-available/project
+# Remove project directory if it exists
+if [ -d "/var/www/$PROJECT_NAME" ]; then
+    echo "Removing existing project directory: /var/www/$PROJECT_NAME"
+    sudo rm -rf "/var/www/$PROJECT_NAME"
+fi
+
+# Remove all potential nginx configurations
+sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
+sudo rm -f "/etc/nginx/sites-available/$PROJECT_NAME"
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Remove all potential supervisor configurations
-sudo rm -f /etc/supervisor/conf.d/backend.conf
-sudo rm -f /etc/supervisor/conf.d/project.conf
+sudo rm -f "/etc/supervisor/conf.d/$PROJECT_NAME.conf"
 
 # Update system packages
 echo "Updating system packages..."
@@ -40,26 +46,23 @@ sudo apt-get install -y \
     libpq-dev \
     python3-venv
 
-# Create project directory if it doesn't exist
-echo "Checking project directory..."
-if [ ! -d "/var/www/backend" ]; then
-    echo "Creating project directory..."
-    sudo mkdir -p /var/www/backend
-    sudo chown ubuntu:ubuntu /var/www/backend
-fi
+# Create project directory
+echo "Creating project directory..."
+sudo mkdir -p "/var/www/$PROJECT_NAME"
+sudo chown ubuntu:ubuntu "/var/www/$PROJECT_NAME"
 
 # Set up Python virtual environment
 echo "Setting up Python virtual environment..."
-cd /var/www/backend
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-fi
+cd "/var/www/$PROJECT_NAME"
+python3 -m venv venv
 source venv/bin/activate
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
 if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
+    # Ensure djangorestframework-simplejwt is installed even if not in requirements.txt
+    pip install djangorestframework-simplejwt
 else
     echo "requirements.txt not found, installing basic dependencies"
     pip install django djangorestframework gunicorn psycopg2-binary redis djangorestframework-simplejwt django-cors-headers drf-yasg
@@ -67,18 +70,18 @@ fi
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
-if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw project_db; then
-    sudo -u postgres psql -c "CREATE DATABASE project_db;"
+if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "${PROJECT_NAME}_db"; then
+    sudo -u postgres psql -c "CREATE DATABASE ${PROJECT_NAME}_db;"
 fi
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='project_user'" | grep -q 1; then
-    sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';"
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${PROJECT_NAME}_user'" | grep -q 1; then
+    sudo -u postgres psql -c "CREATE USER ${PROJECT_NAME}_user WITH PASSWORD 'test_password';"
 fi
 
-sudo -u postgres psql -c "ALTER ROLE project_user SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE project_user SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE project_user SET timezone TO 'UTC';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE project_db TO project_user;"
+sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET client_encoding TO 'utf8';"
+sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET default_transaction_isolation TO 'read committed';"
+sudo -u postgres psql -c "ALTER ROLE ${PROJECT_NAME}_user SET timezone TO 'UTC';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${PROJECT_NAME}_db TO ${PROJECT_NAME}_user;"
 
 # Configure PostgreSQL to allow local connections
 echo "Configuring PostgreSQL connections..."
@@ -95,18 +98,18 @@ fi
 
 # Configure Nginx
 echo "Configuring Nginx..."
-sudo tee /etc/nginx/sites-available/backend << EOF
+sudo tee "/etc/nginx/sites-available/$PROJECT_NAME" << EOF
 server {
     listen 80;
     server_name localhost;
 
     location = /favicon.ico { access_log off; log_not_found off; }
     location /static/ {
-        root /var/www/backend;
+        root /var/www/$PROJECT_NAME;
     }
 
     location /media/ {
-        root /var/www/backend;
+        root /var/www/$PROJECT_NAME;
     }
 
     location / {
@@ -116,23 +119,23 @@ server {
 }
 EOF
 
-sudo rm -f /etc/nginx/sites-enabled/backend
-sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled
+sudo rm -f "/etc/nginx/sites-enabled/$PROJECT_NAME"
+sudo ln -s "/etc/nginx/sites-available/$PROJECT_NAME" "/etc/nginx/sites-enabled"
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 
 # Configure Gunicorn
 echo "Configuring Gunicorn..."
-sudo tee /etc/supervisor/conf.d/backend.conf << EOF
-[program:backend]
-directory=/var/www/backend
-command=/var/www/backend/venv/bin/gunicorn Core.wsgi:application --workers 2 --bind unix:/run/gunicorn.sock
+sudo tee "/etc/supervisor/conf.d/$PROJECT_NAME.conf" << EOF
+[program:$PROJECT_NAME]
+directory=/var/www/$PROJECT_NAME
+command=/var/www/$PROJECT_NAME/venv/bin/gunicorn Core.wsgi:application --workers 2 --bind unix:/run/gunicorn.sock
 user=ubuntu
 autostart=true
 autorestart=true
-stderr_logfile=/var/log/backend.err.log
-stdout_logfile=/var/log/backend.out.log
+stderr_logfile=/var/log/$PROJECT_NAME.err.log
+stdout_logfile=/var/log/$PROJECT_NAME.out.log
 EOF
 
 sudo supervisorctl reread
@@ -140,10 +143,10 @@ sudo supervisorctl update
 
 # Set up environment variables
 echo "Setting up environment variables..."
-sudo tee /var/www/backend/.env << EOF
+sudo tee "/var/www/$PROJECT_NAME/.env" << EOF
 DEBUG=True
 SECRET_KEY=test_secret_key_123
-DATABASE_URL=postgres://project_user:test_password@localhost:5432/project_db
+DATABASE_URL=postgres://${PROJECT_NAME}_user:test_password@localhost:5432/${PROJECT_NAME}_db
 ALLOWED_HOSTS=localhost,127.0.0.1,ec2-public-ip
 AWS_ACCESS_KEY_ID=test_key
 AWS_SECRET_ACCESS_KEY=test_secret
@@ -153,27 +156,27 @@ EOF
 
 # Set proper permissions
 echo "Setting permissions..."
-sudo chown -R ubuntu:ubuntu /var/www/backend
-sudo chmod -R 755 /var/www/backend
+sudo chown -R ubuntu:ubuntu "/var/www/$PROJECT_NAME"
+sudo chmod -R 755 "/var/www/$PROJECT_NAME"
 
-# Create media directory if it doesn't exist
+# Create media directory
 echo "Creating media directory..."
-sudo mkdir -p /var/www/backend/media
-sudo chown -R ubuntu:ubuntu /var/www/backend/media
+sudo mkdir -p "/var/www/$PROJECT_NAME/media"
+sudo chown -R ubuntu:ubuntu "/var/www/$PROJECT_NAME/media"
 
 # Check if manage.py exists
 echo "Checking for manage.py..."
-if [ ! -f "/var/www/backend/manage.py" ]; then
-    echo "Error: manage.py not found in /var/www/backend"
+if [ ! -f "/var/www/$PROJECT_NAME/manage.py" ]; then
+    echo "Error: manage.py not found in /var/www/$PROJECT_NAME"
     echo "Current directory contents:"
-    ls -la /var/www/backend
+    ls -la "/var/www/$PROJECT_NAME"
     echo "Please make sure the repository is cloned correctly"
     exit 1
 fi
 
 # Collect static files
 echo "Collecting static files..."
-cd /var/www/backend
+cd "/var/www/$PROJECT_NAME"
 python manage.py collectstatic --noinput
 
 # Run migrations
