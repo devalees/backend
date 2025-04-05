@@ -180,3 +180,113 @@ class ContactGroup(models.Model):
     def hard_delete(self):
         """Hard delete the contact group"""
         self.delete(hard_delete=True)
+
+class ContactTemplate(models.Model):
+    """ContactTemplate model for defining contact field templates"""
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_templates_created'
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_templates_updated'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='contact_templates'
+    )
+    fields = models.JSONField(
+        help_text="JSON structure defining the template fields and their properties"
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Contact Template'
+        verbose_name_plural = 'Contact Templates'
+        ordering = ['name']
+        unique_together = ['name', 'organization']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """Save the template and validate data"""
+        skip_validation = kwargs.pop('skip_validation', False)
+        if not skip_validation:
+            self.full_clean()
+        super().save(*args, **kwargs)
+
+    def hard_delete(self):
+        """Hard delete the template"""
+        self.delete(hard_delete=True)
+
+    def delete(self, *args, **kwargs):
+        """Delete the template"""
+        hard_delete = kwargs.pop('hard_delete', False)
+        if hard_delete:
+            super().delete(*args, **kwargs)
+        else:
+            self.is_active = False
+            self.save()
+
+    def clean(self):
+        """Validate template data"""
+        # Validate required fields
+        if not self.name:
+            raise ValidationError({'name': ['Name is required.']})
+        if not self.organization:
+            raise ValidationError({'organization': ['Organization is required.']})
+
+        # Validate fields structure
+        if not isinstance(self.fields, dict):
+            raise ValidationError({'fields': ['Fields must be a dictionary.']})
+
+        # Validate each field in the template
+        valid_field_types = {'text', 'email', 'phone', 'select', 'number', 'date'}
+        for field_name, field_config in self.fields.items():
+            if not isinstance(field_config, dict):
+                raise ValidationError({
+                    'fields': [f'Field {field_name} configuration must be a dictionary.']
+                })
+            
+            # Check required field properties
+            if 'type' not in field_config:
+                raise ValidationError({
+                    'fields': [f'Field {field_name} must have a type.']
+                })
+            
+            if field_config['type'] not in valid_field_types:
+                raise ValidationError({
+                    'fields': [f'Invalid type for field {field_name}. Must be one of {valid_field_types}']
+                })
+            
+            # Check required property
+            if 'required' not in field_config:
+                raise ValidationError({
+                    'fields': [f'Field {field_name} must specify if it is required.']
+                })
+            
+            if not isinstance(field_config['required'], bool):
+                raise ValidationError({
+                    'fields': [f'Required property for field {field_name} must be a boolean.']
+                })
+
+        # Validate organization constraint
+        if self.pk:  # Only check on update
+            original = ContactTemplate.objects.get(pk=self.pk)
+            if original.organization != self.organization:
+                raise ValidationError({
+                    'organization': ['Cannot change the organization of a template.']
+                })
