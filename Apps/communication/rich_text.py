@@ -1,6 +1,9 @@
 import re
 import html
 from typing import Optional, List, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 class RichTextFormatter:
     """Handles formatting of rich text content"""
@@ -253,14 +256,19 @@ class RichTextFormatter:
         if content is None:
             return False
             
+        logger.debug(f"Validating content: {content}")
+            
         # Check for matching markdown syntax
         if content.count('**') % 2 != 0:
+            logger.debug("Unmatched bold markers")
             return False
             
         if content.count('*') % 2 != 0:
+            logger.debug("Unmatched italic markers")
             return False
             
         if content.count('`') % 2 != 0:
+            logger.debug("Unmatched code markers")
             return False
             
         # Check for potential XSS attacks
@@ -277,8 +285,171 @@ class RichTextFormatter:
         
         for pattern in xss_patterns:
             if re.search(pattern, content, re.IGNORECASE):
+                logger.debug(f"XSS pattern detected: {pattern}")
+                return False
+
+        # Define allowed extensions for each media type
+        allowed_extensions = {
+            'image': ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+            'video': ['mp4', 'webm', 'ogg'],
+            'audio': ['mp3', 'wav', 'ogg', 'm4a']
+        }
+
+        # Validate media file types
+        media_pattern = r'!\[(.*?)\]\((.*?)\)(?:\{(.*?)\})?'
+        for match in re.finditer(media_pattern, content):
+            url = match.group(2).strip()
+            media_type = match.group(3).strip() if match.group(3) else None
+            
+            logger.debug(f"Found media: url={url}, type={media_type}")
+            
+            # Get file extension, handling query parameters
+            url_parts = url.split('?')[0].lower()  # Remove query parameters
+            if '.' not in url_parts:
+                logger.debug("URL has no extension")
+                continue  # Skip validation for URLs without extensions
+            ext = url_parts.split('.')[-1]
+            
+            logger.debug(f"File extension: {ext}")
+            
+            # Special handling for .ogg files which can be both audio and video
+            if ext == 'ogg':
+                if media_type and media_type in ['audio', 'video']:
+                    continue  # Both audio and video are valid for .ogg
+                elif not media_type:
+                    # If no type specified, default to audio (or could be video)
+                    continue
+            
+            # Determine the expected media type based on extension
+            expected_type = None
+            for type_name, extensions in allowed_extensions.items():
+                if ext in extensions:
+                    expected_type = type_name
+                    break
+            
+            # If media type is specified, validate against that type
+            if media_type:
+                if media_type not in allowed_extensions:
+                    logger.debug(f"Invalid media type: {media_type}")
+                    return False
+                if ext not in allowed_extensions[media_type]:
+                    logger.debug(f"Extension {ext} not allowed for type {media_type}")
+                    return False
+                # Skip media type matching for .ogg files
+                if ext != 'ogg':
+                    if expected_type and media_type != expected_type:
+                        logger.debug(f"Media type {media_type} does not match extension type {expected_type}")
+                        return False
+            # If no media type specified, validate extension against allowed types
+            else:
+                if not expected_type:
+                    logger.debug(f"Extension {ext} not allowed for any media type")
+                    return False
+
+        # Validate URL schemes
+        url_pattern = r'\[(.*?)\]\((.*?)(?:\s+"([^"]*)")?\)'
+        for match in re.finditer(url_pattern, content):
+            url = match.group(2).strip()
+            base_url = url.split('?')[0]  # Remove query parameters for scheme check
+            
+            # Skip URL scheme validation for media files
+            is_media = bool(re.search(r'!\[.*?\]\(' + re.escape(url) + r'\)', content))
+            if not is_media and not base_url.startswith(('http://', 'https://', 'mailto:', 'tel:')):
+                logger.debug(f"Invalid URL scheme: {base_url}")
+                return False
+
+        # Validate content length
+        if len(content) > 10000:  # Maximum content length
+            logger.debug("Content too long")
+            return False
+
+        # Validate nested formatting depth
+        max_nesting = 3
+        for char in ['*', '_', '`']:
+            if content.count(char) > max_nesting * 2:
+                logger.debug(f"Too many {char} characters")
+                return False
+
+        # Validate blockquote nesting
+        max_blockquote_depth = 5
+        for line in content.split('\n'):
+            line = line.lstrip()
+            quote_count = 0
+            while line.startswith('>'):
+                quote_count += 1
+                line = line[1:].lstrip()
+            if quote_count > max_blockquote_depth:
+                logger.debug(f"Blockquote nesting too deep: {quote_count}")
+                return False
+
+        # Validate list nesting
+        list_pattern = r'^(\s*)(?:[-*]|\d+\.)\s'
+        max_list_depth = 3
+        for line in content.split('\n'):
+            match = re.match(list_pattern, line)
+            if match:
+                indent = len(match.group(1))
+                if indent // 2 > max_list_depth - 1:  # Adjust for zero-based counting
+                    logger.debug(f"List nesting too deep: {indent}")
+                    return False
+
+        # Validate nested formatting combinations
+        invalid_patterns = [
+            r'`[^`]*\*\*[^`]*`',  # Bold inside code
+            r'`[^`]*\*[^`]*`',     # Italic inside code
+            r'`[^`]*_[^`]*`'       # Underscore inside code
+        ]
+        
+        for pattern in invalid_patterns:
+            if re.search(pattern, content):
+                logger.debug(f"Invalid formatting pattern: {pattern}")
+                return False
+
+        # Special handling for mixed content
+        lines = [line.strip() for line in content.strip().split('\n')]
+        in_block = False  # Track if we're inside a block element
+        
+        for i, line in enumerate(lines):
+            logger.debug(f"Processing line {i}: {line}")
+            
+            if not line:
+                in_block = False
+                continue
+                
+            # Check if line starts a block element
+            if (line.startswith('#') or  # Headers
+                line.startswith('>') or   # Blockquotes
+                line.startswith('-') or   # Unordered lists
+                line.startswith('*') or   # Unordered lists or emphasis
+                line.startswith('|') or   # Tables
+                re.match(r'^\d+\.', line) or  # Ordered lists
+                re.match(r'^\s*[-*]', line) or  # Indented lists
+                re.match(r'^\s*\d+\.', line)):  # Indented ordered lists
+                logger.debug(f"Line {i} starts a block element")
+                in_block = True
+                continue
+                
+            # Check for inline elements
+            if (re.match(r'.*!\[.*?\]\(.*?(?:\{[^}]*\})?\).*', line) or  # Images with optional type
+                re.match(r'.*\[.*?\]\(.*?\).*', line) or  # Links
+                re.match(r'.*\*\*.*\*\*.*', line) or  # Bold
+                re.match(r'.*\*[^*]+\*.*', line) or  # Italic
+                re.match(r'.*`[^`]+`.*', line) or  # Code
+                line.strip().startswith('> ') or  # Blockquote
+                line.strip().startswith('- ') or  # List item
+                re.match(r'^\s*\d+\.\s', line) or  # Ordered list item
+                line.strip() == '' or  # Empty line
+                line.strip().isspace()):  # Whitespace-only line
+                logger.debug(f"Line {i} contains valid inline elements")
+                continue
+                
+            # If we're not in a block and the line contains markdown-like characters
+            # but doesn't match any valid markdown pattern, it's invalid
+            if not in_block and any(char in line for char in ['*', '_', '`', '[', ']', '(', ')']):
+                logger.debug(f"Line {i} contains invalid markdown characters")
                 return False
             
+        logger.debug("Content validation passed")
         return True
 
 class RichTextMessage:
