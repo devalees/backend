@@ -45,11 +45,14 @@ if [ ! -f "/var/www/backend/requirements.txt" ]; then
     cat > /var/www/backend/requirements.txt << EOL
 Django>=4.2.0
 djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.3.1
 psycopg2-binary>=2.9.9
 redis>=5.0.1
 gunicorn>=21.2.0
 django-cors-headers>=4.3.1
 drf-yasg>=1.21.7
+python-dotenv>=1.0.0
+django-environ>=0.11.2
 EOL
 fi
 
@@ -63,8 +66,8 @@ source venv/bin/activate
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
+pip install --upgrade pip
 pip install -r requirements.txt
-pip install gunicorn
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
