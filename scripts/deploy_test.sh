@@ -39,6 +39,20 @@ else
     git clone https://github.com/devalees/backend.git /var/www/backend
 fi
 
+# Check for requirements.txt
+if [ ! -f "/var/www/backend/requirements.txt" ]; then
+    echo "Creating requirements.txt..."
+    cat > /var/www/backend/requirements.txt << EOL
+Django>=4.2.0
+djangorestframework>=3.14.0
+psycopg2-binary>=2.9.9
+redis>=5.0.1
+gunicorn>=21.2.0
+django-cors-headers>=4.3.1
+drf-yasg>=1.21.7
+EOL
+fi
+
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
@@ -54,12 +68,22 @@ pip install gunicorn
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
-sudo -u postgres psql -c "CREATE DATABASE project_db;" || echo "Database might already exist, continuing..."
-sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';" || echo "User might already exist, continuing..."
-sudo -u postgres psql -c "ALTER ROLE project_user SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE project_user SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE project_user SET timezone TO 'UTC';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE project_db TO project_user;"
+POSTGRES_VERSION=$(ls /etc/postgresql)
+if [ -d "/etc/postgresql/$POSTGRES_VERSION/main" ]; then
+    sudo -u postgres psql -c "CREATE DATABASE project_db;" || echo "Database might already exist, continuing..."
+    sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';" || echo "User might already exist, continuing..."
+    sudo -u postgres psql -c "ALTER ROLE project_user SET client_encoding TO 'utf8';"
+    sudo -u postgres psql -c "ALTER ROLE project_user SET default_transaction_isolation TO 'read committed';"
+    sudo -u postgres psql -c "ALTER ROLE project_user SET timezone TO 'UTC';"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE project_db TO project_user;"
+    
+    # Configure PostgreSQL to allow local connections
+    sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/$POSTGRES_VERSION/main/postgresql.conf
+    sudo sed -i "s/local   all             all                                     peer/local   all             all                                     md5/" /etc/postgresql/$POSTGRES_VERSION/main/pg_hba.conf
+    sudo systemctl restart postgresql
+else
+    echo "Warning: PostgreSQL configuration directory not found. Please check PostgreSQL installation."
+fi
 
 # Configure Redis
 echo "Configuring Redis..."
@@ -81,8 +105,17 @@ echo "Setting up media and static directories..."
 mkdir -p /var/www/backend/media
 mkdir -p /var/www/backend/static
 
+# Check for manage.py
+if [ ! -f "/var/www/backend/manage.py" ]; then
+    echo "Error: manage.py not found in /var/www/backend"
+    echo "Current directory contents:"
+    ls -la /var/www/backend
+    exit 1
+fi
+
 # Run database migrations
 echo "Running database migrations..."
+cd /var/www/backend
 python manage.py migrate
 
 # Create superuser (only if it doesn't exist)
@@ -138,7 +171,8 @@ server {
 EOL
 
 # Enable Nginx configuration
-sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled/ || echo "Nginx configuration might already exist, continuing..."
+sudo rm -f /etc/nginx/sites-enabled/backend
+sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Restart services
