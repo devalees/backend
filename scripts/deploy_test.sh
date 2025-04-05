@@ -29,17 +29,22 @@ sudo apt-get install -y \
 
 # Create project directory
 echo "Setting up project directory..."
-sudo mkdir -p /var/www/backend
-sudo chown ubuntu:ubuntu /var/www/backend
-
-# Clone repository
-echo "Cloning repository..."
-git clone https://github.com/devalees/backend.git /var/www/backend
+if [ -d "/var/www/backend" ]; then
+    echo "Project directory already exists. Using existing directory..."
+else
+    sudo mkdir -p /var/www/backend
+    sudo chown ubuntu:ubuntu /var/www/backend
+    # Clone repository only if directory doesn't exist
+    echo "Cloning repository..."
+    git clone https://github.com/devalees/backend.git /var/www/backend
+fi
 
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
-python3 -m venv venv
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
 source venv/bin/activate
 
 # Install Python dependencies
@@ -49,8 +54,8 @@ pip install gunicorn
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
-sudo -u postgres psql -c "CREATE DATABASE project_db;"
-sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';"
+sudo -u postgres psql -c "CREATE DATABASE project_db;" || echo "Database might already exist, continuing..."
+sudo -u postgres psql -c "CREATE USER project_user WITH PASSWORD 'test_password';" || echo "User might already exist, continuing..."
 sudo -u postgres psql -c "ALTER ROLE project_user SET client_encoding TO 'utf8';"
 sudo -u postgres psql -c "ALTER ROLE project_user SET default_transaction_isolation TO 'read committed';"
 sudo -u postgres psql -c "ALTER ROLE project_user SET timezone TO 'UTC';"
@@ -80,9 +85,9 @@ mkdir -p /var/www/backend/static
 echo "Running database migrations..."
 python manage.py migrate
 
-# Create superuser
+# Create superuser (only if it doesn't exist)
 echo "Creating superuser..."
-echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
+echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.get_or_create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
 
 # Configure Gunicorn
 echo "Configuring Gunicorn..."
@@ -133,7 +138,7 @@ server {
 EOL
 
 # Enable Nginx configuration
-sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/backend /etc/nginx/sites-enabled/ || echo "Nginx configuration might already exist, continuing..."
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Restart services
