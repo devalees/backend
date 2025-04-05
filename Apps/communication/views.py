@@ -9,8 +9,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Audio
 from .services.audio import AudioProcessingService
+from .services.transcription import TranscriptionService
 import os
 import re
+from django.core.exceptions import ValidationError
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -185,5 +187,38 @@ def compress_audio(request, audio_id):
     except Exception as e:
         return Response(
             {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def transcribe_audio(request):
+    """
+    Transcribe an audio file using OpenAI's Whisper model.
+    Supports Arabic language and its various locales.
+    """
+    if 'audio_file' not in request.FILES:
+        return Response(
+            {"error": "No audio file provided"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    language = request.data.get('language', 'ar')
+    
+    try:
+        transcription_service = TranscriptionService()
+        result = transcription_service.transcribe_audio(
+            request.FILES['audio_file'],
+            language=language
+        )
+        return Response(result, status=status.HTTP_200_OK)
+    except ValueError as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         ) 

@@ -7,7 +7,7 @@ User = get_user_model()
 class MessageModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', email='testuser@example.com', password='testpass')
-        self.thread = Thread.objects.create(name='Test Thread')
+        self.thread = Thread.objects.create(title='Test Thread')
 
     def test_create_message(self):
         message = Message.objects.create(content='Hello, World!', sender=self.user, thread=self.thread)
@@ -17,8 +17,8 @@ class MessageModelTest(TestCase):
 
 class ThreadModelTest(TestCase):
     def test_create_thread(self):
-        thread = Thread.objects.create(name='Test Thread')
-        self.assertEqual(thread.name, 'Test Thread')
+        thread = Thread.objects.create(title='Test Thread')
+        self.assertEqual(thread.title, 'Test Thread')
 
 class ChannelModelTest(TestCase):
     def test_create_channel(self):

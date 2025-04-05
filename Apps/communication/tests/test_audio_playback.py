@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from ..services.audio import AudioProcessingService
+from django.conf import settings
 
 class TestAudioPlayback(TestCase):
     def setUp(self):
@@ -18,7 +19,7 @@ class TestAudioPlayback(TestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.audio_service = AudioProcessingService()
-        self.test_wav_path = os.path.join(tempfile.gettempdir(), 'test.wav')
+        self.test_wav_path = os.path.join(settings.MEDIA_ROOT, 'temp', 'test.wav')
         
         # Create a simple test WAV file
         sample_rate = 44100
