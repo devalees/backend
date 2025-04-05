@@ -41,7 +41,7 @@ class TestAudioCompression(TestCase):
         # Upload test audio file
         with open(self.test_wav_path, 'rb') as f:
             response = self.client.post(
-                reverse('audio-upload'),
+                reverse('communication:audio-upload'),
                 {'audio_file': f},
                 format='multipart'
             )
@@ -50,7 +50,7 @@ class TestAudioCompression(TestCase):
         
         # Test compression endpoint
         response = self.client.post(
-            reverse('audio-compress', kwargs={'audio_id': audio_id}),
+            reverse('communication:audio-compress', kwargs={'audio_id': audio_id}),
             {'quality': 0.5}  # 50% quality
         )
         self.assertEqual(response.status_code, 200)
@@ -68,7 +68,7 @@ class TestAudioCompression(TestCase):
         # Upload test audio file
         with open(self.test_wav_path, 'rb') as f:
             response = self.client.post(
-                reverse('audio-upload'),
+                reverse('communication:audio-upload'),
                 {'audio_file': f},
                 format='multipart'
             )
@@ -77,14 +77,14 @@ class TestAudioCompression(TestCase):
         
         # Test with invalid quality value
         response = self.client.post(
-            reverse('audio-compress', kwargs={'audio_id': audio_id}),
+            reverse('communication:audio-compress', kwargs={'audio_id': audio_id}),
             {'quality': 1.5}  # Invalid quality > 1.0
         )
         self.assertEqual(response.status_code, 400)
         
         # Test with negative quality value
         response = self.client.post(
-            reverse('audio-compress', kwargs={'audio_id': audio_id}),
+            reverse('communication:audio-compress', kwargs={'audio_id': audio_id}),
             {'quality': -0.5}  # Invalid quality < 0
         )
         self.assertEqual(response.status_code, 400)
@@ -92,7 +92,7 @@ class TestAudioCompression(TestCase):
     def test_audio_compression_nonexistent_file(self):
         """Test that the audio compression endpoint handles nonexistent files."""
         response = self.client.post(
-            reverse('audio-compress', kwargs={'audio_id': 999999}),
+            reverse('communication:audio-compress', kwargs={'audio_id': 999999}),
             {'quality': 0.5}
         )
         self.assertEqual(response.status_code, 404)
@@ -107,7 +107,7 @@ class TestAudioCompression(TestCase):
         # Upload unsupported file
         with open(unsupported_path, 'rb') as f:
             response = self.client.post(
-                reverse('audio-upload'),
+                reverse('communication:audio-upload'),
                 {'audio_file': f},
                 format='multipart'
             )

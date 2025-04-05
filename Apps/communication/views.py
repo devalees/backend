@@ -72,6 +72,12 @@ def play_audio(request, audio_id):
     
     # Handle range requests
     range_header = request.META.get('HTTP_RANGE', '').strip()
+    if range_header and not re.match(r'bytes=\d*-\d*$', range_header):
+        return HttpResponse(
+            status=400,
+            reason='Invalid range format'
+        )
+    
     range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
     
     if range_match:
