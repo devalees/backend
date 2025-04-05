@@ -9,6 +9,7 @@ from Apps.entity.tests.factories import (
     TeamFactory, TeamMemberFactory
 )
 from Apps.users.tests.factories import UserFactory
+from Apps.entity.models import TeamMember
 
 @pytest.mark.django_db
 class TestOrganizationSerializer:
@@ -152,7 +153,7 @@ class TestTeamMemberSerializer:
         data = {
             'team': team.pk,
             'user_id': user.pk,
-            'role': 'Leader'
+            'role': TeamMember.Role.ADMIN
         }
         serializer = TeamMemberSerializer(data=data)
         
@@ -181,7 +182,7 @@ class TestTeamMemberSerializer:
         data = {
             'team': member.team.pk,
             'user_id': member.user.pk,
-            'role': 'Member'
+            'role': TeamMember.Role.MEMBER
         }
         serializer = TeamMemberSerializer(data=data)
         

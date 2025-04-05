@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from .models import Organization, Department, Team, TeamMember
+from .models import Organization, Department, Team, TeamMember, OrganizationSettings
 from rest_framework.validators import UniqueTogetherValidator
 from django.contrib.auth import get_user_model
+import pytz
 
 User = get_user_model()
 
@@ -71,4 +72,62 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         if 'user_id' in validated_data:
             user = validated_data.pop('user_id')
             validated_data['user'] = user
-        return super().update(instance, validated_data) 
+        return super().update(instance, validated_data)
+
+class OrganizationSettingsSerializer(serializers.ModelSerializer):
+    """Serializer for OrganizationSettings model"""
+    class Meta:
+        model = OrganizationSettings
+        fields = [
+            'id',
+            'organization',
+            'timezone',
+            'date_format',
+            'time_format',
+            'language',
+            'notification_preferences',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_timezone(self, value):
+        """Validate timezone"""
+        if value not in pytz.all_timezones:
+            raise serializers.ValidationError("Invalid timezone")
+        return value
+
+    def validate_date_format(self, value):
+        """Validate date format"""
+        valid_formats = ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY']
+        if value not in valid_formats:
+            raise serializers.ValidationError("Invalid date format")
+        return value
+
+    def validate_time_format(self, value):
+        """Validate time format"""
+        valid_formats = ['12h', '24h']
+        if value not in valid_formats:
+            raise serializers.ValidationError("Invalid time format")
+        return value
+
+    def validate_language(self, value):
+        """Validate language"""
+        valid_languages = ['en', 'es', 'fr', 'de']
+        if value not in valid_languages:
+            raise serializers.ValidationError("Invalid language")
+        return value
+
+    def validate_notification_preferences(self, value):
+        """Validate notification preferences"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Notification preferences must be a dictionary")
+        
+        required_keys = ['email', 'push', 'slack']
+        for key in required_keys:
+            if key not in value:
+                raise serializers.ValidationError(f"Missing required key: {key}")
+            if not isinstance(value[key], bool):
+                raise serializers.ValidationError(f"Value for {key} must be boolean")
+        
+        return value 

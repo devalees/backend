@@ -38,6 +38,6 @@ class TeamMemberFactory(factory.django.DjangoModelFactory):
 
     team = factory.SubFactory(TeamFactory)
     user = factory.SubFactory(UserFactory)
-    role = 'Member'
+    role = TeamMember.Role.MEMBER
     created_by = factory.SelfAttribute('user')
     updated_by = factory.SelfAttribute('user') 

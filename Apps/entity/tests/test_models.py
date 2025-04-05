@@ -214,6 +214,6 @@ class TestTeamMember:
             TeamMemberFactory(user=member.user, team=member.team)
 
     def test_team_member_role_default(self):
-        """Test that team member role defaults to 'Member'"""
+        """Test that team member role defaults to 'member'"""
         member = TeamMemberFactory()
-        assert member.role == 'Member' 
+        assert member.role == TeamMember.Role.MEMBER 

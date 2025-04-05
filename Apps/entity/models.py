@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from Apps.core.models import BaseModel
+import pytz
+import json
 
 User = get_user_model()
 
@@ -15,8 +17,20 @@ class ActiveManager(models.Manager):
 
 class Organization(BaseModel):
     """Organization model representing a company or business unit"""
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        INACTIVE = 'inactive', 'Inactive'
+        SUSPENDED = 'suspended', 'Suspended'
+
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['name']
@@ -170,9 +184,21 @@ class Team(BaseModel):
 
 class TeamMember(BaseModel):
     """TeamMember model representing a user's membership in a team"""
+    class Role(models.TextChoices):
+        ADMIN = 'admin', 'Admin'
+        MEMBER = 'member', 'Member'
+        VIEWER = 'viewer', 'Viewer'
+
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_memberships')
-    role = models.CharField(max_length=50, default='Member', blank=False)
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.MEMBER
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('team', 'user')
@@ -191,4 +217,95 @@ class TeamMember(BaseModel):
 
         # Ensure role is not empty
         if not self.role:
-            self.role = 'Member'
+            self.role = self.Role.MEMBER
+
+class OrganizationSettings(BaseModel):
+    """Organization settings model for managing organization-specific configurations"""
+    organization = models.OneToOneField(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='settings'
+    )
+    timezone = models.CharField(
+        max_length=50,
+        default='UTC',
+        help_text='Organization timezone'
+    )
+    date_format = models.CharField(
+        max_length=20,
+        default='YYYY-MM-DD',
+        help_text='Organization date format'
+    )
+    time_format = models.CharField(
+        max_length=10,
+        default='24h',
+        choices=[('12h', '12-hour'), ('24h', '24-hour')],
+        help_text='Organization time format'
+    )
+    language = models.CharField(
+        max_length=10,
+        default='en',
+        help_text='Organization default language'
+    )
+    notification_preferences = models.JSONField(
+        default=dict,
+        help_text='Organization notification preferences'
+    )
+
+    class Meta:
+        verbose_name = 'Organization Settings'
+        verbose_name_plural = 'Organization Settings'
+
+    def __str__(self):
+        return f"Settings for {self.organization.name}"
+
+    def clean(self):
+        """Validate organization settings"""
+        # Validate timezone
+        if self.timezone not in pytz.all_timezones:
+            raise ValidationError({"timezone": "Invalid timezone"})
+
+        # Validate date format
+        valid_date_formats = ['YYYY-MM-DD', 'MM/DD/YYYY', 'DD/MM/YYYY']
+        if self.date_format not in valid_date_formats:
+            raise ValidationError({"date_format": "Invalid date format"})
+
+        # Validate language
+        valid_languages = ['en', 'es', 'fr', 'de']  # Add more as needed
+        if self.language not in valid_languages:
+            raise ValidationError({"language": "Invalid language"})
+
+        # Validate notification preferences
+        if not isinstance(self.notification_preferences, dict):
+            raise ValidationError({"notification_preferences": "Must be a dictionary"})
+        
+        required_keys = ['email', 'push', 'slack']
+        for key in required_keys:
+            if key not in self.notification_preferences:
+                raise ValidationError({"notification_preferences": f"Missing required key: {key}"})
+            if not isinstance(self.notification_preferences[key], bool):
+                raise ValidationError({"notification_preferences": f"Value for {key} must be boolean"})
+
+    def save(self, *args, **kwargs):
+        """Save the organization settings with validation"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_default_notification_preferences(cls):
+        """Get default notification preferences"""
+        return {
+            "email": True,
+            "push": True,
+            "slack": False
+        }
+
+    def get_settings(self):
+        """Get all settings as a dictionary"""
+        return {
+            "timezone": self.timezone,
+            "date_format": self.date_format,
+            "time_format": self.time_format,
+            "language": self.language,
+            "notification_preferences": self.notification_preferences
+        }

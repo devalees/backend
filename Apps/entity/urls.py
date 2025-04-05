@@ -1,15 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import OrganizationViewSet, DepartmentViewSet, TeamViewSet, TeamMemberViewSet
+from . import views
 
 app_name = 'entity'
 
 router = DefaultRouter()
-router.register(r'organizations', OrganizationViewSet, basename='organization')
-router.register(r'departments', DepartmentViewSet, basename='department')
-router.register(r'teams', TeamViewSet, basename='team')
-router.register(r'members', TeamMemberViewSet, basename='team-member')
+router.register(r'organizations', views.OrganizationViewSet, basename='organization')
+router.register(r'departments', views.DepartmentViewSet, basename='department')
+router.register(r'teams', views.TeamViewSet, basename='team')
+router.register(r'team-members', views.TeamMemberViewSet, basename='team_members')
+router.register(r'organization-settings', views.OrganizationSettingsViewSet)
 
-urlpatterns = [
-    path('', include(router.urls)),
-] 
+urlpatterns = router.urls 

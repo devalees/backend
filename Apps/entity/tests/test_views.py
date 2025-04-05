@@ -22,9 +22,17 @@ def authenticated_client(api_client):
 class TestOrganizationViewSet:
     def test_list_organizations(self, authenticated_client):
         """Test listing organizations"""
+        client, user = authenticated_client
         orgs = [OrganizationFactory() for _ in range(3)]
+        
+        # Make user a member of each organization
+        for org in orgs:
+            dept = DepartmentFactory(organization=org)
+            team = TeamFactory(department=dept)
+            TeamMemberFactory(team=team, user=user)
+            
         url = reverse('entity:organization-list')
-        response = authenticated_client[0].get(url)
+        response = client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data['results']) == 3
@@ -32,6 +40,12 @@ class TestOrganizationViewSet:
     def test_create_organization(self, authenticated_client):
         """Test creating an organization."""
         client, user = authenticated_client
+        # Create an initial organization and make user a member to pass permission check
+        org = OrganizationFactory()
+        dept = DepartmentFactory(organization=org)
+        team = TeamFactory(department=dept)
+        TeamMemberFactory(team=team, user=user)
+        
         data = {
             'name': 'Test Organization',
             'description': 'Test Description'
@@ -45,19 +59,29 @@ class TestOrganizationViewSet:
 
     def test_retrieve_organization(self, authenticated_client):
         """Test retrieving an organization"""
+        client, user = authenticated_client
         org = OrganizationFactory()
+        dept = DepartmentFactory(organization=org)
+        team = TeamFactory(department=dept)
+        TeamMemberFactory(team=team, user=user)
+        
         url = reverse('entity:organization-detail', kwargs={'pk': org.pk})
-        response = authenticated_client[0].get(url)
+        response = client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
         assert response.data['name'] == org.name
 
     def test_update_organization(self, authenticated_client):
         """Test updating an organization"""
+        client, user = authenticated_client
         org = OrganizationFactory()
+        dept = DepartmentFactory(organization=org)
+        team = TeamFactory(department=dept)
+        TeamMemberFactory(team=team, user=user)
+        
         url = reverse('entity:organization-detail', kwargs={'pk': org.pk})
         data = {'name': 'Updated Organization'}
-        response = authenticated_client[0].patch(url, data)
+        response = client.patch(url, data)
         
         assert response.status_code == status.HTTP_200_OK
         org.refresh_from_db()
@@ -65,9 +89,14 @@ class TestOrganizationViewSet:
 
     def test_delete_organization(self, authenticated_client):
         """Test deleting an organization"""
+        client, user = authenticated_client
         org = OrganizationFactory()
+        dept = DepartmentFactory(organization=org)
+        team = TeamFactory(department=dept)
+        TeamMemberFactory(team=team, user=user)
+        
         url = reverse('entity:organization-detail', kwargs={'pk': org.pk})
-        response = authenticated_client[0].delete(url)
+        response = client.delete(url)
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
         org.refresh_from_db()
@@ -193,7 +222,7 @@ class TestTeamMemberViewSet:
         """Test listing team members"""
         team = TeamFactory()
         members = [TeamMemberFactory(team=team) for _ in range(3)]
-        url = reverse('entity:team-member-list')
+        url = reverse('entity:team_members-list')
         response = authenticated_client[0].get(url)
         
         assert response.status_code == status.HTTP_200_OK
@@ -207,10 +236,10 @@ class TestTeamMemberViewSet:
         data = {
             'user_id': user.id,
             'team': team.id,
-            'role': 'member'
+            'role': TeamMember.Role.MEMBER
         }
         
-        url = reverse('entity:team-member-list')
+        url = reverse('entity:team_members-list')
         response = client.post(url, data, format='json')
         
         assert response.status_code == status.HTTP_201_CREATED
@@ -219,7 +248,7 @@ class TestTeamMemberViewSet:
     def test_retrieve_team_member(self, authenticated_client):
         """Test retrieving a team member"""
         member = TeamMemberFactory()
-        url = reverse('entity:team-member-detail', kwargs={'pk': member.pk})
+        url = reverse('entity:team_members-detail', kwargs={'pk': member.pk})
         response = authenticated_client[0].get(url)
         
         assert response.status_code == status.HTTP_200_OK
@@ -228,8 +257,8 @@ class TestTeamMemberViewSet:
     def test_update_team_member(self, authenticated_client):
         """Test updating a team member"""
         member = TeamMemberFactory()
-        url = reverse('entity:team-member-detail', kwargs={'pk': member.pk})
-        data = {'role': 'Manager'}
+        url = reverse('entity:team_members-detail', kwargs={'pk': member.pk})
+        data = {'role': TeamMember.Role.ADMIN}
         response = authenticated_client[0].patch(url, data)
         
         assert response.status_code == status.HTTP_200_OK
@@ -239,7 +268,7 @@ class TestTeamMemberViewSet:
     def test_delete_team_member(self, authenticated_client):
         """Test deleting a team member"""
         member = TeamMemberFactory()
-        url = reverse('entity:team-member-detail', kwargs={'pk': member.pk})
+        url = reverse('entity:team_members-detail', kwargs={'pk': member.pk})
         response = authenticated_client[0].delete(url)
         
         assert response.status_code == status.HTTP_204_NO_CONTENT
@@ -249,11 +278,11 @@ class TestTeamMemberViewSet:
     def test_unique_user_team_constraint(self, authenticated_client):
         """Test that a user cannot be added to the same team twice"""
         member = TeamMemberFactory()
-        url = reverse('entity:team-member-list')
+        url = reverse('entity:team_members-list')
         data = {
             'team': member.team.pk,
             'user_id': member.user.pk,
-            'role': 'Member'
+            'role': TeamMember.Role.MEMBER
         }
         response = authenticated_client[0].post(url, data)
         
