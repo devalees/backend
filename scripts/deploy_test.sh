@@ -39,23 +39,6 @@ else
     git clone https://github.com/devalees/backend.git /var/www/backend
 fi
 
-# Check for requirements.txt
-if [ ! -f "/var/www/backend/requirements.txt" ]; then
-    echo "Creating requirements.txt..."
-    cat > /var/www/backend/requirements.txt << EOL
-Django>=4.2.0
-djangorestframework>=3.14.0
-djangorestframework-simplejwt>=5.3.1
-psycopg2-binary>=2.9.9
-redis>=5.0.1
-gunicorn>=21.2.0
-django-cors-headers>=4.3.1
-drf-yasg>=1.21.7
-python-dotenv>=1.0.0
-django-environ>=0.11.2
-EOL
-fi
-
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
@@ -67,7 +50,42 @@ source venv/bin/activate
 # Install Python dependencies
 echo "Installing Python dependencies..."
 pip install --upgrade pip
-pip install -r requirements.txt
+
+# Install core packages first
+echo "Installing core packages..."
+pip install Django==4.2.0
+pip install djangorestframework==3.14.0
+
+# Special handling for djangorestframework-simplejwt
+echo "Installing djangorestframework-simplejwt..."
+pip uninstall -y djangorestframework-simplejwt || true
+pip install djangorestframework-simplejwt==5.3.1
+
+# Install remaining packages
+pip install psycopg2-binary==2.9.9
+pip install redis==5.0.1
+pip install gunicorn==21.2.0
+pip install django-cors-headers==4.3.1
+pip install drf-yasg==1.21.7
+pip install python-dotenv==1.0.0
+pip install django-environ==0.11.2
+
+# Debug: Show installed packages
+echo "Installed packages:"
+pip freeze | grep -E "Django|djangorestframework|simplejwt"
+
+# Verify installation
+echo "Verifying package installation..."
+python -c "
+import sys
+print('Python path:', sys.path)
+try:
+    import rest_framework_simplejwt
+    print('rest_framework_simplejwt imported successfully')
+except ImportError as e:
+    print('ImportError:', e)
+    sys.exit(1)
+"
 
 # Configure PostgreSQL
 echo "Configuring PostgreSQL..."
