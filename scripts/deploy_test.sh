@@ -78,44 +78,33 @@ path.data: /var/lib/elasticsearch
 path.logs: /var/log/elasticsearch
 
 # Network
-network.host: 0.0.0.0
+network.host: 127.0.0.1
 http.port: 9200
 
 # Discovery
 discovery.type: single-node
 
-# Security
-xpack.security.enabled: true
-xpack.security.enrollment.enabled: true
+# Security - Disabled for development
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
 xpack.security.http.ssl.enabled: false
 xpack.security.transport.ssl.enabled: false
 
-# Memory Settings
-indices.memory.index_buffer_size: 5%
-indices.queries.cache.size: 2%
-indices.fielddata.cache.size: 5%
-indices.breaker.total.use_real_memory: false
-indices.breaker.total.limit: 50%
+# Memory Settings - Minimal configuration
+bootstrap.memory_lock: false
+indices.memory.index_buffer_size: 1%
+indices.queries.cache.size: 1%
+indices.fielddata.cache.size: 1%
 
-# Circuit Breaker Settings
-indices.breaker.fielddata.limit: 20%
-indices.breaker.request.limit: 20%
+# Thread Pool Settings
+thread_pool.write.queue_size: 100
+thread_pool.search.queue_size: 100
 EOL
 
 # Set minimal JVM heap size for small instances
 sudo tee /etc/elasticsearch/jvm.options.d/heap.options > /dev/null << EOL
--Xms128m
--Xmx128m
-EOL
-
-# Additional memory optimization
-sudo tee /etc/elasticsearch/jvm.options.d/memory.options > /dev/null << EOL
--XX:+UseG1GC
--XX:G1ReservePercent=10
--XX:InitiatingHeapOccupancyPercent=25
--XX:G1HeapRegionSize=2m
--XX:MaxDirectMemorySize=50m
--XX:+HeapDumpOnOutOfMemoryError
+-Xms64m
+-Xmx64m
 EOL
 
 # Set correct permissions
@@ -156,7 +145,7 @@ while true; do
         exit 1
     fi
     
-    if curl -s --insecure https://localhost:9200 > /dev/null 2>&1; then
+    if curl -s http://localhost:9200 > /dev/null 2>&1; then
         echo "Elasticsearch is running successfully"
         break
     else
@@ -165,30 +154,9 @@ while true; do
     fi
 done
 
-# Generate and save credentials with better error handling
-echo "Generating Elasticsearch credentials..."
-if ! ELASTIC_PASSWORD=$(sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b 2>/dev/null); then
-    echo "Failed to generate Elasticsearch password"
-    exit 1
-fi
-
-if ! ENROLLMENT_TOKEN=$(sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node 2>/dev/null); then
-    echo "Failed to generate enrollment token"
-    exit 1
-fi
-
-# Save credentials to environment file
-echo "Saving Elasticsearch credentials..."
-{
-    echo "ELASTICSEARCH_USERNAME=elastic"
-    echo "ELASTICSEARCH_PASSWORD=$ELASTIC_PASSWORD"
-    echo "ELASTICSEARCH_HOSTS=https://localhost:9200"
-    echo "ELASTICSEARCH_VERIFY_CERTS=false"
-} >> /var/www/backend/.env
-
 # Final verification
 echo "Verifying Elasticsearch installation..."
-if curl -s -k -u "elastic:$ELASTIC_PASSWORD" https://localhost:9200; then
+if curl -s http://localhost:9200; then
     echo "Elasticsearch verification successful"
 else
     echo "Elasticsearch verification failed. Please check the logs:"
