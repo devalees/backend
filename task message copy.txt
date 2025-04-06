@@ -57,7 +57,7 @@ I want you to propose a PRD and RFC for Multi-layer caching strategy (Redis, Mem
 
 
 
-based on project rules and implementation steps, implement **Celery Background Task Configuration** section step by step with Test-first methodology for all features using purest with minimum 90% coverage score
+based on project rules and implementation steps, implement **Celery Background Task Configuration** section step by step with Test-first methodology for all features using pytest with minimum 90% coverage score
 
 
 
