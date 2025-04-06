@@ -50,19 +50,36 @@ sudo sed -i 's/#network.host: 192.168.0.1/network.host: 127.0.0.1/' /etc/elastic
 sudo sed -i 's/#http.port: 9200/http.port: 9200/' /etc/elasticsearch/elasticsearch.yml
 
 # Start and enable Elasticsearch
+echo "Starting Elasticsearch service..."
 sudo systemctl daemon-reload
-sudo systemctl enable elasticsearch
-sudo systemctl start elasticsearch
+sudo systemctl enable elasticsearch.service
+sudo systemctl start elasticsearch.service
 
-# Wait for Elasticsearch to start
-echo "Waiting for Elasticsearch to start..."
-sleep 30
+# Wait for Elasticsearch to start with better verification
+echo "Waiting for Elasticsearch to start (this may take a few minutes)..."
+for i in {1..10}; do
+    if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
+        echo "Elasticsearch is running successfully"
+        break
+    else
+        echo "Attempt $i: Waiting for Elasticsearch to start..."
+        sleep 30
+    fi
+done
+
+# Generate enrollment token
+echo "Generating Elasticsearch enrollment token..."
+ENROLLMENT_TOKEN=$(sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node)
+echo "Elasticsearch enrollment token: $ENROLLMENT_TOKEN"
+echo "Please save this token for future use"
 
 # Verify Elasticsearch is running
 if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
     echo "Elasticsearch is running successfully"
 else
     echo "Warning: Elasticsearch might not be running properly"
+    echo "Please check the Elasticsearch logs:"
+    echo "sudo journalctl -u elasticsearch"
 fi
 
 # Create and activate virtual environment
