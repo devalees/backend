@@ -27,18 +27,6 @@ sudo apt-get install -y \
     curl \
     wget
 
-# Create project directory
-echo "Setting up project directory..."
-if [ -d "/var/www/backend" ]; then
-    echo "Project directory already exists. Using existing directory..."
-else
-    sudo mkdir -p /var/www/backend
-    sudo chown ubuntu:ubuntu /var/www/backend
-    # Clone repository only if directory doesn't exist
-    echo "Cloning repository..."
-    git clone https://github.com/devalees/backend.git /var/www/backend
-fi
-
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
