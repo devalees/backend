@@ -153,3 +153,46 @@ class Role(RBACBaseModel):
 
     def __str__(self):
         return self.name
+
+class Permission(RBACBaseModel):
+    """
+    Model representing a permission in the RBAC system.
+    Permissions define specific actions that can be performed on resources.
+    """
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    code = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Permission'
+        verbose_name_plural = 'Permissions'
+        ordering = ['name']
+        unique_together = ['code', 'organization']
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        """Validate the permission data"""
+        if not self.name:
+            raise ValidationError("Permission name cannot be empty")
+        if not self.code:
+            raise ValidationError("Permission code cannot be empty")
+        if not re.match(r'^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*$', self.code):
+            raise ValidationError(
+                "Permission code must be in format 'module.action' with lowercase letters, numbers, and underscores"
+            )
+
+    def get_cache_key(self):
+        """Generate a unique cache key for this permission"""
+        return f"permission:{self.id}:{self.code}"
+
+    def has_permission(self, obj, action):
+        """
+        Check if this permission has the specified action on the given object.
+        Permissions have full control over themselves.
+        """
+        if obj == self:
+            return True
+        return super().has_permission(obj, action)
