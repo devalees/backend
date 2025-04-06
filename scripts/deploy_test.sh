@@ -68,10 +68,13 @@ pip install pyotp==2.9.0
 pip install qrcode==7.4.2
 pip install django-otp==1.2.2
 pip install django-two-factor-auth==1.16.0
+pip install beautifulsoup4==4.12.3
+pip install lxml==5.1.0
+pip install requests==2.31.0
 
 # Debug: Show installed packages
 echo "Installed packages:"
-pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery|pyotp|qrcode|django-otp"
+pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery|pyotp|qrcode|django-otp|beautifulsoup4|lxml|requests"
 
 # Verify installation
 echo "Verifying package installation..."
