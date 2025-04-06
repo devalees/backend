@@ -41,9 +41,9 @@ sudo apt-get install -y elasticsearch
 
 # Configure Elasticsearch
 echo "Configuring Elasticsearch..."
-# Set JVM heap size to 1GB (adjust based on your server's memory)
-sudo sed -i 's/#-Xms1g/-Xms1g/' /etc/elasticsearch/jvm.options
-sudo sed -i 's/#-Xmx1g/-Xmx1g/' /etc/elasticsearch/jvm.options
+# Set JVM heap size to 512MB (reduced for t2.micro)
+sudo sed -i 's/#-Xms1g/-Xms512m/' /etc/elasticsearch/jvm.options
+sudo sed -i 's/#-Xmx1g/-Xmx512m/' /etc/elasticsearch/jvm.options
 
 # Configure Elasticsearch to listen on localhost
 sudo sed -i 's/#network.host: 192.168.0.1/network.host: 127.0.0.1/' /etc/elasticsearch/elasticsearch.yml
@@ -57,8 +57,8 @@ sudo systemctl start elasticsearch.service
 
 # Wait for Elasticsearch to start with better verification
 echo "Waiting for Elasticsearch to start (this may take a few minutes)..."
-for i in {1..10}; do
-    if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
+for i in {1..20}; do
+    if curl -s -k https://localhost:9200 | grep -q "You Know, for Search"; then
         echo "Elasticsearch is running successfully"
         break
     else
@@ -67,19 +67,31 @@ for i in {1..10}; do
     fi
 done
 
-# Generate enrollment token
-echo "Generating Elasticsearch enrollment token..."
+# Generate enrollment token and save credentials
+echo "Generating Elasticsearch credentials..."
+ELASTIC_PASSWORD=$(sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b | grep "New value:" | awk '{print $3}')
 ENROLLMENT_TOKEN=$(sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node)
-echo "Elasticsearch enrollment token: $ENROLLMENT_TOKEN"
-echo "Please save this token for future use"
+
+echo "Elasticsearch credentials:"
+echo "Username: elastic"
+echo "Password: $ELASTIC_PASSWORD"
+echo "Enrollment token: $ENROLLMENT_TOKEN"
+echo "Please save these credentials for future use"
+
+# Create environment variables for Elasticsearch
+echo "ELASTICSEARCH_USERNAME=elastic" >> /var/www/backend/.env
+echo "ELASTICSEARCH_PASSWORD=$ELASTIC_PASSWORD" >> /var/www/backend/.env
+echo "ELASTICSEARCH_HOSTS=https://localhost:9200" >> /var/www/backend/.env
 
 # Verify Elasticsearch is running
-if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
+if curl -s -k https://localhost:9200 -u elastic:$ELASTIC_PASSWORD | grep -q "You Know, for Search"; then
     echo "Elasticsearch is running successfully"
 else
     echo "Warning: Elasticsearch might not be running properly"
     echo "Please check the Elasticsearch logs:"
-    echo "sudo journalctl -u elasticsearch"
+    echo "sudo journalctl -u elasticsearch.service"
+    echo "You can try to start it manually with:"
+    echo "sudo systemctl start elasticsearch.service"
 fi
 
 # Create and activate virtual environment
