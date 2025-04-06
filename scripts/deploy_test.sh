@@ -29,69 +29,140 @@ sudo apt-get install -y \
 
 # Install Elasticsearch
 echo "Installing Elasticsearch..."
-# Import the Elasticsearch GPG key
-wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
 
-# Add the Elasticsearch repository
-echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
+# Add retry mechanism for package installation
+MAX_RETRIES=3
+RETRY_COUNT=0
+SUCCESS=false
 
-# Update package list and install Elasticsearch
-sudo apt-get update
-sudo apt-get install -y elasticsearch
+while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = false ]; do
+    echo "Attempt $(($RETRY_COUNT + 1)) of $MAX_RETRIES to install Elasticsearch..."
+    
+    # Import the Elasticsearch GPG key with retry
+    if ! wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg; then
+        echo "Failed to import GPG key, retrying..."
+        sleep 10
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        continue
+    fi
 
-# Configure Elasticsearch
-echo "Configuring Elasticsearch..."
-# Set JVM heap size to 512MB (reduced for t2.micro)
-sudo sed -i 's/#-Xms1g/-Xms512m/' /etc/elasticsearch/jvm.options
-sudo sed -i 's/#-Xmx1g/-Xmx512m/' /etc/elasticsearch/jvm.options
+    # Add the Elasticsearch repository
+    echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
 
-# Configure Elasticsearch to listen on localhost
-sudo sed -i 's/#network.host: 192.168.0.1/network.host: 127.0.0.1/' /etc/elasticsearch/elasticsearch.yml
-sudo sed -i 's/#http.port: 9200/http.port: 9200/' /etc/elasticsearch/elasticsearch.yml
-
-# Start and enable Elasticsearch
-echo "Starting Elasticsearch service..."
-sudo systemctl daemon-reload
-sudo systemctl enable elasticsearch.service
-sudo systemctl start elasticsearch.service
-
-# Wait for Elasticsearch to start with better verification
-echo "Waiting for Elasticsearch to start (this may take a few minutes)..."
-for i in {1..20}; do
-    if curl -s -k https://localhost:9200 | grep -q "You Know, for Search"; then
-        echo "Elasticsearch is running successfully"
-        break
+    # Update package list and install Elasticsearch
+    if sudo apt-get update && sudo apt-get install -y elasticsearch; then
+        SUCCESS=true
     else
-        echo "Attempt $i: Waiting for Elasticsearch to start..."
-        sleep 30
+        echo "Failed to install Elasticsearch, retrying..."
+        sleep 10
+        RETRY_COUNT=$((RETRY_COUNT + 1))
     fi
 done
 
-# Generate enrollment token and save credentials
+if [ "$SUCCESS" = false ]; then
+    echo "Failed to install Elasticsearch after $MAX_RETRIES attempts"
+    exit 1
+fi
+
+# Configure Elasticsearch
+echo "Configuring Elasticsearch..."
+
+# Create Elasticsearch configuration
+sudo tee /etc/elasticsearch/elasticsearch.yml > /dev/null << EOL
+cluster.name: my-application
+node.name: node-1
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 0.0.0.0
+http.port: 9200
+discovery.type: single-node
+xpack.security.enabled: true
+xpack.security.enrollment.enabled: true
+EOL
+
+# Set JVM heap size (adjust based on instance size)
+TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
+HEAP_SIZE=$(($TOTAL_MEM_MB / 2))
+
+if [ $HEAP_SIZE -gt 31744 ]; then
+    HEAP_SIZE=31744
+elif [ $HEAP_SIZE -lt 512 ]; then
+    HEAP_SIZE=512
+fi
+
+sudo tee /etc/elasticsearch/jvm.options.d/heap.options > /dev/null << EOL
+-Xms${HEAP_SIZE}m
+-Xmx${HEAP_SIZE}m
+EOL
+
+# Set correct permissions
+sudo chown -R elasticsearch:elasticsearch /etc/elasticsearch
+sudo chmod -R 750 /etc/elasticsearch
+
+# Start and enable Elasticsearch with better error handling
+echo "Starting Elasticsearch service..."
+sudo systemctl daemon-reload
+sudo systemctl enable elasticsearch.service
+if ! sudo systemctl start elasticsearch.service; then
+    echo "Failed to start Elasticsearch. Checking logs..."
+    sudo journalctl -u elasticsearch.service --no-pager | tail -n 50
+    exit 1
+fi
+
+# Wait for Elasticsearch to start with better verification and timeout
+echo "Waiting for Elasticsearch to start (this may take a few minutes)..."
+TIMEOUT=300
+START_TIME=$(date +%s)
+
+while true; do
+    CURRENT_TIME=$(date +%s)
+    ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+    
+    if [ $ELAPSED_TIME -gt $TIMEOUT ]; then
+        echo "Timeout waiting for Elasticsearch to start"
+        echo "Elasticsearch logs:"
+        sudo journalctl -u elasticsearch.service --no-pager | tail -n 50
+        exit 1
+    fi
+    
+    if curl -s --insecure https://localhost:9200 > /dev/null 2>&1; then
+        echo "Elasticsearch is running successfully"
+        break
+    else
+        echo "Waiting for Elasticsearch to start... (${ELAPSED_TIME}s elapsed)"
+        sleep 10
+    fi
+done
+
+# Generate and save credentials with better error handling
 echo "Generating Elasticsearch credentials..."
-ELASTIC_PASSWORD=$(sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b | grep "New value:" | awk '{print $3}')
-ENROLLMENT_TOKEN=$(sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node)
+if ! ELASTIC_PASSWORD=$(sudo /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -b 2>/dev/null); then
+    echo "Failed to generate Elasticsearch password"
+    exit 1
+fi
 
-echo "Elasticsearch credentials:"
-echo "Username: elastic"
-echo "Password: $ELASTIC_PASSWORD"
-echo "Enrollment token: $ENROLLMENT_TOKEN"
-echo "Please save these credentials for future use"
+if ! ENROLLMENT_TOKEN=$(sudo /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s node 2>/dev/null); then
+    echo "Failed to generate enrollment token"
+    exit 1
+fi
 
-# Create environment variables for Elasticsearch
-echo "ELASTICSEARCH_USERNAME=elastic" >> /var/www/backend/.env
-echo "ELASTICSEARCH_PASSWORD=$ELASTIC_PASSWORD" >> /var/www/backend/.env
-echo "ELASTICSEARCH_HOSTS=https://localhost:9200" >> /var/www/backend/.env
+# Save credentials to environment file
+echo "Saving Elasticsearch credentials..."
+{
+    echo "ELASTICSEARCH_USERNAME=elastic"
+    echo "ELASTICSEARCH_PASSWORD=$ELASTIC_PASSWORD"
+    echo "ELASTICSEARCH_HOSTS=https://localhost:9200"
+    echo "ELASTICSEARCH_VERIFY_CERTS=false"
+} >> /var/www/backend/.env
 
-# Verify Elasticsearch is running
-if curl -s -k https://localhost:9200 -u elastic:$ELASTIC_PASSWORD | grep -q "You Know, for Search"; then
-    echo "Elasticsearch is running successfully"
+# Final verification
+echo "Verifying Elasticsearch installation..."
+if curl -s -k -u "elastic:$ELASTIC_PASSWORD" https://localhost:9200; then
+    echo "Elasticsearch verification successful"
 else
-    echo "Warning: Elasticsearch might not be running properly"
-    echo "Please check the Elasticsearch logs:"
-    echo "sudo journalctl -u elasticsearch.service"
-    echo "You can try to start it manually with:"
-    echo "sudo systemctl start elasticsearch.service"
+    echo "Elasticsearch verification failed. Please check the logs:"
+    sudo journalctl -u elasticsearch.service --no-pager | tail -n 50
+    exit 1
 fi
 
 # Create and activate virtual environment

@@ -6,6 +6,10 @@
 sudo apt-get update
 sudo apt-get upgrade -y
 
+# Configure system for Elasticsearch
+sudo sysctl -w vm.max_map_count=262144
+echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
+
 # Install required system packages
 sudo apt-get install -y \
     python3-pip \
@@ -19,6 +23,34 @@ sudo apt-get install -y \
     build-essential \
     libpq-dev \
     python3-venv
+
+# Install Elasticsearch
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
+echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee -a /etc/apt/sources.list.d/elastic-8.x.list
+sudo apt-get update
+sudo apt-get install -y elasticsearch
+
+# Configure Elasticsearch for EC2 micro instance
+sudo tee /etc/elasticsearch/jvm.options.d/micro.options << EOF
+-Xms256m
+-Xmx256m
+EOF
+
+sudo tee /etc/elasticsearch/elasticsearch.yml << EOF
+cluster.name: my-application
+network.host: 0.0.0.0
+http.port: 9200
+discovery.type: single-node
+xpack.security.enabled: false
+EOF
+
+# Start and enable Elasticsearch
+sudo systemctl daemon-reload
+sudo systemctl enable elasticsearch.service
+sudo systemctl start elasticsearch.service
+
+# Wait for Elasticsearch to start
+sleep 30
 
 # Create project directory
 sudo mkdir -p /var/www/project
