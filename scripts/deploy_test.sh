@@ -27,6 +27,44 @@ sudo apt-get install -y \
     curl \
     wget
 
+# Install Elasticsearch
+echo "Installing Elasticsearch..."
+# Import the Elasticsearch GPG key
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo gpg --dearmor -o /usr/share/keyrings/elasticsearch-keyring.gpg
+
+# Add the Elasticsearch repository
+echo "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
+
+# Update package list and install Elasticsearch
+sudo apt-get update
+sudo apt-get install -y elasticsearch
+
+# Configure Elasticsearch
+echo "Configuring Elasticsearch..."
+# Set JVM heap size to 1GB (adjust based on your server's memory)
+sudo sed -i 's/#-Xms1g/-Xms1g/' /etc/elasticsearch/jvm.options
+sudo sed -i 's/#-Xmx1g/-Xmx1g/' /etc/elasticsearch/jvm.options
+
+# Configure Elasticsearch to listen on localhost
+sudo sed -i 's/#network.host: 192.168.0.1/network.host: 127.0.0.1/' /etc/elasticsearch/elasticsearch.yml
+sudo sed -i 's/#http.port: 9200/http.port: 9200/' /etc/elasticsearch/elasticsearch.yml
+
+# Start and enable Elasticsearch
+sudo systemctl daemon-reload
+sudo systemctl enable elasticsearch
+sudo systemctl start elasticsearch
+
+# Wait for Elasticsearch to start
+echo "Waiting for Elasticsearch to start..."
+sleep 30
+
+# Verify Elasticsearch is running
+if curl -s http://localhost:9200 | grep -q "You Know, for Search"; then
+    echo "Elasticsearch is running successfully"
+else
+    echo "Warning: Elasticsearch might not be running properly"
+fi
+
 # Create and activate virtual environment
 echo "Setting up Python virtual environment..."
 cd /var/www/backend
@@ -71,10 +109,14 @@ pip install django-two-factor-auth==1.16.0
 pip install beautifulsoup4==4.12.3
 pip install lxml==5.1.0
 pip install requests==2.31.0
+pip install elasticsearch==8.11.1
+pip install elasticsearch-dsl==8.11.1
+pip install django-elasticsearch-dsl==7.2.2
+pip install django-elasticsearch-dsl-drf==0.22.0
 
 # Debug: Show installed packages
 echo "Installed packages:"
-pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery|pyotp|qrcode|django-otp|beautifulsoup4|lxml|requests"
+pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery|pyotp|qrcode|django-otp|beautifulsoup4|lxml|requests|elasticsearch|elasticsearch-dsl"
 
 # Verify installation
 echo "Verifying package installation..."
