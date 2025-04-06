@@ -58,10 +58,16 @@ pip install drf-yasg==1.21.7
 pip install python-dotenv==1.0.0
 pip install django-environ==0.11.2
 pip install django-import-export==3.3.4
+pip install django-celery-results==2.5.1
+pip install celery==5.3.6
+pip install django-celery-beat==2.5.0
+pip install django-filter==23.5
+pip install django-storages==1.14.2
+pip install Pillow==10.2.0
 
 # Debug: Show installed packages
 echo "Installed packages:"
-pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export"
+pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery"
 
 # Verify installation
 echo "Verifying package installation..."
