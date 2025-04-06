@@ -67,7 +67,18 @@ fi
 # Configure Elasticsearch
 echo "Configuring Elasticsearch..."
 
-# Create Elasticsearch configuration
+# Get total memory and calculate very conservative heap size for low memory situations
+TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
+HEAP_SIZE=256  # Set a very conservative minimum heap size
+
+# If we have more memory, we can allocate more, but still be conservative
+if [ $TOTAL_MEM_MB -gt 2048 ]; then
+    HEAP_SIZE=512
+elif [ $TOTAL_MEM_MB -gt 4096 ]; then
+    HEAP_SIZE=1024
+fi
+
+# Create Elasticsearch configuration with memory-conscious settings
 sudo tee /etc/elasticsearch/elasticsearch.yml > /dev/null << EOL
 cluster.name: my-application
 node.name: node-1
@@ -78,33 +89,57 @@ http.port: 9200
 discovery.type: single-node
 xpack.security.enabled: true
 xpack.security.enrollment.enabled: true
+
+# Memory-related settings
+bootstrap.memory_lock: false
+indices.memory.index_buffer_size: 10%
+indices.queries.cache.size: 5%
+indices.fielddata.cache.size: 10%
+indices.breaker.total.use_real_memory: false
+indices.breaker.total.limit: 70%
 EOL
 
-# Set JVM heap size (adjust based on instance size)
-TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
-HEAP_SIZE=$(($TOTAL_MEM_MB / 2))
-
-if [ $HEAP_SIZE -gt 31744 ]; then
-    HEAP_SIZE=31744
-elif [ $HEAP_SIZE -lt 512 ]; then
-    HEAP_SIZE=512
-fi
-
+# Set JVM heap size
 sudo tee /etc/elasticsearch/jvm.options.d/heap.options > /dev/null << EOL
 -Xms${HEAP_SIZE}m
 -Xmx${HEAP_SIZE}m
 EOL
 
+# Add system limits configuration for elasticsearch
+sudo tee /etc/security/limits.d/elasticsearch.conf > /dev/null << EOL
+elasticsearch soft nofile 65535
+elasticsearch hard nofile 65535
+elasticsearch soft memlock unlimited
+elasticsearch hard memlock unlimited
+EOL
+
+# Update system configuration for elasticsearch
+sudo tee /etc/sysctl.d/elasticsearch.conf > /dev/null << EOL
+vm.max_map_count=262144
+vm.swappiness=1
+EOL
+
+# Apply sysctl settings
+sudo sysctl -p /etc/sysctl.d/elasticsearch.conf
+
 # Set correct permissions
 sudo chown -R elasticsearch:elasticsearch /etc/elasticsearch
 sudo chmod -R 750 /etc/elasticsearch
 
-# Start and enable Elasticsearch with better error handling
+# Start and enable Elasticsearch with better error handling and memory monitoring
 echo "Starting Elasticsearch service..."
 sudo systemctl daemon-reload
 sudo systemctl enable elasticsearch.service
+
+# Print memory status before starting
+echo "Current memory status:"
+free -h
+
 if ! sudo systemctl start elasticsearch.service; then
     echo "Failed to start Elasticsearch. Checking logs..."
+    echo "Memory status at failure:"
+    free -h
+    echo "Elasticsearch logs:"
     sudo journalctl -u elasticsearch.service --no-pager | tail -n 50
     exit 1
 fi
