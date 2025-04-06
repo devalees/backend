@@ -67,60 +67,56 @@ fi
 # Configure Elasticsearch
 echo "Configuring Elasticsearch..."
 
-# Get total memory and calculate very conservative heap size for low memory situations
-TOTAL_MEM_MB=$(free -m | awk '/^Mem:/{print $2}')
-HEAP_SIZE=256  # Set a very conservative minimum heap size
-
-# If we have more memory, we can allocate more, but still be conservative
-if [ $TOTAL_MEM_MB -gt 2048 ]; then
-    HEAP_SIZE=512
-elif [ $TOTAL_MEM_MB -gt 4096 ]; then
-    HEAP_SIZE=1024
-fi
-
-# Create Elasticsearch configuration with memory-conscious settings
+# Create Elasticsearch configuration with minimal settings
 sudo tee /etc/elasticsearch/elasticsearch.yml > /dev/null << EOL
+# Cluster Configuration
 cluster.name: my-application
 node.name: node-1
+
+# Paths
 path.data: /var/lib/elasticsearch
 path.logs: /var/log/elasticsearch
+
+# Network
 network.host: 0.0.0.0
 http.port: 9200
+
+# Discovery
 discovery.type: single-node
+
+# Security
 xpack.security.enabled: true
 xpack.security.enrollment.enabled: true
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
 
-# Memory-related settings
-bootstrap.memory_lock: false
-indices.memory.index_buffer_size: 10%
-indices.queries.cache.size: 5%
-indices.fielddata.cache.size: 10%
+# Memory Settings
+indices.memory.index_buffer_size: 5%
+indices.queries.cache.size: 2%
+indices.fielddata.cache.size: 5%
 indices.breaker.total.use_real_memory: false
-indices.breaker.total.limit: 70%
+indices.breaker.total.limit: 50%
+
+# Circuit Breaker Settings
+indices.breaker.fielddata.limit: 20%
+indices.breaker.request.limit: 20%
 EOL
 
-# Set JVM heap size
+# Set minimal JVM heap size for small instances
 sudo tee /etc/elasticsearch/jvm.options.d/heap.options > /dev/null << EOL
--Xms${HEAP_SIZE}m
--Xmx${HEAP_SIZE}m
+-Xms128m
+-Xmx128m
 EOL
 
-# Add system limits configuration for elasticsearch
-sudo tee /etc/security/limits.d/elasticsearch.conf > /dev/null << EOL
-elasticsearch soft nofile 65535
-elasticsearch hard nofile 65535
-elasticsearch soft memlock unlimited
-elasticsearch hard memlock unlimited
+# Additional memory optimization
+sudo tee /etc/elasticsearch/jvm.options.d/memory.options > /dev/null << EOL
+-XX:+UseG1GC
+-XX:G1ReservePercent=10
+-XX:InitiatingHeapOccupancyPercent=25
+-XX:G1HeapRegionSize=2m
+-XX:MaxDirectMemorySize=50m
+-XX:+HeapDumpOnOutOfMemoryError
 EOL
-
-# Update system configuration for elasticsearch
-sudo tee /etc/sysctl.d/elasticsearch.conf > /dev/null << EOL
-vm.max_map_count=262144
-vm.swappiness=1
-EOL
-
-# Apply sysctl settings
-sudo sysctl -p /etc/sysctl.d/elasticsearch.conf
 
 # Set correct permissions
 sudo chown -R elasticsearch:elasticsearch /etc/elasticsearch
