@@ -90,21 +90,34 @@ xpack.security.enrollment.enabled: false
 xpack.security.http.ssl.enabled: false
 xpack.security.transport.ssl.enabled: false
 
-# Memory Settings - Minimal configuration
+# Memory Settings - Ultra minimal configuration
 bootstrap.memory_lock: false
-indices.memory.index_buffer_size: 1%
-indices.queries.cache.size: 1%
-indices.fielddata.cache.size: 1%
+indices.memory.index_buffer_size: 0.5%
+indices.queries.cache.size: 0.5%
+indices.fielddata.cache.size: 0.5%
+indices.breaker.total.use_real_memory: false
+indices.breaker.total.limit: 20%
+indices.breaker.fielddata.limit: 10%
+indices.breaker.request.limit: 10%
 
 # Thread Pool Settings
-thread_pool.write.queue_size: 100
-thread_pool.search.queue_size: 100
+thread_pool.write.queue_size: 50
+thread_pool.search.queue_size: 50
+thread_pool.get.queue_size: 50
+
+# Search Settings
+search.max_buckets: 1000
+search.max_open_scroll_context: 100
 EOL
 
 # Set minimal JVM heap size for small instances
 sudo tee /etc/elasticsearch/jvm.options.d/heap.options > /dev/null << EOL
--Xms64m
--Xmx64m
+-Xms32m
+-Xmx32m
+-XX:+UseSerialGC
+-XX:MaxDirectMemorySize=32m
+-XX:+HeapDumpOnOutOfMemoryError
+-XX:HeapDumpPath=/var/lib/elasticsearch
 EOL
 
 # Set correct permissions
