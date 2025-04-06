@@ -57,10 +57,11 @@ pip install django-cors-headers==4.3.1
 pip install drf-yasg==1.21.7
 pip install python-dotenv==1.0.0
 pip install django-environ==0.11.2
+pip install django-import-export==3.3.4
 
 # Debug: Show installed packages
 echo "Installed packages:"
-pip freeze | grep -E "Django|djangorestframework|simplejwt"
+pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export"
 
 # Verify installation
 echo "Verifying package installation..."
