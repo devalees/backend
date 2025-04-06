@@ -347,7 +347,6 @@ CACHES = {
             'SOCKET_TIMEOUT': 5,
             'RETRY_ON_TIMEOUT': True,
             'MAX_CONNECTIONS': 1000,
-            'PARSER_CLASS': 'redis.connection.HiredisParser',
         }
     }
 }
