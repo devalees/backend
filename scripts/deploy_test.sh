@@ -64,10 +64,14 @@ pip install django-celery-beat==2.5.0
 pip install django-filter==23.5
 pip install django-storages==1.14.2
 pip install Pillow==10.2.0
+pip install pyotp==2.9.0
+pip install qrcode==7.4.2
+pip install django-otp==1.2.2
+pip install django-two-factor-auth==1.16.0
 
 # Debug: Show installed packages
 echo "Installed packages:"
-pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery"
+pip freeze | grep -E "Django|djangorestframework|simplejwt|import_export|celery|django_celery|pyotp|qrcode|django-otp"
 
 # Verify installation
 echo "Verifying package installation..."
