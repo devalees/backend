@@ -46,6 +46,7 @@ urlpatterns = [
         path('time-management/', include('Apps.time_management.urls')),
         path('automation/', include('Apps.automation.urls', namespace='automation')),
         path('communication/', include('Apps.communication.urls', namespace='communication')),
+        path('rbac/', include('Apps.rbac.urls', namespace='rbac')),  # RBAC URLs with namespace
     ])),
     path('api/import-export/', include('Apps.data_import_export.urls', namespace='data_import_export')),
 ]

@@ -106,16 +106,44 @@
   - [x] Implemented permission usage monitoring
 
 ## 3. User-Role Assignment
-- [ ] Create UserRole model (inherits from RBACBaseModel)
-- [ ] Implement role assignment operations
-- [ ] Add role revocation support
-- [ ] Create role delegation
-- [ ] Implement role conflict resolution
-- [ ] Add role assignment caching
-- [ ] Create role assignment API endpoints
-- [ ] Add role assignment documentation
-- [ ] Implement role assignment tests
-- [ ] Add role assignment monitoring
+- [x] Create UserRole model (inherits from RBACBaseModel)
+  - [x] Implemented with user, role, organization, assigned_by, delegated_by, and is_delegated fields
+  - [x] Added unique constraint on user, role, and organization
+  - [x] Implemented role activation/deactivation
+  - [x] Added role delegation support
+- [x] Implement role assignment operations
+  - [x] Added create, read, update, and delete functionality
+  - [x] Implemented role validation
+  - [x] Added role caching
+- [x] Add role revocation support
+  - [x] Implemented deactivate action
+  - [x] Added validation for role revocation
+  - [x] Created revocation tests
+- [x] Create role delegation
+  - [x] Implemented delegate action
+  - [x] Added target user validation
+  - [x] Created delegation tests
+- [x] Implement role conflict resolution
+  - [x] Added organization isolation
+  - [x] Implemented permission checks
+  - [x] Added validation for role conflicts
+- [x] Add role assignment caching
+  - [x] Implemented permission caching
+  - [x] Added cache invalidation
+- [x] Create role assignment API endpoints
+  - [x] Added CRUD endpoints
+  - [x] Implemented activation/deactivation endpoints
+  - [x] Added delegation endpoint
+- [x] Add role assignment documentation
+  - [x] Added model documentation
+  - [x] Created API documentation
+- [x] Implement role assignment tests
+  - [x] Added model tests
+  - [x] Created API tests
+  - [x] Implemented integration tests
+- [x] Add role assignment monitoring
+  - [x] Added role usage tracking
+  - [x] Implemented permission usage monitoring
 
 ## 4. Resource Access Control
 - [ ] Create Resource model (inherits from RBACBaseModel)
