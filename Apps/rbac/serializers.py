@@ -88,6 +88,32 @@ class RoleSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def validate_name(self, value):
+        """Validate role name"""
+        if not value or not isinstance(value, str):
+            raise serializers.ValidationError("Name must be a non-empty string")
+        if len(value) < 3:
+            raise serializers.ValidationError("Name must be at least 3 characters long")
+        if len(value) > 100:
+            raise serializers.ValidationError("Name must not exceed 100 characters")
+        return value
+
+    def validate_description(self, value):
+        """Validate role description"""
+        if value and not isinstance(value, str):
+            raise serializers.ValidationError("Description must be a string")
+        if value and len(value) > 500:
+            raise serializers.ValidationError("Description must not exceed 500 characters")
+        return value
+
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization is required")
+        if not value.is_active:
+            raise serializers.ValidationError("Organization must be active")
+        return value
+
     def validate(self, data):
         """Validate role data"""
         # Ensure parent role belongs to the same organization
@@ -95,6 +121,16 @@ class RoleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Parent role must belong to the same organization"
             )
+
+        # Check for duplicate role names within the same organization
+        if Role.objects.filter(
+            name=data['name'],
+            organization=data['organization']
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "A role with this name already exists in the organization"
+            )
+
         return data
 
 class PermissionSerializer(serializers.ModelSerializer):
@@ -107,6 +143,32 @@ class PermissionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def validate_name(self, value):
+        """Validate permission name"""
+        if not value or not isinstance(value, str):
+            raise serializers.ValidationError("Name must be a non-empty string")
+        if len(value) < 3:
+            raise serializers.ValidationError("Name must be at least 3 characters long")
+        if len(value) > 100:
+            raise serializers.ValidationError("Name must not exceed 100 characters")
+        return value
+
+    def validate_description(self, value):
+        """Validate permission description"""
+        if value and not isinstance(value, str):
+            raise serializers.ValidationError("Description must be a string")
+        if value and len(value) > 500:
+            raise serializers.ValidationError("Description must not exceed 500 characters")
+        return value
+
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization is required")
+        if not value.is_active:
+            raise serializers.ValidationError("Organization must be active")
+        return value
+
     def validate_code(self, value):
         """Validate permission code format"""
         if not value or not isinstance(value, str):
@@ -115,4 +177,30 @@ class PermissionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Code can only contain alphanumeric characters, dots, and underscores"
             )
-        return value 
+        if len(value) < 3:
+            raise serializers.ValidationError("Code must be at least 3 characters long")
+        if len(value) > 100:
+            raise serializers.ValidationError("Code must not exceed 100 characters")
+        return value
+
+    def validate(self, data):
+        """Validate permission data"""
+        # Check for duplicate permission codes within the same organization
+        if Permission.objects.filter(
+            code=data['code'],
+            organization=data['organization']
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "A permission with this code already exists in the organization"
+            )
+
+        # Check for duplicate permission names within the same organization
+        if Permission.objects.filter(
+            name=data['name'],
+            organization=data['organization']
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "A permission with this name already exists in the organization"
+            )
+
+        return data 
