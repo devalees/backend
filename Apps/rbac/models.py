@@ -67,96 +67,6 @@ class RBACBaseModel(models.Model):
             # Invalidate all users' permissions
             cache.delete(f"rbac_permission_{self.__class__.__name__}_{self.id}_*_*")
 
-class Role(RBACBaseModel):
-    """
-    Role model for implementing role-based access control.
-    Supports role hierarchy and permission inheritance.
-    """
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
-    is_active = models.BooleanField(default=True)
-    permissions = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        app_label = 'rbac'
-        unique_together = ('name', 'organization')
-        ordering = ['name']
-
-    def clean(self):
-        super().clean()
-        if not self.name:
-            raise ValidationError({'name': 'Role name cannot be empty'})
-        
-        if not re.match(r'^[a-zA-Z0-9_\s-]+$', self.name):
-            raise ValidationError({'name': 'Role name can only contain letters, numbers, spaces, underscores, and hyphens'})
-        
-        if self.parent and self.parent.organization != self.organization:
-            raise ValidationError({'parent': 'Parent role must belong to the same organization'})
-        
-        # Check for circular references
-        if self.parent:
-            current = self.parent
-            while current:
-                if current == self:
-                    raise ValidationError({'parent': 'Circular reference detected in role hierarchy'})
-                current = current.parent
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def get_permission_cache_key(self, permission):
-        """Generate cache key for permission checks"""
-        return f"role_permission_{self.id}_{permission}"
-
-    def add_permission(self, permission):
-        """Add a permission to the role"""
-        if not self.permissions:
-            self.permissions = {}
-        if permission not in self.permissions:
-            self.permissions[permission] = True
-            self.save()
-            cache.delete(self.get_permission_cache_key(permission))
-
-    def remove_permission(self, permission):
-        """Remove a permission from the role"""
-        if self.permissions and permission in self.permissions:
-            del self.permissions[permission]
-            self.save()
-            cache.delete(self.get_permission_cache_key(permission))
-
-    def has_permission(self, permission):
-        """Check if the role has a specific permission"""
-        cache_key = self.get_permission_cache_key(permission)
-        cached_value = cache.get(cache_key)
-        if cached_value is not None:
-            return cached_value
-
-        has_perm = permission in self.get_all_permissions()
-        cache.set(cache_key, has_perm, timeout=3600)
-        return has_perm
-
-    def get_all_permissions(self):
-        """Get all permissions including inherited ones"""
-        permissions = set(self.permissions.keys() if self.permissions else set())
-        if self.parent:
-            permissions.update(self.parent.get_all_permissions())
-        return permissions
-
-    def deactivate(self):
-        """Deactivate the role"""
-        self.is_active = False
-        self.save()
-
-    def activate(self):
-        """Activate the role"""
-        self.is_active = True
-        self.save()
-
-    def __str__(self):
-        return self.name
-
 class Permission(RBACBaseModel):
     """
     Model representing a permission in the RBAC system.
@@ -199,6 +109,143 @@ class Permission(RBACBaseModel):
         if obj == self:
             return True
         return super().has_permission(obj, action)
+
+class Role(RBACBaseModel):
+    """
+    Role model for implementing role-based access control.
+    Supports role hierarchy and permission inheritance.
+    """
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='children')
+    is_active = models.BooleanField(default=True)
+    permissions = models.ManyToManyField(Permission, related_name='roles', blank=True)
+
+    class Meta:
+        app_label = 'rbac'
+        unique_together = ('name', 'organization')
+        ordering = ['name']
+
+    def clean(self):
+        super().clean()
+        if not self.name:
+            raise ValidationError({'name': 'Role name cannot be empty'})
+        
+        if not re.match(r'^[a-zA-Z0-9_\s-]+$', self.name):
+            raise ValidationError({'name': 'Role name can only contain letters, numbers, spaces, underscores, and hyphens'})
+        
+        if self.parent and self.parent.organization != self.organization:
+            raise ValidationError({'parent': 'Parent role must belong to the same organization'})
+        
+        # Check for circular references
+        if self.parent:
+            current = self.parent
+            while current:
+                if current == self:
+                    raise ValidationError({'parent': 'Circular reference detected in role hierarchy'})
+                current = current.parent
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def get_permission_cache_key(self, permission_code):
+        """Generate cache key for permission checks"""
+        return f"role_permission_{self.id}_{permission_code}"
+
+    def add_permission(self, permission):
+        """Add a permission to the role"""
+        if isinstance(permission, str):
+            # If permission is a string (code), get the Permission object
+            permission = Permission.objects.get(code=permission, organization=self.organization)
+        
+        if permission.organization != self.organization:
+            raise ValidationError("Permission must belong to the same organization")
+        
+        self.permissions.add(permission)
+        self.invalidate_permission_cache(permission.code)
+
+    def remove_permission(self, permission):
+        """Remove a permission from the role"""
+        if isinstance(permission, str):
+            try:
+                # If permission is a string (code), get the Permission object
+                permission = Permission.objects.get(code=permission, organization=self.organization)
+            except Permission.DoesNotExist:
+                return  # If permission doesn't exist, nothing to remove
+        
+        # Remove the permission
+        self.permissions.remove(permission)
+        
+        # Invalidate cache for this permission
+        self.invalidate_permission_cache(permission.code)
+        
+        # Also invalidate cache for all child roles recursively
+        for child in self.children.all():
+            child.invalidate_permission_cache(permission.code)
+            child.remove_permission(permission)  # Recursively remove from children
+
+    def has_permission(self, permission_code):
+        """Check if the role has a specific permission"""
+        if not self.is_active:
+            return False
+
+        cache_key = self.get_permission_cache_key(permission_code)
+        cached_value = cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+
+        # Check if permission exists and is active
+        try:
+            permission = Permission.objects.get(code=permission_code, organization=self.organization)
+            if not permission.is_active:
+                cache.set(cache_key, False, timeout=300)
+                return False
+        except Permission.DoesNotExist:
+            cache.set(cache_key, False, timeout=300)
+            return False
+
+        # Check direct permissions
+        has_perm = self.permissions.filter(code=permission_code, is_active=True).exists()
+        
+        # Check inherited permissions from parent role
+        if not has_perm and self.parent and self.parent.is_active:
+            has_perm = self.parent.has_permission(permission_code)
+
+        # Cache the result
+        cache.set(cache_key, has_perm, timeout=300)
+        return has_perm
+
+    def invalidate_permission_cache(self, permission_code=None):
+        """Invalidate permission cache for this role"""
+        if permission_code:
+            # Invalidate specific permission cache
+            cache_key = self.get_permission_cache_key(permission_code)
+            cache.delete(cache_key)
+        else:
+            # Invalidate all permission caches for this role
+            # Since LocMemCache doesn't support delete_pattern, we'll delete each permission cache individually
+            for permission in self.permissions.all():
+                cache_key = self.get_permission_cache_key(permission.code)
+                cache.delete(cache_key)
+            # Also invalidate cache for child roles
+            for child in self.children.all():
+                child.invalidate_permission_cache()
+
+    def deactivate(self):
+        """Deactivate the role"""
+        self.is_active = False
+        self.save()
+        self.invalidate_permission_cache()
+
+    def activate(self):
+        """Activate the role"""
+        self.is_active = True
+        self.save()
+        self.invalidate_permission_cache()
+
+    def __str__(self):
+        return self.name
 
 class UserRole(RBACBaseModel):
     """Model representing a role assignment to a user"""

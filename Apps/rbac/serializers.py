@@ -1,20 +1,114 @@
 from rest_framework import serializers
 from .models import UserRole, Role, Permission
 from Apps.users.models import User
+from django.db import models
+from django.contrib.auth import get_user_model
+from Apps.entity.models import Organization
+
+class JsonApiRelatedField(serializers.PrimaryKeyRelatedField):
+    """Custom field for JSON:API relationships"""
+    def __init__(self, **kwargs):
+        self.resource_name = kwargs.pop('resource_name', None)
+        super().__init__(**kwargs)
+
+class JsonApiSerializerMixin:
+    """Mixin to format data according to JSON:API specification"""
+    def to_representation(self, instance):
+        """Convert the resource object into a JSON:API formatted dict"""
+        representation = super().to_representation(instance)
+        
+        # Extract fields that should be at root level
+        root_fields = {
+            'id': str(instance.pk),
+            'type': self.Meta.resource_name,
+            'name': representation.pop('name', None)
+        }
+        
+        # Remove None values from root_fields
+        root_fields = {k: v for k, v in root_fields.items() if v is not None}
+        
+        # Move remaining fields to attributes
+        data = {
+            **root_fields,
+            'attributes': representation,
+            'relationships': self.get_relationships(instance)
+        }
+        return data
+    
+    def get_relationships(self, instance):
+        """Get relationships for the resource object"""
+        relationships = {}
+        
+        # Ensure permissions relationship is always included for roles
+        if hasattr(self.Meta, 'resource_name') and self.Meta.resource_name == 'roles':
+            relationships['permissions'] = {'data': []}
+            if hasattr(instance, 'permissions'):
+                relationships['permissions']['data'] = [
+                    {'type': 'permissions', 'id': str(perm.id)}
+                    for perm in instance.permissions.all()
+                ]
+        
+        # Add other relationships
+        for field_name, field in self.fields.items():
+            if isinstance(field, serializers.RelatedField):
+                relationships[field_name] = {
+                    'data': None
+                }
+                
+                # Get the related instance
+                related = getattr(instance, field_name, None)
+                if related:
+                    if isinstance(field, serializers.ManyRelatedField):
+                        # For many-to-many relationships
+                        relationships[field_name]['data'] = [
+                            {
+                                'type': self._get_resource_type(field.child_relation),
+                                'id': str(item.id)
+                            }
+                            for item in related.all()
+                        ]
+                    else:
+                        # For foreign key relationships
+                        relationships[field_name]['data'] = {
+                            'type': self._get_resource_type(field),
+                            'id': str(related.id)
+                        }
+        
+        return relationships
+
+    def _get_resource_type(self, field):
+        """Get the resource type for a field"""
+        # Try to get resource_name from field
+        if hasattr(field, 'resource_name'):
+            return field.resource_name
+        
+        # For PrimaryKeyRelatedField, try to get model name
+        if isinstance(field, serializers.PrimaryKeyRelatedField) and field.queryset is not None:
+            model = field.queryset.model
+            return model._meta.model_name.lower()
+            
+        # For other fields, try to get parent serializer's resource name
+        if hasattr(self.Meta, 'resource_name'):
+            return self.Meta.resource_name
+            
+        # Fallback to a generic name
+        return 'resource'
 
 class UserRoleSerializer(serializers.ModelSerializer):
     """Serializer for UserRole model"""
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all())
-    assigned_by = serializers.PrimaryKeyRelatedField(
+    user = JsonApiRelatedField(queryset=User.objects.all(), resource_name='users')
+    role = JsonApiRelatedField(queryset=Role.objects.all(), resource_name='roles')
+    assigned_by = JsonApiRelatedField(
         queryset=User.objects.all(),
         required=False,
-        allow_null=True
+        allow_null=True,
+        resource_name='users'
     )
-    delegated_by = serializers.PrimaryKeyRelatedField(
+    delegated_by = JsonApiRelatedField(
         queryset=UserRole.objects.all(),
         required=False,
-        allow_null=True
+        allow_null=True,
+        resource_name='user_roles'
     )
 
     class Meta:
@@ -78,13 +172,31 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
-class RoleSerializer(serializers.ModelSerializer):
+class RoleSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
     """Serializer for Role model"""
+    permissions = JsonApiRelatedField(
+        many=True,
+        queryset=Permission.objects.all(),
+        resource_name='permissions',
+        required=False
+    )
+    parent = JsonApiRelatedField(
+        queryset=Role.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='roles'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+
     class Meta:
         model = Role
+        resource_name = 'roles'
         fields = [
             'id', 'name', 'description', 'organization', 'parent',
-            'is_active', 'created_at', 'updated_at'
+            'is_active', 'permissions', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
@@ -114,6 +226,17 @@ class RoleSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Organization must be active")
         return value
 
+    def validate_permissions(self, value):
+        """Validate that all permissions belong to the same organization"""
+        organization = self.context.get('organization') or (self.instance.organization if self.instance else None)
+        if organization:
+            for permission in value:
+                if permission.organization != organization:
+                    raise serializers.ValidationError(
+                        f"Permission {permission.name} does not belong to the same organization"
+                    )
+        return value
+
     def validate(self, data):
         """Validate role data"""
         # Ensure parent role belongs to the same organization
@@ -133,13 +256,22 @@ class RoleSerializer(serializers.ModelSerializer):
 
         return data
 
-class PermissionSerializer(serializers.ModelSerializer):
+    def get_relationships(self, instance):
+        """Get relationships for the resource object"""
+        relationships = super().get_relationships(instance)
+        # Ensure permissions relationship is always included
+        if 'permissions' not in relationships:
+            relationships['permissions'] = {'data': []}
+        return relationships
+
+class PermissionSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
     """Serializer for Permission model"""
     class Meta:
         model = Permission
+        resource_name = 'permissions'
         fields = [
             'id', 'name', 'description', 'code', 'organization',
-            'created_at', 'updated_at'
+            'is_active', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 

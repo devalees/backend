@@ -1,6 +1,35 @@
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from .utils import get_paginated_response
+from .response_formatters import BaseResponseFormatter
+
+class RBACPagination(PageNumberPagination):
+    """Custom pagination for RBAC API responses"""
+    
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+    
+    def get_paginated_response(self, data):
+        """Override to use our custom response format"""
+        formatter = BaseResponseFormatter(self.request)
+        return formatter.format_list_response(
+            data=data,
+            paginator=self
+        )
+
+    def get_first_link(self):
+        """Get the URL for the first page"""
+        if not self.page.has_previous():
+            return None
+        url = self.request.build_absolute_uri()
+        return self.replace_query_param(url, self.page_query_param, 1)
+
+    def get_last_link(self):
+        """Get the URL for the last page"""
+        if not self.page.has_next():
+            return None
+        url = self.request.build_absolute_uri()
+        return self.replace_query_param(url, self.page_query_param, self.page.paginator.num_pages)
 
 class StandardResultsSetPagination(PageNumberPagination):
     """

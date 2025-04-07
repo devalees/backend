@@ -94,4 +94,29 @@ def setup_test_environment():
     Setup test environment
     """
     # Add any test environment setup here
-    pass 
+    pass
+
+@pytest.fixture
+def common_permissions(organization):
+    """Create common permissions used in tests"""
+    permissions = {
+        'view_project': Permission.objects.create(
+            name='View Project',
+            code='view_project',
+            description='Can view projects',
+            organization=organization
+        ),
+        'edit_project': Permission.objects.create(
+            name='Edit Project',
+            code='edit_project',
+            description='Can edit projects',
+            organization=organization
+        ),
+        'delete_project': Permission.objects.create(
+            name='Delete Project',
+            code='delete_project',
+            description='Can delete projects',
+            organization=organization
+        )
+    }
+    return permissions 

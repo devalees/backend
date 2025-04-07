@@ -1,26 +1,23 @@
 import pytest
 from django.core.exceptions import ValidationError
-from django.test import TransactionTestCase
 from Apps.rbac.models import Role
 from Apps.entity.models import Organization
 from Apps.users.models import User
 
-class TestRoleModel(TransactionTestCase):
+@pytest.mark.django_db
+class TestRoleModel:
     """Test cases for the Role model"""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self, organization, user):
         """Set up test data"""
-        self.organization = Organization.objects.create(name="Test Org")
+        self.organization = organization
         self.parent_role = Role.objects.create(
             name="Parent Role",
             description="Parent role for testing",
             organization=self.organization
         )
-        self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
-            password="testpass123"
-        )
+        self.user = user
 
     def test_role_creation(self):
         """Test basic role creation"""
@@ -73,7 +70,7 @@ class TestRoleModel(TransactionTestCase):
                 description="Test role"
             )
 
-    def test_role_permissions(self):
+    def test_role_permissions(self, common_permissions):
         """Test role permission methods"""
         role = Role.objects.create(
             name="Test Role",
@@ -82,21 +79,21 @@ class TestRoleModel(TransactionTestCase):
         )
         
         # Test adding permission
-        role.add_permission("view_project")
+        role.permissions.add(common_permissions['view_project'])
         assert role.has_permission("view_project") is True
         
         # Test removing permission
-        role.remove_permission("view_project")
+        role.permissions.remove(common_permissions['view_project'])
         assert role.has_permission("view_project") is False
 
-    def test_role_inheritance(self):
+    def test_role_inheritance(self, common_permissions):
         """Test role permission inheritance"""
         parent_role = Role.objects.create(
             name="Parent Role 2",
             description="Parent role",
             organization=self.organization
         )
-        parent_role.add_permission("view_project")
+        parent_role.permissions.add(common_permissions['view_project'])
         
         child_role = Role.objects.create(
             name="Child Role",
@@ -121,7 +118,7 @@ class TestRoleModel(TransactionTestCase):
         role.activate()
         assert role.is_active is True
 
-    def test_role_cache_invalidation(self):
+    def test_role_cache_invalidation(self, common_permissions):
         """Test role cache invalidation"""
         role = Role.objects.create(
             name="Test Role",
@@ -130,11 +127,11 @@ class TestRoleModel(TransactionTestCase):
         )
         
         # Add permission and check cache
-        role.add_permission("view_project")
+        role.permissions.add(common_permissions['view_project'])
         assert role.has_permission("view_project") is True
         
         # Remove permission and verify cache is invalidated
-        role.remove_permission("view_project")
+        role.permissions.remove(common_permissions['view_project'])
         assert role.has_permission("view_project") is False
 
     def test_role_str_representation(self):

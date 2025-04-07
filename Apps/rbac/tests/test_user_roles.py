@@ -62,7 +62,7 @@ class TestUserRole:
         assert user_role.is_active is True
         assert user_role.deactivated_at is None
 
-    def test_user_role_caching(self, organization, user, role):
+    def test_user_role_caching(self, organization, user, role, common_permissions):
         """Test caching of user role permissions"""
         user_role = UserRole.objects.create(
             user=user,
@@ -71,8 +71,8 @@ class TestUserRole:
             assigned_by=user
         )
         # Add some permissions to the role
-        role.add_permission('view_project')
-        role.add_permission('edit_project')
+        role.permissions.add(common_permissions['view_project'])
+        role.permissions.add(common_permissions['edit_project'])
         
         # Test permission caching
         assert user_role.has_permission('view_project') is True
@@ -180,14 +180,14 @@ class TestUserRole:
         expected_str = f"{user.username} - {role.name} ({organization.name})"
         assert str(user_role) == expected_str
 
-    def test_user_role_permission_inheritance(self, organization, user, role):
+    def test_user_role_permission_inheritance(self, organization, user, role, common_permissions):
         """Test permission inheritance through role hierarchy"""
         # Create a parent role with permissions
         parent_role = Role.objects.create(
             name='Parent Role',
             organization=organization
         )
-        parent_role.add_permission('view_project')
+        parent_role.permissions.add(common_permissions['view_project'])
         
         # Create a child role
         child_role = Role.objects.create(
@@ -195,7 +195,7 @@ class TestUserRole:
             organization=organization,
             parent=parent_role
         )
-        child_role.add_permission('edit_project')
+        child_role.permissions.add(common_permissions['edit_project'])
         
         # Assign child role to user
         user_role = UserRole.objects.create(
