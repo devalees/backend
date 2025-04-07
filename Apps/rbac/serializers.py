@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import UserRole, Role
+from .models import UserRole, Role, Permission
 from Apps.users.models import User
 
 class UserRoleSerializer(serializers.ModelSerializer):
@@ -76,4 +76,43 @@ class UserRoleUpdateSerializer(serializers.ModelSerializer):
                 instance.deactivate()
             validated_data.pop('is_active')
 
-        return super().update(instance, validated_data) 
+        return super().update(instance, validated_data)
+
+class RoleSerializer(serializers.ModelSerializer):
+    """Serializer for Role model"""
+    class Meta:
+        model = Role
+        fields = [
+            'id', 'name', 'description', 'organization', 'parent',
+            'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate(self, data):
+        """Validate role data"""
+        # Ensure parent role belongs to the same organization
+        if data.get('parent') and data['parent'].organization != data['organization']:
+            raise serializers.ValidationError(
+                "Parent role must belong to the same organization"
+            )
+        return data
+
+class PermissionSerializer(serializers.ModelSerializer):
+    """Serializer for Permission model"""
+    class Meta:
+        model = Permission
+        fields = [
+            'id', 'name', 'description', 'code', 'organization',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_code(self, value):
+        """Validate permission code format"""
+        if not value or not isinstance(value, str):
+            raise serializers.ValidationError("Code must be a non-empty string")
+        if not value.replace('.', '').replace('_', '').isalnum():
+            raise serializers.ValidationError(
+                "Code can only contain alphanumeric characters, dots, and underscores"
+            )
+        return value 

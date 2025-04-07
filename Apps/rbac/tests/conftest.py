@@ -1,9 +1,16 @@
+import os
+import sys
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework.test import APIClient
 from Apps.rbac.models import Role, Permission
 from Apps.entity.models import Organization, Department, Team, TeamMember
+
+# Add the project root to the Python path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
 
 User = get_user_model()
 
@@ -79,4 +86,12 @@ def test_organization():
 @pytest.fixture(autouse=True)
 def clear_cache():
     """Clear cache before each test"""
-    cache.clear() 
+    cache.clear()
+
+@pytest.fixture(autouse=True)
+def setup_test_environment():
+    """
+    Setup test environment
+    """
+    # Add any test environment setup here
+    pass 
