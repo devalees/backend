@@ -9,5 +9,5 @@ router.register(r'user-roles', UserRoleViewSet, basename='userrole')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('api/', include('rbac.api.urls')),
+    path('api/', include('Apps.rbac.api.urls')),
 ] 

@@ -74,8 +74,8 @@ class TestRoleAPI:
         url = reverse('rbac:role-list')
         response = api_client.get(url)
         assert response.status_code == 200
-        assert len(response.data['results']) == 1
-        assert response.data['results'][0]['name'] == test_role.name
+        assert len(response.data['data']) == 1
+        assert response.data['data'][0]['name'] == test_role.name
 
     def test_role_create_endpoint(self, api_client, test_organization):
         url = reverse('rbac:role-list')
@@ -94,8 +94,8 @@ class TestPermissionAPI:
         url = reverse('rbac:permission-list')
         response = api_client.get(url)
         assert response.status_code == 200
-        assert len(response.data['results']) == 1
-        assert response.data['results'][0]['name'] == test_permission.name
+        assert len(response.data['data']) == 1
+        assert response.data['data'][0]['name'] == test_permission.name
 
     def test_permission_create_endpoint(self, api_client, test_organization):
         url = reverse('rbac:permission-list')
