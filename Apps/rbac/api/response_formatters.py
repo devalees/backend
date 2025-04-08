@@ -17,16 +17,16 @@ class BaseResponseFormatter:
             raise AttributeError("Serializer class not provided")
         return self.serializer_class(instance, many=many)
     
-    def format_list_response(self, data, paginator=None, status=None):
-        """Format a list response according to JSON:API specification"""
+    def format_list_response(self, data, paginator=None, page_number=1, page_size=10):
+        """Format a list response according to JSON:API specifications"""
         response_data = {
-            'data': data,
+            'data': [],
             'meta': {},
             'links': {}
         }
-        
+
+        # Add pagination metadata directly to meta
         if paginator:
-            # Add pagination metadata directly in meta object
             response_data['meta'].update({
                 'count': paginator.page.paginator.count,
                 'total_pages': paginator.page.paginator.num_pages,
@@ -42,8 +42,34 @@ class BaseResponseFormatter:
                 'next': paginator.get_next_link(),
                 'prev': paginator.get_previous_link()
             })
-        
-        return Response(response_data, status=status)
+            
+            response_data['data'] = data
+        else:
+            # Calculate pagination metadata manually
+            response_data['meta'].update({
+                'count': len(data),
+                'total_pages': max(1, (len(data) + page_size - 1) // page_size),
+                'current_page': page_number,
+                'page_size': page_size
+            })
+            
+            # Calculate pagination slices
+            start_idx = (page_number - 1) * page_size
+            end_idx = start_idx + page_size
+            paginated_data = data[start_idx:end_idx]
+            
+            response_data['data'] = paginated_data
+            
+            # Add pagination links
+            response_data['links'].update({
+                'self': self._get_page_url(page_number),
+                'first': self._get_page_url(1),
+                'last': self._get_page_url(response_data['meta']['total_pages']),
+                'next': self._get_page_url(page_number + 1) if page_number < response_data['meta']['total_pages'] else None,
+                'prev': self._get_page_url(page_number - 1) if page_number > 1 else None
+            })
+
+        return Response(response_data)
     
     def format_detail_response(self, instance, status=None):
         """Format detail response according to JSON:API specification"""
