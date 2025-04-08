@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+from django.conf import settings
 from ..services.audio import AudioProcessingService
 
 class TestAudioCompression(TestCase):
@@ -18,7 +19,14 @@ class TestAudioCompression(TestCase):
         )
         self.client.force_authenticate(user=self.user)
         self.audio_service = AudioProcessingService()
-        self.test_wav_path = os.path.join(tempfile.gettempdir(), 'test.wav')
+        
+        # Ensure media/temp directory exists
+        self.temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp')
+        os.makedirs(self.temp_dir, exist_ok=True)
+        
+        # Use process-specific filename to avoid conflicts in parallel testing
+        pid = os.getpid()
+        self.test_wav_path = os.path.join(self.temp_dir, f'test_{pid}.wav')
         
         # Create a simple test WAV file
         sample_rate = 44100
