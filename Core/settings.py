@@ -357,3 +357,17 @@ SESSION_CACHE_ALIAS = 'default'
 
 # Cache key prefix to avoid collisions
 CACHE_KEY_PREFIX = 'api'
+
+# Rate limiting settings
+RATE_LIMIT_ENABLED = True
+RATE_LIMIT_REQUESTS = 100  # Number of requests allowed per window
+RATE_LIMIT_WINDOW = 60  # Time window in seconds
+RATE_LIMIT_CACHE_PREFIX = 'rate_limit:'
+
+# Rate limit headers
+RATE_LIMIT_HEADERS = {
+    'X-RateLimit-Limit': 'X-RateLimit-Limit',
+    'X-RateLimit-Remaining': 'X-RateLimit-Remaining',
+    'X-RateLimit-Reset': 'X-RateLimit-Reset',
+    'Retry-After': 'Retry-After'
+}

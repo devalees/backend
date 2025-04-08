@@ -7,6 +7,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 from Apps.rbac.models import Role, Permission
 from Apps.entity.models import Organization, Department, Team, TeamMember
+import django
 
 # Add the project root to the Python path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -119,4 +120,8 @@ def common_permissions(organization):
             organization=organization
         )
     }
-    return permissions 
+    return permissions
+
+def pytest_configure():
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Core.settings')
+    django.setup() 
