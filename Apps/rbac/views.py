@@ -4,27 +4,47 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import UserRole
-from .serializers import UserRoleSerializer, UserRoleUpdateSerializer
+from .models import UserRole, Role, Permission
+from .serializers import UserRoleSerializer, UserRoleUpdateSerializer, RoleSerializer, PermissionSerializer
 from .permissions import HasOrganizationPermission
 from django.contrib.auth import get_user_model
 
 # Create your views here.
 
-class UserRoleViewSet(viewsets.ModelViewSet):
+class BaseViewSet(viewsets.ModelViewSet):
+    """Base ViewSet with common functionality"""
+    permission_classes = [IsAuthenticated, HasOrganizationPermission]
+    filter_backends = [DjangoFilterBackend]
+
+    def get_paginated_response(self, data):
+        """Return paginated response in standardized format"""
+        assert self.paginator is not None
+        return self.paginator.get_paginated_response(data)
+
+    def get_queryset(self):
+        """Filter queryset based on user's organization"""
+        return self.queryset.filter(organization=self.request.user.organization)
+
+class RoleViewSet(BaseViewSet):
+    """ViewSet for managing roles"""
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    filterset_fields = ['name', 'is_active', 'parent']
+
+class PermissionViewSet(BaseViewSet):
+    """ViewSet for managing permissions"""
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+    filterset_fields = ['name', 'code', 'is_active']
+
+class UserRoleViewSet(BaseViewSet):
     """
     ViewSet for managing user role assignments.
     Supports CRUD operations and role activation/deactivation.
     """
     queryset = UserRole.objects.all()
     serializer_class = UserRoleSerializer
-    permission_classes = [IsAuthenticated, HasOrganizationPermission]
-    filter_backends = [DjangoFilterBackend]
     filterset_fields = ['user', 'role', 'organization', 'is_active', 'is_delegated']
-
-    def get_queryset(self):
-        """Filter queryset based on user's organization"""
-        return self.queryset.filter(organization=self.request.user.organization)
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""

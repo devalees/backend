@@ -17,39 +17,33 @@ class BaseResponseFormatter:
             raise AttributeError("Serializer class not provided")
         return self.serializer_class(instance, many=many)
     
-    def format_list_response(self, data, paginator=None):
-        """Format list response according to JSON:API specification"""
+    def format_list_response(self, data, paginator=None, status=None):
+        """Format a list response according to JSON:API specification"""
         response_data = {
-            'data': [],
+            'data': data,
             'meta': {},
             'links': {}
         }
-
-        # Format data
-        if isinstance(data, list):
-            response_data['data'] = data
-        else:
-            response_data['data'] = self.get_serializer(data, many=True).data
-
-        # Add pagination metadata if paginator is provided
+        
         if paginator:
+            # Add pagination metadata directly in meta object
             response_data['meta'].update({
                 'count': paginator.page.paginator.count,
                 'total_pages': paginator.page.paginator.num_pages,
                 'current_page': paginator.page.number,
-                'page_size': paginator.get_page_size(self.request)
+                'page_size': paginator.get_page_size(paginator.request)
             })
-
+            
             # Add pagination links
-            response_data['links'] = {
-                'self': self.request.build_absolute_uri(),
+            response_data['links'].update({
+                'self': paginator.request.build_absolute_uri(),
                 'first': paginator.get_first_link(),
                 'last': paginator.get_last_link(),
                 'next': paginator.get_next_link(),
                 'prev': paginator.get_previous_link()
-            }
-
-        return Response(response_data)
+            })
+        
+        return Response(response_data, status=status)
     
     def format_detail_response(self, instance, status=None):
         """Format detail response according to JSON:API specification"""
