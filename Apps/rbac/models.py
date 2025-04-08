@@ -126,28 +126,19 @@ class Role(RBACBaseModel):
         unique_together = ('name', 'organization')
         ordering = ['name']
 
-    def clean(self):
-        super().clean()
-        if not self.name:
-            raise ValidationError({'name': 'Role name cannot be empty'})
-        
-        if not re.match(r'^[a-zA-Z0-9_\s-]+$', self.name):
-            raise ValidationError({'name': 'Role name can only contain letters, numbers, spaces, underscores, and hyphens'})
-        
-        if self.parent and self.parent.organization != self.organization:
-            raise ValidationError({'parent': 'Parent role must belong to the same organization'})
-        
-        # Check for circular references
-        if self.parent:
-            current = self.parent
-            while current:
-                if current == self:
-                    raise ValidationError({'parent': 'Circular reference detected in role hierarchy'})
-                current = current.parent
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Store original permissions for change detection
+        self._original_permissions = set()
+        if self.pk:
+            self._original_permissions = set(self.permissions.values_list('id', flat=True))
 
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+        # Update original permissions after save
+        if self.pk:
+            self._original_permissions = set(self.permissions.values_list('id', flat=True))
 
     def get_permission_cache_key(self, permission_code):
         """Generate cache key for permission checks"""
@@ -183,7 +174,6 @@ class Role(RBACBaseModel):
         # Also invalidate cache for all child roles recursively
         for child in self.children.all():
             child.invalidate_permission_cache(permission.code)
-            child.remove_permission(permission)  # Recursively remove from children
 
     def has_permission(self, permission_code):
         """Check if the role has a specific permission"""
@@ -201,51 +191,71 @@ class Role(RBACBaseModel):
             if not permission.is_active:
                 cache.set(cache_key, False, timeout=300)
                 return False
+
+            # Check direct permissions first
+            has_direct_permission = self.permissions.filter(
+                code=permission_code,
+                is_active=True
+            ).exists()
+
+            if has_direct_permission:
+                cache.set(cache_key, True, timeout=300)
+                return True
+
+            # Check parent role if exists and is active
+            if self.parent and self.parent.is_active:
+                has_parent_permission = self.parent.has_permission(permission_code)
+                cache.set(cache_key, has_parent_permission, timeout=300)
+                return has_parent_permission
+
+            cache.set(cache_key, False, timeout=300)
+            return False
+
         except Permission.DoesNotExist:
             cache.set(cache_key, False, timeout=300)
             return False
 
-        # Check direct permissions
-        has_perm = self.permissions.filter(code=permission_code, is_active=True).exists()
-        
-        # Check inherited permissions from parent role
-        if not has_perm and self.parent and self.parent.is_active:
-            has_perm = self.parent.has_permission(permission_code)
-
-        # Cache the result
-        cache.set(cache_key, has_perm, timeout=300)
-        return has_perm
-
     def invalidate_permission_cache(self, permission_code=None):
         """Invalidate permission cache for this role"""
         if permission_code:
-            # Invalidate specific permission cache
-            cache_key = self.get_permission_cache_key(permission_code)
-            cache.delete(cache_key)
+            # Invalidate specific permission
+            cache.delete(self.get_permission_cache_key(permission_code))
         else:
-            # Invalidate all permission caches for this role
-            # Since LocMemCache doesn't support delete_pattern, we'll delete each permission cache individually
+            # Invalidate all permissions
             for permission in self.permissions.all():
-                cache_key = self.get_permission_cache_key(permission.code)
-                cache.delete(cache_key)
-            # Also invalidate cache for child roles
-            for child in self.children.all():
-                child.invalidate_permission_cache()
+                cache.delete(self.get_permission_cache_key(permission.code))
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        super().clean()
+        if not self.name:
+            raise ValidationError({'name': 'Role name cannot be empty'})
+        
+        if not re.match(r'^[a-zA-Z0-9_\s-]+$', self.name):
+            raise ValidationError({'name': 'Role name can only contain letters, numbers, spaces, underscores, and hyphens'})
+        
+        if self.parent and self.parent.organization != self.organization:
+            raise ValidationError({'parent': 'Parent role must belong to the same organization'})
+        
+        # Check for circular references
+        if self.parent:
+            current = self.parent
+            while current:
+                if current == self:
+                    raise ValidationError({'parent': 'Circular reference detected in role hierarchy'})
+                current = current.parent
 
     def deactivate(self):
         """Deactivate the role"""
         self.is_active = False
         self.save()
-        self.invalidate_permission_cache()
 
     def activate(self):
         """Activate the role"""
         self.is_active = True
         self.save()
-        self.invalidate_permission_cache()
-
-    def __str__(self):
-        return self.name
 
 class UserRole(RBACBaseModel):
     """Model representing a role assignment to a user"""

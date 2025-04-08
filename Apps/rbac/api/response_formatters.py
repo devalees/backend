@@ -54,7 +54,14 @@ class BaseResponseFormatter:
     def format_detail_response(self, instance, status=None):
         """Format detail response according to JSON:API specification"""
         if isinstance(instance, dict):
-            data = instance
+            data = instance.copy()  # Create a copy to avoid modifying the original
+            if 'attributes' not in data:
+                data['attributes'] = {}
+            # Move fields to attributes
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            for field in fields_to_move:
+                if field in data:
+                    data['attributes'][field] = data[field]
         else:
             serializer = self.get_serializer(instance)
             data = serializer.data
@@ -63,17 +70,15 @@ class BaseResponseFormatter:
             if 'attributes' not in data:
                 data['attributes'] = {}
 
-            # Add name to attributes if it exists
+            # Move fields to attributes
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            for field in fields_to_move:
+                if field in data:
+                    data['attributes'][field] = data.pop(field)
+
+            # Add name to attributes if it exists in the instance
             if hasattr(instance, 'name'):
                 data['attributes']['name'] = instance.name
-            elif hasattr(instance, 'get_name'):
-                data['attributes']['name'] = instance.get_name()
-
-            # Move fields to attributes if they're not already there
-            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at']
-            for field in fields_to_move:
-                if field in data and field not in data['attributes']:
-                    data['attributes'][field] = data.pop(field)
 
         response_data = {
             'data': data,
