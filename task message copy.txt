@@ -73,3 +73,9 @@ is all implementation considered done?
 Please check done in the file 
 
 please make a new How To use file for celery in details with simple language
+
+
+
+we need to start on section Add API documentation, with the following conditions:
+- test-driven-approach using pytest as the main tool
+-DON'T AFFECT OTHER IMPLEMNTATIONS - because this the second time we try to implement it and evrytime other sections became failed in the test

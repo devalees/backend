@@ -193,7 +193,7 @@
 - [x] Implement cache tests
 - [x] Add cache performance metrics
 
-## 8. API Layer [🚧 IN PROGRESS - 60%]
+## 8. API Layer [🚧 IN PROGRESS - 70%]
 - [x] Create API endpoints
   - [x] Role API endpoints (CRUD operations)
   - [x] Permission API endpoints (CRUD operations)
@@ -216,10 +216,10 @@
   - [x] Configure rate limit settings
   - [x] Add rate limit middleware
   - [x] Implement rate limit storage
-- [ ] Add API documentation
-  - [ ] Add OpenAPI/Swagger specs
-  - [ ] Document endpoints and parameters
-  - [ ] Add example requests/responses
+- [x] Add API documentation
+  - [x] Add OpenAPI/Swagger specs
+  - [x] Document endpoints and parameters
+  - [x] Add example requests/responses
 - [ ] Create API tests
   - [ ] Add endpoint tests
   - [ ] Add performance tests
