@@ -21,17 +21,21 @@ class BaseResponseFormatter:
         """Format a list response according to JSON:API specifications"""
         response_data = {
             'data': [],
-            'meta': {},
+            'meta': {
+                'pagination': {}  # Move pagination data under meta.pagination
+            },
             'links': {}
         }
 
-        # Add pagination metadata directly to meta
+        # Add pagination metadata under meta.pagination
         if paginator:
-            response_data['meta'].update({
+            response_data['meta']['pagination'].update({
                 'count': paginator.page.paginator.count,
                 'total_pages': paginator.page.paginator.num_pages,
                 'current_page': paginator.page.number,
-                'page_size': paginator.get_page_size(paginator.request)
+                'page_size': paginator.get_page_size(paginator.request),
+                'has_next': paginator.page.has_next(),
+                'has_previous': paginator.page.has_previous()
             })
             
             # Add pagination links
@@ -46,11 +50,14 @@ class BaseResponseFormatter:
             response_data['data'] = data
         else:
             # Calculate pagination metadata manually
-            response_data['meta'].update({
+            total_pages = max(1, (len(data) + page_size - 1) // page_size)
+            response_data['meta']['pagination'].update({
                 'count': len(data),
-                'total_pages': max(1, (len(data) + page_size - 1) // page_size),
+                'total_pages': total_pages,
                 'current_page': page_number,
-                'page_size': page_size
+                'page_size': page_size,
+                'has_next': page_number < total_pages,
+                'has_previous': page_number > 1
             })
             
             # Calculate pagination slices
@@ -64,8 +71,8 @@ class BaseResponseFormatter:
             response_data['links'].update({
                 'self': self._get_page_url(page_number),
                 'first': self._get_page_url(1),
-                'last': self._get_page_url(response_data['meta']['total_pages']),
-                'next': self._get_page_url(page_number + 1) if page_number < response_data['meta']['total_pages'] else None,
+                'last': self._get_page_url(total_pages),
+                'next': self._get_page_url(page_number + 1) if page_number < total_pages else None,
                 'prev': self._get_page_url(page_number - 1) if page_number > 1 else None
             })
 

@@ -81,10 +81,14 @@ class TestSuccessResponseFormatting:
         assert 'relationships' in role_data
         
         # Check meta structure
-        assert 'count' in response.data['meta']
-        assert 'total_pages' in response.data['meta']
-        assert 'current_page' in response.data['meta']
-        assert 'page_size' in response.data['meta']
+        assert 'pagination' in response.data['meta']
+        pagination = response.data['meta']['pagination']
+        assert 'count' in pagination
+        assert 'total_pages' in pagination
+        assert 'current_page' in pagination
+        assert 'page_size' in pagination
+        assert 'has_next' in pagination
+        assert 'has_previous' in pagination
         
         # Check links structure
         assert 'self' in response.data['links']
@@ -148,10 +152,14 @@ class TestSuccessResponseFormatting:
         assert 'relationships' in perm_data
         
         # Check meta structure
-        assert 'count' in response.data['meta']
-        assert 'total_pages' in response.data['meta']
-        assert 'current_page' in response.data['meta']
-        assert 'page_size' in response.data['meta']
+        assert 'pagination' in response.data['meta']
+        pagination = response.data['meta']['pagination']
+        assert 'count' in pagination
+        assert 'total_pages' in pagination
+        assert 'current_page' in pagination
+        assert 'page_size' in pagination
+        assert 'has_next' in pagination
+        assert 'has_previous' in pagination
         
         # Check links structure
         assert 'self' in response.data['links']

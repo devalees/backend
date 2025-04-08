@@ -62,6 +62,15 @@ class TestResponseFormat:
         assert 'data' in response.json()
         assert 'meta' in response.json()
         assert 'pagination' in response.json()['meta']
+        
+        # Check pagination metadata
+        pagination = response.json()['meta']['pagination']
+        assert 'count' in pagination
+        assert 'total_pages' in pagination
+        assert 'current_page' in pagination
+        assert 'page_size' in pagination
+        assert 'has_next' in pagination
+        assert 'has_previous' in pagination
 
     def test_role_create_response_format(self, api_client, organization):
         """Test the format of role create response."""
