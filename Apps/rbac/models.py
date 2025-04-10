@@ -333,3 +333,186 @@ class UserRole(RBACBaseModel):
 
     def __str__(self):
         return f"{self.user.username} - {self.role.name} ({self.organization.name})"
+
+class Resource(RBACBaseModel):
+    """
+    Model representing a resource in the RBAC system.
+    Resources are objects that can be accessed by users with appropriate permissions.
+    """
+    name = models.CharField(max_length=255)
+    resource_type = models.CharField(max_length=50)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='owned_resources'
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+    is_active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        app_label = 'rbac'
+        unique_together = ('name', 'resource_type', 'organization')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.resource_type})"
+
+    def clean(self):
+        """Validate resource data"""
+        super().clean()
+        
+        # Validate resource type
+        valid_resource_types = ['document', 'folder', 'project', 'task', 'user', 'role', 'permission']
+        if self.resource_type not in valid_resource_types:
+            raise ValidationError({
+                'resource_type': _('Invalid resource type. Must be one of: %(valid_types)s') % {
+                    'valid_types': ', '.join(valid_resource_types)
+                }
+            })
+        
+        # Validate parent relationship
+        if self.parent and self.parent.resource_type != 'folder':
+            raise ValidationError({
+                'parent': _('Parent resource must be of type "folder"')
+            })
+        
+        # Validate parent organization
+        if self.parent and self.parent.organization != self.organization:
+            raise ValidationError({
+                'parent': _('Parent resource must belong to the same organization')
+            })
+
+    def get_ancestors(self):
+        """Get all ancestor resources"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+
+    def get_descendants(self):
+        """Get all descendant resources"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+
+    def grant_access(self, user, access_type):
+        """
+        Grant access to a user for this resource
+        """
+        from .models import ResourceAccess
+        return ResourceAccess.objects.create(
+            resource=self,
+            user=user,
+            access_type=access_type,
+            organization=self.organization
+        )
+
+    def revoke_access(self, user, access_type=None):
+        """
+        Revoke access from a user for this resource
+        """
+        from .models import ResourceAccess
+        query = ResourceAccess.objects.filter(
+            resource=self,
+            user=user,
+            organization=self.organization,
+            is_active=True
+        )
+        
+        if access_type:
+            query = query.filter(access_type=access_type)
+        
+        for access in query:
+            access.deactivate()
+
+    def has_access(self, user, access_type):
+        """
+        Check if a user has access to this resource
+        """
+        from .models import ResourceAccess
+        return ResourceAccess.objects.filter(
+            resource=self,
+            user=user,
+            access_type=access_type,
+            organization=self.organization,
+            is_active=True
+        ).exists()
+
+class ResourceAccess(RBACBaseModel):
+    """
+    Model representing access to a resource by a user.
+    Defines the type of access (read, write, etc.) and tracks access status.
+    """
+    resource = models.ForeignKey(
+        Resource,
+        on_delete=models.CASCADE,
+        related_name='access_entries'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='resource_access'
+    )
+    access_type = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        app_label = 'rbac'
+        unique_together = ('resource', 'user', 'access_type', 'organization')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.resource.name} ({self.access_type})"
+
+    def clean(self):
+        """Validate resource access data"""
+        super().clean()
+        
+        # Validate access type
+        valid_access_types = ['read', 'write', 'delete', 'admin']
+        if self.access_type not in valid_access_types:
+            raise ValidationError({
+                'access_type': _('Invalid access type. Must be one of: %(valid_types)s') % {
+                    'valid_types': ', '.join(valid_access_types)
+                }
+            })
+        
+        # Validate resource organization
+        if self.resource.organization != self.organization:
+            raise ValidationError({
+                'resource': _('Resource must belong to the same organization')
+            })
+        
+        # Validate user organization
+        from Apps.entity.models import TeamMember
+        if not TeamMember.objects.filter(user=self.user, team__department__organization=self.organization).exists():
+            raise ValidationError({
+                'user': _('User must belong to the organization')
+            })
+
+    def deactivate(self):
+        """Deactivate this access entry"""
+        self.is_active = False
+        self.deactivated_at = timezone.now()
+        self.save()
+
+    def activate(self):
+        """Activate this access entry"""
+        self.is_active = True
+        self.deactivated_at = None
+        self.save()

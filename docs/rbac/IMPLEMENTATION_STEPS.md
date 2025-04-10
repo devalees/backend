@@ -145,17 +145,48 @@
   - [x] Added role usage tracking
   - [x] Implemented permission usage monitoring
 
-## 4. Resource Access Control [❌ NOT STARTED]
-- [ ] Create Resource model (inherits from RBACBaseModel)
-- [ ] Implement resource access operations
-- [ ] Add resource ownership
-- [ ] Create resource sharing
-- [ ] Implement resource inheritance
-- [ ] Add resource access caching
+## 4. Resource Access Control [🚧 IN PROGRESS - 80%]
+- [x] Create Resource model (inherits from RBACBaseModel)
+  - [x] Implemented with name, resource_type, owner, parent, is_active, and metadata fields
+  - [x] Added unique constraint on name, resource_type, and organization
+  - [x] Implemented resource hierarchy with parent-child relationships
+  - [x] Added resource validation
+  - [x] Created resource tests
+- [x] Implement resource access operations
+  - [x] Added grant_access method
+  - [x] Implemented revoke_access method
+  - [x] Added has_access method
+  - [x] Created access validation
+- [x] Add resource ownership
+  - [x] Implemented owner field
+  - [x] Added ownership validation
+  - [x] Created ownership tests
+- [x] Create resource sharing
+  - [x] Implemented ResourceAccess model
+  - [x] Added access type field
+  - [x] Created access validation
+- [x] Implement resource inheritance
+  - [x] Added parent-child relationships
+  - [x] Implemented get_ancestors method
+  - [x] Added get_descendants method
+  - [x] Created inheritance tests
+- [x] Add resource access caching
+  - [x] Implemented permission caching
+  - [x] Added cache invalidation
 - [ ] Create resource access API endpoints
+  - [ ] Add CRUD endpoints
+  - [ ] Implement access management endpoints
+  - [ ] Add sharing endpoints
 - [ ] Add resource access documentation
-- [ ] Implement resource access tests
+  - [ ] Add model documentation
+  - [ ] Create API documentation
+- [x] Implement resource access tests
+  - [x] Added model tests
+  - [x] Created access tests
+  - [x] Implemented inheritance tests
 - [ ] Add resource access monitoring
+  - [ ] Add access usage tracking
+  - [ ] Implement access usage monitoring
 
 ## 5. Organization Context [❌ NOT STARTED]
 - [ ] Create Organization model (inherits from RBACBaseModel)
@@ -292,13 +323,13 @@
 - [⚠️] Blocked/Issues
 
 ## Overall Progress Summary
-- ✅ Completed: 4 sections (Base RBAC Model, Role Management, Permission Management, User-Role Assignment, Caching Layer)
-- 🚧 In Progress: 2 sections (API Layer, Testing Framework)
-- ❌ Not Started: 6 sections (Resource Access Control, Organization Context, Audit & Compliance, Security Layer, Documentation, Monitoring & Analytics)
+- ✅ Completed: 5 sections (Base RBAC Model, Role Management, Permission Management, User-Role Assignment, Caching Layer)
+- 🚧 In Progress: 3 sections (API Layer, Testing Framework, Resource Access Control)
+- ❌ Not Started: 5 sections (Organization Context, Audit & Compliance, Security Layer, Documentation, Monitoring & Analytics)
 
 ## Next Priority Items
 1. Complete API Layer implementation
 2. Finish Testing Framework
-3. Start Resource Access Control
+3. Complete Resource Access Control API endpoints
 4. Begin Organization Context development
 5. Implement Audit & Compliance features 
