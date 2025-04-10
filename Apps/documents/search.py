@@ -3,7 +3,11 @@ from elasticsearch_dsl.connections import connections
 from django.conf import settings
 
 # Create Elasticsearch connection
-connections.create_connection(hosts=[settings.ELASTICSEARCH_DSN])
+connections.create_connection(
+    hosts=[settings.ELASTICSEARCH_DSN],
+    http_auth=(settings.ELASTICSEARCH_USERNAME, settings.ELASTICSEARCH_PASSWORD),
+    verify_certs=settings.ELASTICSEARCH_VERIFY_CERTS
+)
 
 class DocumentIndex(Document):
     """
