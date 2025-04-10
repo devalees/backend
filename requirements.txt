@@ -33,7 +33,7 @@ django-celery-results==2.5.1
 django-cors-headers==4.7.0
 django-filter==24.1
 django-import-export==3.3.7
-django-redis==5.4.0
+django-redis==5.0.0
 django-timezone-field==7.1
 djangorestframework==3.16.0
 djangorestframework-simplejwt==5.3.1
@@ -97,7 +97,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.2
 qrcode==8.0
-redis==5.0.1
+redis==4.6.0
 referencing==0.36.2
 requests==2.32.3
 rpds-py==0.24.0

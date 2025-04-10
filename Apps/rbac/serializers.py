@@ -4,6 +4,7 @@ from Apps.users.models import User
 from django.db import models
 from django.contrib.auth import get_user_model
 from Apps.entity.models import Organization
+from Apps.rbac.models import Resource, ResourceAccess
 
 class JsonApiRelatedField(serializers.PrimaryKeyRelatedField):
     """Custom field for JSON:API relationships"""
@@ -336,3 +337,150 @@ class PermissionSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
             )
 
         return data 
+
+class ResourceSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for Resource model"""
+    owner = JsonApiRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='users'
+    )
+    parent = JsonApiRelatedField(
+        queryset=Resource.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='resources'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    
+    class Meta:
+        model = Resource
+        resource_name = 'resources'
+        fields = [
+            'id', 'name', 'resource_type', 'owner', 'parent',
+            'organization', 'is_active', 'metadata', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_name(self, value):
+        """Validate resource name"""
+        if not value:
+            raise serializers.ValidationError("Resource name cannot be empty")
+        return value
+    
+    def validate_resource_type(self, value):
+        """Validate resource type"""
+        if not value:
+            raise serializers.ValidationError("Resource type cannot be empty")
+        return value
+    
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization cannot be empty")
+        return value
+    
+    def validate(self, data):
+        """Validate resource data"""
+        # Check for unique name, resource_type, and organization combination
+        if Resource.objects.filter(
+            name=data.get('name'),
+            resource_type=data.get('resource_type'),
+            organization=data.get('organization')
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "A resource with this name and type already exists in this organization"
+            )
+        
+        return data
+
+class ResourceAccessSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for ResourceAccess model"""
+    resource = JsonApiRelatedField(
+        queryset=Resource.objects.all(),
+        resource_name='resources'
+    )
+    user = JsonApiRelatedField(
+        queryset=User.objects.all(),
+        resource_name='users'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    
+    class Meta:
+        model = ResourceAccess
+        resource_name = 'resource_accesses'
+        fields = [
+            'id', 'resource', 'user', 'organization', 'access_type',
+            'is_active', 'deactivated_at', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+    
+    def validate_access_type(self, value):
+        """Validate access type"""
+        valid_types = ['read', 'write', 'admin']
+        if value not in valid_types:
+            raise serializers.ValidationError(f"Access type must be one of: {', '.join(valid_types)}")
+        return value
+    
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization cannot be empty")
+        return value
+    
+    def validate(self, data):
+        """Validate resource access data"""
+        # Check for unique resource, user, access_type, and organization combination
+        if ResourceAccess.objects.filter(
+            resource=data.get('resource'),
+            user=data.get('user'),
+            access_type=data.get('access_type'),
+            organization=data.get('organization')
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "This access entry already exists"
+            )
+        
+        # Ensure resource and user belong to the same organization
+        if data.get('resource') and data.get('user') and data.get('organization'):
+            if data['resource'].organization != data['organization']:
+                raise serializers.ValidationError(
+                    "Resource must belong to the same organization"
+                )
+            
+            # Check if user belongs to the organization
+            if not data['user'].team_memberships.filter(team__department__organization=data['organization']).exists():
+                raise serializers.ValidationError(
+                    "User must belong to the same organization"
+                )
+        
+        return data
+
+class ResourceAccessUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating ResourceAccess model"""
+    
+    class Meta:
+        model = ResourceAccess
+        fields = ['access_type', 'notes']
+        read_only_fields = ['resource', 'user', 'organization']
+    
+    def validate_access_type(self, value):
+        """Validate access type"""
+        valid_types = ['read', 'write', 'admin']
+        if value not in valid_types:
+            raise serializers.ValidationError(f"Access type must be one of: {', '.join(valid_types)}")
+        return value
+    
+    def update(self, instance, validated_data):
+        """Update resource access"""
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance 

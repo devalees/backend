@@ -27,6 +27,22 @@ class BaseResponseFormatter:
             'links': {}
         }
 
+        # Format each item in the data list
+        formatted_data = []
+        for item in data:
+            if isinstance(item, dict):
+                formatted_item = item.copy()
+                if 'attributes' not in formatted_item:
+                    formatted_item['attributes'] = {}
+                # Move fields to attributes
+                fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
+                for field in fields_to_move:
+                    if field in formatted_item:
+                        formatted_item['attributes'][field] = formatted_item[field]
+                formatted_data.append(formatted_item)
+            else:
+                formatted_data.append(item)
+
         # Add pagination metadata under meta.pagination
         if paginator:
             response_data['meta']['pagination'].update({
@@ -47,7 +63,7 @@ class BaseResponseFormatter:
                 'prev': paginator.get_previous_link()
             })
             
-            response_data['data'] = data
+            response_data['data'] = formatted_data
         else:
             # Calculate pagination metadata manually
             total_pages = max(1, (len(data) + page_size - 1) // page_size)
@@ -63,7 +79,7 @@ class BaseResponseFormatter:
             # Calculate pagination slices
             start_idx = (page_number - 1) * page_size
             end_idx = start_idx + page_size
-            paginated_data = data[start_idx:end_idx]
+            paginated_data = formatted_data[start_idx:end_idx]
             
             response_data['data'] = paginated_data
             
@@ -85,7 +101,7 @@ class BaseResponseFormatter:
             if 'attributes' not in data:
                 data['attributes'] = {}
             # Move fields to attributes
-            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
             for field in fields_to_move:
                 if field in data:
                     data['attributes'][field] = data[field]
@@ -98,7 +114,7 @@ class BaseResponseFormatter:
                 data['attributes'] = {}
 
             # Move fields to attributes
-            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
             for field in fields_to_move:
                 if field in data:
                     data['attributes'][field] = data.pop(field)
@@ -136,23 +152,27 @@ class BaseResponseFormatter:
     
     def format_error_response(self, errors, status=None):
         """Format error response"""
-        # If errors is already a dict, use it directly
+        error_list = []
+        
+        # Convert errors to a list of error objects
         if isinstance(errors, dict):
-            error_data = errors
-        # If errors is a list, convert it to a dict
+            for key, value in errors.items():
+                if isinstance(value, list):
+                    for error in value:
+                        error_list.append({'detail': f"{key}: {error}"})
+                else:
+                    error_list.append({'detail': f"{key}: {value}"})
         elif isinstance(errors, list):
-            error_data = {}
             for error in errors:
                 if isinstance(error, dict):
-                    error_data.update(error)
+                    error_list.append({'detail': str(error)})
                 else:
-                    error_data['detail'] = error
-        # If errors is a string or other type, wrap it in a dict
+                    error_list.append({'detail': str(error)})
         else:
-            error_data = {'detail': errors}
+            error_list.append({'detail': str(errors)})
         
         response_data = {
-            'errors': error_data,
+            'errors': error_list,
             'meta': {},
             'links': {}
         }

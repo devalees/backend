@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 from Apps.rbac.models import Role, Permission
 from Apps.entity.models import Organization, Department, Team, TeamMember
 import django
+from datetime import datetime
 
 # Add the project root to the Python path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,8 +21,17 @@ def client():
     return APIClient()
 
 @pytest.fixture
+def api_client(user):
+    """Create an authenticated API client"""
+    client = APIClient()
+    client.force_authenticate(user=user)
+    return client
+
+@pytest.fixture
 def organization():
-    return Organization.objects.create(name='Test Organization')
+    """Create a test organization with a unique name"""
+    unique_name = f'Test Organization {datetime.now().timestamp()}'
+    return Organization.objects.create(name=unique_name)
 
 @pytest.fixture
 def user(organization):
@@ -48,7 +58,8 @@ def user(organization):
     TeamMember.objects.create(
         team=team,
         user=user,
-        role=TeamMember.Role.MEMBER
+        role=TeamMember.Role.MEMBER,
+        is_active=True  # Make sure the team membership is active
     )
     
     return user
@@ -80,9 +91,9 @@ def user_role(organization, user, role):
 
 @pytest.fixture
 def test_organization():
-    """Create a test organization"""
-    # This will be replaced with actual Organization model when implemented
-    return {'id': 1, 'name': 'Test Organization'}
+    """Create a test organization with a unique name"""
+    unique_name = f'Test Organization {datetime.now().timestamp()}'
+    return Organization.objects.create(name=unique_name)
 
 @pytest.fixture(autouse=True)
 def clear_cache():
