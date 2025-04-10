@@ -173,10 +173,10 @@
 - [x] Add resource access caching
   - [x] Implemented permission caching
   - [x] Added cache invalidation
-- [ ] Create resource access API endpoints
-  - [ ] Add CRUD endpoints
-  - [ ] Implement access management endpoints
-  - [ ] Add sharing endpoints
+- [x] Create resource access API endpoints
+  - [x] Add CRUD endpoints
+  - [x] Implement access management endpoints
+  - [x] Add sharing endpoints
 - [ ] Add resource access documentation
   - [ ] Add model documentation
   - [ ] Create API documentation
