@@ -177,9 +177,9 @@
   - [x] Add CRUD endpoints
   - [x] Implement access management endpoints
   - [x] Add sharing endpoints
-- [ ] Add resource access documentation
-  - [ ] Add model documentation
-  - [ ] Create API documentation
+- [x] Add resource access documentation
+  - [x] Add model documentation
+  - [x] Create API documentation
 - [x] Implement resource access tests
   - [x] Added model tests
   - [x] Created access tests
