@@ -151,7 +151,7 @@ class BaseResponseFormatter:
         return Response(response_data, status=status)
     
     def format_error_response(self, errors, status=None):
-        """Format error response"""
+        """Format error response according to JSON:API specification"""
         error_list = []
         
         # Convert errors to a list of error objects
@@ -159,17 +159,34 @@ class BaseResponseFormatter:
             for key, value in errors.items():
                 if isinstance(value, list):
                     for error in value:
-                        error_list.append({'detail': f"{key}: {error}"})
+                        error_list.append({
+                            'status': str(status or '400'),
+                            'source': {'pointer': f"/data/attributes/{key}"},
+                            'detail': error
+                        })
                 else:
-                    error_list.append({'detail': f"{key}: {value}"})
+                    error_list.append({
+                        'status': str(status or '400'),
+                        'source': {'pointer': f"/data/attributes/{key}"},
+                        'detail': value
+                    })
         elif isinstance(errors, list):
             for error in errors:
                 if isinstance(error, dict):
-                    error_list.append({'detail': str(error)})
+                    error_list.append({
+                        'status': str(status or '400'),
+                        'detail': str(error.get('detail', error))
+                    })
                 else:
-                    error_list.append({'detail': str(error)})
+                    error_list.append({
+                        'status': str(status or '400'),
+                        'detail': str(error)
+                    })
         else:
-            error_list.append({'detail': str(errors)})
+            error_list.append({
+                'status': str(status or '400'),
+                'detail': str(errors)
+            })
         
         response_data = {
             'errors': error_list,

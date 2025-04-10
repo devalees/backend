@@ -2,7 +2,8 @@ import pytest
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from Apps.rbac.models import Resource
-from Apps.entity.models import Organization
+from Apps.entity.models import Organization, Department, Team, TeamMember
+from datetime import datetime
 
 User = get_user_model()
 
@@ -24,14 +25,27 @@ class TestResourceAPI:
         client.force_authenticate(user=test_user)
         url = reverse('rbac:resource-list')
         data = {
-            'name': 'Test Resource',
-            'description': 'Test Description',
-            'organization': test_organization.id,
-            'resource_type': 'document'
+            'data': {
+                'type': 'resources',
+                'attributes': {
+                    'name': 'Test Resource',
+                    'resource_type': 'document',
+                    'is_active': True
+                },
+                'relationships': {
+                    'organization': {
+                        'data': {
+                            'type': 'organizations',
+                            'id': str(test_organization.id)
+                        }
+                    }
+                }
+            }
         }
-        response = client.post(url, data, content_type='application/json')
+        response = client.post(url, data, format='json')
+        print(f"Create response content: {response.content}")  # Debug print
         assert response.status_code == 201
-        assert response.data['data']['attributes']['name'] == data['name']
+        assert response.data['data']['attributes']['name'] == data['data']['attributes']['name']
     
     def test_resource_retrieve_endpoint(self, api_client, test_resource):
         """Test that resource can be retrieved via API"""
@@ -41,8 +55,28 @@ class TestResourceAPI:
         assert response.status_code == 200
         assert response.data['data']['attributes']['name'] == test_resource.name
     
-    def test_resource_update_endpoint(self, client, test_organization, test_user):
+    def test_resource_update_endpoint(self, client, organization, test_user):
         """Test that resource can be updated via API"""
+        # Create a department for the test organization
+        department = Department.objects.create(
+            name=f'Test Department {datetime.now().timestamp()}',
+            organization=organization
+        )
+        
+        # Create a team in the department
+        team = Team.objects.create(
+            name=f'Test Team {datetime.now().timestamp()}',
+            department=department
+        )
+        
+        # Create a team membership to associate the user with the test organization
+        TeamMember.objects.create(
+            team=team,
+            user=test_user,
+            role=TeamMember.Role.MEMBER,
+            is_active=True
+        )
+        
         client.force_authenticate(user=test_user)
         # First create a resource
         create_url = reverse('rbac:resource-list')
@@ -51,35 +85,49 @@ class TestResourceAPI:
                 'type': 'resources',
                 'attributes': {
                     'name': 'Original Resource',
-                    'description': 'Original Description',
                     'resource_type': 'document',
-                    'organization': test_organization.id,
                     'is_active': True
+                },
+                'relationships': {
+                    'organization': {
+                        'data': {
+                            'type': 'organizations',
+                            'id': str(organization.id)
+                        }
+                    }
                 }
             }
         }
         create_response = client.post(create_url, create_data, format='json')
+        print(f"Create response content: {create_response.content}")  # Debug print
         assert create_response.status_code == 201
         resource_id = create_response.data['data']['id']
 
-        # Now update it
-        url = reverse('rbac:resource-detail', kwargs={'pk': resource_id})
+        # Update the resource
+        update_url = reverse('rbac:resource-detail', kwargs={'pk': resource_id})
         update_data = {
             'data': {
                 'type': 'resources',
-                'id': str(resource_id),
+                'id': resource_id,
                 'attributes': {
                     'name': 'Updated Resource',
-                    'description': 'Updated Description',
                     'resource_type': 'document',
-                    'organization': test_organization.id,
                     'is_active': True
+                },
+                'relationships': {
+                    'organization': {
+                        'data': {
+                            'type': 'organizations',
+                            'id': str(organization.id)
+                        }
+                    }
                 }
             }
         }
-        response = client.put(url, update_data, format='json')
-        assert response.status_code == 200
-        assert response.data['data']['attributes']['name'] == 'Updated Resource'
+        update_response = client.put(update_url, update_data, format='json')
+        print(f"Update response content: {update_response.content}")  # Debug print
+        assert update_response.status_code == 200
+        assert update_response.data['data']['attributes']['name'] == update_data['data']['attributes']['name']
     
     def test_resource_delete_endpoint(self, api_client, test_resource):
         """Test that resource can be deleted via API"""

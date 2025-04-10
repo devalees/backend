@@ -179,9 +179,37 @@ class ResourceViewSet(viewsets.ModelViewSet):
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         return formatter.format_detail_response(serializer.data)
     
+    def _extract_json_api_data(self, request_data):
+        """Extract data from JSON:API format"""
+        if not isinstance(request_data, dict) or 'data' not in request_data:
+            return request_data
+            
+        data = request_data['data']
+        if not isinstance(data, dict):
+            return request_data
+            
+        result = {}
+        
+        # Extract attributes
+        if 'attributes' in data:
+            result.update(data['attributes'])
+            
+        # Extract relationships
+        if 'relationships' in data:
+            for field, value in data['relationships'].items():
+                if isinstance(value, dict) and 'data' in value:
+                    rel_data = value['data']
+                    if isinstance(rel_data, dict) and 'id' in rel_data:
+                        result[field] = rel_data['id']
+                    elif isinstance(rel_data, list):
+                        result[field] = [item['id'] for item in rel_data if isinstance(item, dict) and 'id' in item]
+                        
+        return result
+    
     def create(self, request, *args, **kwargs):
         """Create resource with formatted response"""
-        serializer = self.get_serializer(data=request.data)
+        data = self._extract_json_api_data(request.data)
+        serializer = self.get_serializer(data=data)
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         try:
             serializer.is_valid(raise_exception=True)
@@ -194,7 +222,8 @@ class ResourceViewSet(viewsets.ModelViewSet):
         """Update resource with formatted response"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        data = self._extract_json_api_data(request.data)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         try:
             serializer.is_valid(raise_exception=True)
