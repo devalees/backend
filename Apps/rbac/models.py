@@ -481,29 +481,32 @@ class ResourceAccess(RBACBaseModel):
 
     def clean(self):
         """Validate resource access data"""
-        super().clean()
+        if not self.resource:
+            raise ValidationError("Resource is required")
+        if not self.user:
+            raise ValidationError("User is required")
+        if not self.access_type:
+            raise ValidationError("Access type is required")
         
         # Validate access type
         valid_access_types = ['read', 'write', 'delete', 'admin']
         if self.access_type not in valid_access_types:
             raise ValidationError({
-                'access_type': _('Invalid access type. Must be one of: %(valid_types)s') % {
-                    'valid_types': ', '.join(valid_access_types)
-                }
+                'access_type': f'Invalid access type. Must be one of: {", ".join(valid_access_types)}'
             })
         
-        # Validate resource organization
+        # Check if the resource belongs to the same organization
         if self.resource.organization != self.organization:
-            raise ValidationError({
-                'resource': _('Resource must belong to the same organization')
-            })
+            raise ValidationError("Resource must belong to the same organization")
         
-        # Validate user organization
-        from Apps.entity.models import TeamMember
-        if not TeamMember.objects.filter(user=self.user, team__department__organization=self.organization).exists():
-            raise ValidationError({
-                'user': _('User must belong to the organization')
-            })
+        # Check if the user belongs to the organization
+        user_teams = TeamMember.objects.filter(
+            user=self.user,
+            team__department__organization=self.organization,
+            is_active=True
+        )
+        if not user_teams.exists():
+            raise ValidationError("User must belong to the organization")
 
     def deactivate(self):
         """Deactivate this access entry"""
@@ -516,3 +519,105 @@ class ResourceAccess(RBACBaseModel):
         self.is_active = True
         self.deactivated_at = None
         self.save()
+
+class OrganizationContext(RBACBaseModel):
+    """
+    Model representing an organization context in the RBAC system.
+    Organization contexts provide a way to group and organize resources within an organization.
+    """
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+    is_active = models.BooleanField(default=True)
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        app_label = 'rbac'
+        unique_together = ('name', 'organization')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.organization.name})"
+
+    def clean(self):
+        """Validate organization context data"""
+        if not self.name:
+            raise ValidationError("Name is required")
+        
+        # Check for duplicate names within the same organization
+        if OrganizationContext.objects.exclude(pk=self.pk).filter(
+            name=self.name,
+            organization=self.organization
+        ).exists():
+            raise ValidationError("An organization context with this name already exists in the organization")
+        
+        # Check if parent belongs to the same organization
+        if self.parent and self.parent.organization != self.organization:
+            raise ValidationError("Parent context must belong to the same organization")
+        
+        # Check for circular references
+        if self.parent:
+            current = self.parent
+            while current:
+                if current == self:
+                    raise ValidationError("Circular reference detected in parent-child relationship")
+                current = current.parent
+
+    def save(self, *args, **kwargs):
+        """Save the organization context and validate data"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Soft delete the organization context"""
+        self.is_active = False
+        self.deactivated_at = timezone.now()
+        self.save()
+
+    def hard_delete(self):
+        """Hard delete the organization context"""
+        super().delete()
+
+    def deactivate(self):
+        """Deactivate the organization context"""
+        self.is_active = False
+        self.deactivated_at = timezone.now()
+        self.save()
+
+    def activate(self):
+        """Activate the organization context"""
+        self.is_active = True
+        self.deactivated_at = None
+        self.save()
+
+    def get_ancestors(self):
+        """Get all ancestors of this context"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+
+    def get_descendants(self):
+        """Get all descendants of this context"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+
+    def get_all_children(self):
+        """Get all direct children of this context"""
+        return list(self.children.all())
+
+    def get_all_parents(self):
+        """Get all direct parents of this context"""
+        return [self.parent] if self.parent else []
