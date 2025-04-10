@@ -109,6 +109,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.username
 
+    @property
+    def organization(self):
+        """Get the user's organization through their team membership"""
+        team_membership = self.team_memberships.filter(is_active=True).first()
+        if team_membership:
+            return team_membership.team.department.organization
+        return None
+
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"
 

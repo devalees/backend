@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'import_export',  # Django Import Export base package
     'django_celery_results',  # Celery results backend
     'django_celery_beat',  # Celery beat scheduler
+    'drf_spectacular',  # OpenAPI schema generation
     'Core',  # Core app
     'Apps.core',
     'Apps.users',
@@ -56,6 +57,7 @@ INSTALLED_APPS = [
     'Apps.documents',  # Document Management System
     'Apps.automation.apps.AutomationConfig',  # Workflow Automation System
     'Apps.communication',  # Communication app
+    'Apps.rbac.apps.RbacConfig',  # RBAC app
 ]
 
 MIDDLEWARE = [
@@ -162,7 +164,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # Celery Configuration
@@ -338,15 +340,12 @@ CHANNEL_LAYERS = {
 
 # Cache Configuration
 CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'RETRY_ON_TIMEOUT': True,
-            'MAX_CONNECTIONS': 1000,
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+>>>>>>> origin/v1.0
         }
     }
 }
@@ -360,3 +359,62 @@ SESSION_CACHE_ALIAS = 'default'
 
 # Cache key prefix to avoid collisions
 CACHE_KEY_PREFIX = 'api'
+
+# Rate limiting settings
+RATE_LIMIT_ENABLED = True
+RATE_LIMIT_REQUESTS = 100  # Number of requests allowed per window
+RATE_LIMIT_WINDOW = 60  # Time window in seconds
+RATE_LIMIT_CACHE_PREFIX = 'rate_limit:'
+
+# Rate limit headers
+RATE_LIMIT_HEADERS = {
+    'X-RateLimit-Limit': 'X-RateLimit-Limit',
+    'X-RateLimit-Remaining': 'X-RateLimit-Remaining',
+    'X-RateLimit-Reset': 'X-RateLimit-Reset',
+    'Retry-After': 'Retry-After'
+}
+
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Project Management API',
+    'DESCRIPTION': 'API for project management system with RBAC and rate limiting',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/v1',
+    'SCHEMA_PATH_PREFIX_TRIM': True,
+    'SERVERS': [
+        {'url': 'http://localhost:8000', 'description': 'Local Development Server'},
+    ],
+    'TAGS': [
+        {'name': 'roles', 'description': 'Role management endpoints'},
+        {'name': 'permissions', 'description': 'Permission management endpoints'},
+        {'name': 'user-roles', 'description': 'User-role assignment endpoints'},
+    ],
+    'SECURITY': [
+        {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'Enter your bearer token in the format: Bearer <token>'
+            }
+        }
+    ],
+    'COMPONENTS': {
+        'headers': {
+            'x-rate-limit': {
+                'description': 'Rate limit quota',
+                'schema': {'type': 'integer'}
+            },
+            'x-rate-limit-remaining': {
+                'description': 'Remaining rate limit quota',
+                'schema': {'type': 'integer'}
+            },
+            'x-rate-limit-reset': {
+                'description': 'Rate limit reset time',
+                'schema': {'type': 'string', 'format': 'date-time'}
+            }
+        }
+    }
+}

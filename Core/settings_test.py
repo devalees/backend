@@ -14,6 +14,10 @@ class DisableMigrations:
         return True
 
     def __getitem__(self, item):
+        if item == 'entity':
+            return 'entity.migrations'
+        if item == 'rbac':
+            return 'rbac.migrations'
         return None
 
 MIGRATION_MODULES = DisableMigrations()
@@ -70,4 +74,5 @@ INSTALLED_APPS = [
     'Apps.documents',  # Document Management System
     'Apps.automation.apps.AutomationConfig',  # Workflow Automation System
     'Apps.communication',  # Communication app
+    'Apps.rbac',  # RBAC app
 ]
