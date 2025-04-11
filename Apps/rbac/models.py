@@ -619,5 +619,5 @@ class OrganizationContext(RBACBaseModel):
         return list(self.children.all())
 
     def get_all_parents(self):
-        """Get all direct parents of this context"""
-        return [self.parent] if self.parent else []
+        """Get all parents of this context (including ancestors)"""
+        return self.get_ancestors()
