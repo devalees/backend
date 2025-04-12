@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .models import UserRole, Role, Permission
+from .models import UserRole, Role, Permission, OrganizationContext
 from Apps.users.models import User
 from django.db import models
 from django.contrib.auth import get_user_model
 from Apps.entity.models import Organization
+from Apps.rbac.models import Resource, ResourceAccess, Audit
 
 class JsonApiRelatedField(serializers.PrimaryKeyRelatedField):
     """Custom field for JSON:API relationships"""
@@ -336,3 +337,354 @@ class PermissionSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
             )
 
         return data 
+
+class ResourceSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for Resource model"""
+    owner = JsonApiRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='users'
+    )
+    parent = JsonApiRelatedField(
+        queryset=Resource.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='resources'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    
+    class Meta:
+        model = Resource
+        resource_name = 'resources'
+        fields = [
+            'id', 'name', 'resource_type', 'owner', 'parent',
+            'organization', 'is_active', 'metadata', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_name(self, value):
+        """Validate resource name"""
+        if not value:
+            raise serializers.ValidationError("Resource name cannot be empty")
+        return value
+    
+    def validate_resource_type(self, value):
+        """Validate resource type"""
+        if not value:
+            raise serializers.ValidationError("Resource type cannot be empty")
+        return value
+    
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization cannot be empty")
+        return value
+    
+    def validate(self, data):
+        """Validate resource data"""
+        # Check for unique name, resource_type, and organization combination
+        if Resource.objects.filter(
+            name=data.get('name'),
+            resource_type=data.get('resource_type'),
+            organization=data.get('organization')
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "A resource with this name and type already exists in this organization"
+            )
+        
+        return data
+
+class ResourceAccessSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for ResourceAccess model"""
+    resource = JsonApiRelatedField(
+        queryset=Resource.objects.all(),
+        resource_name='resources'
+    )
+    user = JsonApiRelatedField(
+        queryset=User.objects.all(),
+        resource_name='users'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    
+    class Meta:
+        model = ResourceAccess
+        resource_name = 'resource_accesses'
+        fields = [
+            'id', 'resource', 'user', 'organization', 'access_type',
+            'is_active', 'deactivated_at', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+    
+    def validate_access_type(self, value):
+        """Validate access type"""
+        valid_types = ['read', 'write', 'admin']
+        if value not in valid_types:
+            raise serializers.ValidationError(f"Access type must be one of: {', '.join(valid_types)}")
+        return value
+    
+    def validate_organization(self, value):
+        """Validate organization"""
+        if not value:
+            raise serializers.ValidationError("Organization cannot be empty")
+        return value
+    
+    def validate(self, data):
+        """Validate resource access data"""
+        # Check for unique resource, user, access_type, and organization combination
+        if ResourceAccess.objects.filter(
+            resource=data.get('resource'),
+            user=data.get('user'),
+            access_type=data.get('access_type'),
+            organization=data.get('organization')
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError(
+                "This access entry already exists"
+            )
+        
+        # Ensure resource and user belong to the same organization
+        if data.get('resource') and data.get('user') and data.get('organization'):
+            if data['resource'].organization != data['organization']:
+                raise serializers.ValidationError(
+                    "Resource must belong to the same organization"
+                )
+            
+            # Check if user belongs to the organization
+            if not data['user'].team_memberships.filter(team__department__organization=data['organization']).exists():
+                raise serializers.ValidationError(
+                    "User must belong to the same organization"
+                )
+        
+        return data
+
+class ResourceAccessUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating ResourceAccess model"""
+    
+    class Meta:
+        model = ResourceAccess
+        fields = ['access_type', 'notes']
+        read_only_fields = ['resource', 'user', 'organization']
+    
+    def validate_access_type(self, value):
+        """Validate access type"""
+        if not value:
+            raise serializers.ValidationError("Access type is required")
+        return value
+    
+    def update(self, instance, validated_data):
+        """Update the resource access"""
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+class OrganizationContextSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for OrganizationContext model"""
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    parent = JsonApiRelatedField(
+        queryset=OrganizationContext.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='organization_contexts'
+    )
+
+    class Meta:
+        model = OrganizationContext
+        resource_name = 'organization_contexts'
+        fields = [
+            'id', 'name', 'description', 'organization', 'parent',
+            'is_active', 'deactivated_at', 'metadata', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['parent'].queryset = OrganizationContext.objects.all()
+
+    def validate_name(self, value):
+        """Validate name field"""
+        if not value:
+            raise serializers.ValidationError({
+                'source': {'pointer': '/data/attributes/name'},
+                'detail': "Name is required"
+            })
+        return value
+
+    def validate_description(self, value):
+        """Validate description field"""
+        return value
+
+    def validate_organization(self, value):
+        """Validate organization field"""
+        if not value:
+            raise serializers.ValidationError({
+                'source': {'pointer': '/data/attributes/organization'},
+                'detail': "Organization is required"
+            })
+        return value
+
+    def validate(self, data):
+        """Validate the data"""
+        # Extract data from JSON:API format if needed
+        if isinstance(self.initial_data, dict) and 'data' in self.initial_data:
+            json_api_data = self.initial_data['data']
+            if 'attributes' in json_api_data:
+                name = json_api_data['attributes'].get('name')
+            else:
+                name = data.get('name')
+            
+            if 'relationships' in json_api_data:
+                organization_data = json_api_data['relationships'].get('organization', {}).get('data', {})
+                organization_id = organization_data.get('id') if organization_data else None
+                if organization_id:
+                    organization = Organization.objects.get(id=organization_id)
+                else:
+                    organization = data.get('organization')
+                
+                parent_data = json_api_data['relationships'].get('parent', {}).get('data', {})
+                parent_id = parent_data.get('id') if parent_data else None
+                if parent_id:
+                    parent = OrganizationContext.objects.get(id=parent_id)
+                else:
+                    parent = data.get('parent')
+            else:
+                organization = data.get('organization')
+                parent = data.get('parent')
+        else:
+            name = data.get('name')
+            organization = data.get('organization')
+            parent = data.get('parent')
+
+        # Check for duplicate names within the same organization
+        if self.instance:
+            if OrganizationContext.objects.exclude(pk=self.instance.pk).filter(
+                name=name,
+                organization=organization
+            ).exists():
+                raise serializers.ValidationError({
+                    'name': [{
+                        'source': {'pointer': '/data/attributes/name'},
+                        'detail': "An organization context with this name already exists in the organization"
+                    }]
+                })
+        else:
+            if OrganizationContext.objects.filter(
+                name=name,
+                organization=organization
+            ).exists():
+                raise serializers.ValidationError({
+                    'name': [{
+                        'source': {'pointer': '/data/attributes/name'},
+                        'detail': "An organization context with this name already exists in the organization"
+                    }]
+                })
+        
+        # Check if parent belongs to the same organization
+        if parent and parent.organization != organization:
+            raise serializers.ValidationError({
+                'parent': [{
+                    'source': {'pointer': '/data/relationships/parent'},
+                    'detail': "Parent context must belong to the same organization"
+                }]
+            })
+        
+        # Check for circular references
+        if parent:
+            current = parent
+            while current:
+                if current == self.instance:
+                    raise serializers.ValidationError({
+                        'parent': [{
+                            'source': {'pointer': '/data/relationships/parent'},
+                            'detail': "Circular reference detected in parent-child relationship"
+                        }]
+                    })
+                current = current.parent
+        
+        return data
+
+    def create(self, validated_data):
+        """Create a new organization context"""
+        # Extract data from JSON:API format if needed
+        if isinstance(self.initial_data, dict) and 'data' in self.initial_data:
+            json_api_data = self.initial_data['data']
+            if 'attributes' in json_api_data:
+                validated_data.update(json_api_data['attributes'])
+            
+            if 'relationships' in json_api_data:
+                organization_data = json_api_data['relationships'].get('organization', {}).get('data', {})
+                if organization_data and 'id' in organization_data:
+                    validated_data['organization'] = Organization.objects.get(id=organization_data['id'])
+                
+                parent_data = json_api_data['relationships'].get('parent', {}).get('data', {})
+                if parent_data and 'id' in parent_data:
+                    validated_data['parent'] = OrganizationContext.objects.get(id=parent_data['id'])
+                elif parent_data is None:
+                    validated_data['parent'] = None
+        
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """Update an organization context"""
+        # Extract data from JSON:API format if needed
+        if isinstance(self.initial_data, dict) and 'data' in self.initial_data:
+            json_api_data = self.initial_data['data']
+            if 'attributes' in json_api_data:
+                validated_data.update(json_api_data['attributes'])
+            
+            if 'relationships' in json_api_data:
+                organization_data = json_api_data['relationships'].get('organization', {}).get('data', {})
+                if organization_data and 'id' in organization_data:
+                    validated_data['organization'] = Organization.objects.get(id=organization_data['id'])
+                
+                parent_data = json_api_data['relationships'].get('parent', {}).get('data', {})
+                if parent_data and 'id' in parent_data:
+                    validated_data['parent'] = OrganizationContext.objects.get(id=parent_data['id'])
+                elif parent_data is None:
+                    validated_data['parent'] = None
+        
+        return super().update(instance, validated_data)
+
+class AuditSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
+    """Serializer for Audit model"""
+    user = JsonApiRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True,
+        resource_name='users'
+    )
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+
+    class Meta:
+        model = Audit
+        resource_name = 'audits'
+        fields = [
+            'id', 'user', 'organization', 'action', 'resource_type', 'resource_id',
+            'details', 'status', 'timestamp', 'ip_address', 'user_agent', 'session_id',
+            'retention_period', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_retention_period(self, value):
+        """Validate retention period"""
+        if value < 1:
+            raise serializers.ValidationError("Retention period must be at least 1 day")
+        return value
+
+    def validate_organization(self, value):
+        """Validate organization"""
+        if self.context['request'].user.organization != value:
+            raise serializers.ValidationError("Cannot create audit logs for a different organization")
+        return value 

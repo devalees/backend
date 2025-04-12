@@ -4,13 +4,11 @@ globs:
 alwaysApply: true
 ---
 # PROJECT STRUCTURE:
-- Django App Name = API
-- Django App Location = API/Apps
-- Tests Location = API/Apps/tests
+- Django App Name = Server
+- Django App Location = Apps
+- Tests Location = Apps/tests
 - Database File & Configuration Location =  Database
 - Data Location = Data
-- Frontend App Name = frontend
-
 
 
 
@@ -37,8 +35,7 @@ step 1: give a summary to what will implement
 step 2: provide a state after implementing every requirement
 
 # Github Project repo:
- - backend: https://github.com/devalees/backend.git
- - frontend: https://github.com/devalees/frontend.git
+https://github.com/devalees/backend.git
 
 
 # Project Management System Specification - Django Backend

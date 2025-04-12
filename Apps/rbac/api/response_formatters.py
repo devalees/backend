@@ -2,6 +2,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from urllib.parse import urljoin
 from django.conf import settings
+from rest_framework import serializers
 
 class BaseResponseFormatter:
     """Base class for standardizing API responses"""
@@ -27,6 +28,22 @@ class BaseResponseFormatter:
             'links': {}
         }
 
+        # Format each item in the data list
+        formatted_data = []
+        for item in data:
+            if isinstance(item, dict):
+                formatted_item = item.copy()
+                if 'attributes' not in formatted_item:
+                    formatted_item['attributes'] = {}
+                # Move fields to attributes
+                fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
+                for field in fields_to_move:
+                    if field in formatted_item:
+                        formatted_item['attributes'][field] = formatted_item[field]
+                formatted_data.append(formatted_item)
+            else:
+                formatted_data.append(item)
+
         # Add pagination metadata under meta.pagination
         if paginator:
             response_data['meta']['pagination'].update({
@@ -47,7 +64,7 @@ class BaseResponseFormatter:
                 'prev': paginator.get_previous_link()
             })
             
-            response_data['data'] = data
+            response_data['data'] = formatted_data
         else:
             # Calculate pagination metadata manually
             total_pages = max(1, (len(data) + page_size - 1) // page_size)
@@ -63,7 +80,7 @@ class BaseResponseFormatter:
             # Calculate pagination slices
             start_idx = (page_number - 1) * page_size
             end_idx = start_idx + page_size
-            paginated_data = data[start_idx:end_idx]
+            paginated_data = formatted_data[start_idx:end_idx]
             
             response_data['data'] = paginated_data
             
@@ -85,7 +102,7 @@ class BaseResponseFormatter:
             if 'attributes' not in data:
                 data['attributes'] = {}
             # Move fields to attributes
-            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
             for field in fields_to_move:
                 if field in data:
                     data['attributes'][field] = data[field]
@@ -98,7 +115,7 @@ class BaseResponseFormatter:
                 data['attributes'] = {}
 
             # Move fields to attributes
-            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id']
+            fields_to_move = ['name', 'description', 'code', 'is_active', 'created_at', 'updated_at', 'id', 'message']
             for field in fields_to_move:
                 if field in data:
                     data['attributes'][field] = data.pop(field)
@@ -106,6 +123,31 @@ class BaseResponseFormatter:
             # Add name to attributes if it exists in the instance
             if hasattr(instance, 'name'):
                 data['attributes']['name'] = instance.name
+
+            # Handle relationships
+            relationships = {}
+            for field_name, field in serializer.fields.items():
+                if isinstance(field, serializers.RelatedField):
+                    relationships[field_name] = {
+                        'data': None
+                    }
+                    related = getattr(instance, field_name, None)
+                    if related:
+                        if isinstance(field, serializers.ManyRelatedField):
+                            relationships[field_name]['data'] = [
+                                {
+                                    'type': self._get_resource_type(field.child_relation),
+                                    'id': str(item.id)
+                                }
+                                for item in related.all()
+                            ]
+                        else:
+                            relationships[field_name]['data'] = {
+                                'type': self._get_resource_type(field),
+                                'id': str(related.id)
+                            }
+            if relationships:
+                data['relationships'] = relationships
 
         response_data = {
             'data': data,
@@ -135,56 +177,141 @@ class BaseResponseFormatter:
         return Response(response_data, status=status)
     
     def format_error_response(self, errors, status=None):
-        """Format error response"""
-        # If errors is already a dict, use it directly
-        if isinstance(errors, dict):
-            error_data = errors
-        # If errors is a list, convert it to a dict
-        elif isinstance(errors, list):
-            error_data = {}
-            for error in errors:
-                if isinstance(error, dict):
-                    error_data.update(error)
-                else:
-                    error_data['detail'] = error
-        # If errors is a string or other type, wrap it in a dict
-        else:
-            error_data = {'detail': errors}
+        """Format error response according to JSON:API specification"""
+        error_list = []
         
-        response_data = {
-            'errors': error_data,
-            'meta': {},
-            'links': {}
-        }
-        return Response(response_data, status=status)
+        # Convert errors to a list of error objects
+        if isinstance(errors, dict):
+            for key, value in errors.items():
+                if isinstance(value, list):
+                    for error in value:
+                        # Handle pre-formatted errors
+                        if isinstance(error, dict) and 'source' in error:
+                            error_list.append({
+                                'status': str(status or '400'),
+                                'source': error['source'],
+                                'title': 'Validation Error',
+                                'detail': error['detail']
+                            })
+                        # Handle unique constraint violations
+                        elif key == 'non_field_errors' and 'unique set' in str(error):
+                            fields = str(error).split('fields ')[1].split(' must')[0].split(', ')
+                            for field in fields:
+                                error_list.append({
+                                    'status': str(status or '400'),
+                                    'source': {'pointer': f"/data/attributes/{field}"},
+                                    'title': 'Validation Error',
+                                    'detail': str(error)
+                                })
+                        # Handle relationship errors
+                        elif key in ['parent', 'organization', 'user', 'role', 'resource']:
+                            error_list.append({
+                                'status': str(status or '400'),
+                                'source': {'pointer': f"/data/relationships/{key}"},
+                                'title': 'Validation Error',
+                                'detail': str(error)
+                            })
+                        # Handle other field errors
+                        else:
+                            pointer = f"/data/attributes/{key}"
+                            if key.startswith('relationships.'):
+                                field = key.split('.')[1]
+                                pointer = f"/data/relationships/{field}"
+                            error_list.append({
+                                'status': str(status or '400'),
+                                'source': {'pointer': pointer},
+                                'title': 'Validation Error',
+                                'detail': str(error)
+                            })
+                else:
+                    # Handle pre-formatted errors
+                    if isinstance(value, dict) and 'source' in value:
+                        error_list.append({
+                            'status': str(status or '400'),
+                            'source': value['source'],
+                            'title': 'Validation Error',
+                            'detail': value['detail']
+                        })
+                    # Handle relationship errors
+                    elif key in ['parent', 'organization', 'user', 'role', 'resource']:
+                        error_list.append({
+                            'status': str(status or '400'),
+                            'source': {'pointer': f"/data/relationships/{key}"},
+                            'title': 'Validation Error',
+                            'detail': str(value)
+                        })
+                    # Handle other field errors
+                    else:
+                        pointer = f"/data/attributes/{key}"
+                        if key.startswith('relationships.'):
+                            field = key.split('.')[1]
+                            pointer = f"/data/relationships/{field}"
+                        error_list.append({
+                            'status': str(status or '400'),
+                            'source': {'pointer': pointer},
+                            'title': 'Validation Error',
+                            'detail': str(value)
+                        })
+        elif isinstance(errors, list):
+            for error in errors:
+                # Handle pre-formatted errors
+                if isinstance(error, dict) and 'source' in error:
+                    error_list.append({
+                        'status': str(status or '400'),
+                        'source': error['source'],
+                        'title': 'Validation Error',
+                        'detail': error['detail']
+                    })
+                else:
+                    error_list.append({
+                        'status': str(status or '400'),
+                        'source': {'pointer': '/data/attributes/non_field_errors'},
+                        'title': 'Validation Error',
+                        'detail': str(error)
+                    })
+        else:
+            error_list.append({
+                'status': str(status or '400'),
+                'source': {'pointer': '/data/attributes/non_field_errors'},
+                'title': 'Validation Error',
+                'detail': str(errors)
+            })
+
+        return Response({'errors': error_list}, status=status)
     
     def _get_page_url(self, page_number):
-        """Generate URL for a specific page"""
+        """Get URL for a specific page number"""
         if not self.request:
             return None
-            
-        query_params = self.request.GET.copy()
-        query_params['page'] = page_number
-        return f"{self.request.path}?{query_params.urlencode()}"
+        return self.request.build_absolute_uri(f'?page={page_number}')
     
     def _get_resource_type(self, serializer):
-        """Get the resource type from serializer"""
-        if hasattr(serializer, 'Meta') and hasattr(serializer.Meta, 'model'):
-            return serializer.Meta.model._meta.model_name + 's'
-        return None
+        """Get resource type from serializer"""
+        if hasattr(serializer.Meta, 'resource_name'):
+            return serializer.Meta.resource_name
+        return serializer.Meta.model._meta.model_name + 's'
     
     def _get_relationships(self, data, serializer):
-        """Get relationships from serializer"""
+        """Get relationships from serializer data"""
         relationships = {}
-        if hasattr(serializer, 'get_fields'):
-            for field_name, field in serializer.get_fields().items():
-                if hasattr(field, 'get_attribute'):
-                    value = field.get_attribute(data)
-                    if value is not None:
-                        relationships[field_name] = {
-                            'data': {
-                                'id': str(value.id),
-                                'type': self._get_resource_type(field)
+        for field_name, field in serializer.fields.items():
+            if isinstance(field, serializers.RelatedField):
+                relationships[field_name] = {
+                    'data': None
+                }
+                related = getattr(data, field_name, None)
+                if related:
+                    if isinstance(field, serializers.ManyRelatedField):
+                        relationships[field_name]['data'] = [
+                            {
+                                'type': self._get_resource_type(field.child_relation),
+                                'id': str(item.id)
                             }
+                            for item in related.all()
+                        ]
+                    else:
+                        relationships[field_name]['data'] = {
+                            'type': self._get_resource_type(field),
+                            'id': str(related.id)
                         }
         return relationships 

@@ -130,4 +130,9 @@ class TestResponseFormat:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert 'errors' in response.json()
-        assert 'name' in response.json()['errors'] 
+        # Check that the error response contains an error object with a detail field
+        error_response = response.json()['errors']
+        assert isinstance(error_response, list)
+        assert len(error_response) > 0
+        assert 'detail' in error_response[0]
+        assert 'name' in error_response[0]['detail'].lower() or 'name' in error_response[0]['source']['pointer'] 

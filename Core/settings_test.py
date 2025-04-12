@@ -53,7 +53,14 @@ MIDDLEWARE = [m for m in MIDDLEWARE if 'csrf' not in m.lower()]
 ELASTICSEARCH_DSN = 'https://localhost:9200'
 ELASTICSEARCH_USERNAME = 'elastic'
 ELASTICSEARCH_PASSWORD = 'Hgdshv@6281'
-ELASTICSEARCH_VERIFY_CERTS = False
+ELASTICSEARCH_VERIFY_CERTS = False  # Disable certificate verification in tests
+ELASTICSEARCH_USE_SSL = True
+ELASTICSEARCH_INDEX_PREFIX = 'test_'
+# Custom SSL context for testing
+ELASTICSEARCH_SSL_CONTEXT = {
+    'check_hostname': False,
+    'verify_mode': 'CERT_NONE'
+}
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -81,4 +88,5 @@ INSTALLED_APPS = [
     'Apps.automation.apps.AutomationConfig',  # Workflow Automation System
     'Apps.communication',  # Communication app
     'Apps.rbac',  # RBAC app
+    'Apps.filtering.apps.FilteringConfig',  # Filtering app
 ]

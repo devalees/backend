@@ -1,6 +1,7 @@
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from .response_formatters import BaseResponseFormatter
+from urllib.parse import urlencode, urlparse, parse_qs
 
 class RBACPagination(PageNumberPagination):
     """Custom pagination for RBAC API responses"""
@@ -16,6 +17,19 @@ class RBACPagination(PageNumberPagination):
             data=data,
             paginator=self
         )
+
+    def replace_query_param(self, url, key, value):
+        """Replace or add a query parameter in the URL"""
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        
+        if value is None:
+            query_params.pop(key, None)
+        else:
+            query_params[key] = [str(value)]
+            
+        encoded_query = urlencode(query_params, doseq=True)
+        return url.split('?')[0] + ('?' + encoded_query if encoded_query else '')
 
     def get_first_link(self):
         """Get the URL for the first page"""
