@@ -34,6 +34,16 @@ class FilteringConfig(AppConfig):
             AdvancedFilterFactory,
             FilterTypeMapping
         )
+        from .aggregations import (
+            count_aggregation,
+            sum_aggregation,
+            avg_aggregation,
+            min_aggregation,
+            max_aggregation,
+            custom_aggregation,
+            get_aggregation,
+            aggregation_registry
+        )
         
         # Import the __init__.py module properly
         import Apps.filtering
@@ -55,4 +65,14 @@ class FilteringConfig(AppConfig):
         Apps.filtering.FilterFactory = FilterFactory
         Apps.filtering.BasicFilterFactory = BasicFilterFactory
         Apps.filtering.AdvancedFilterFactory = AdvancedFilterFactory
-        Apps.filtering.FilterTypeMapping = FilterTypeMapping 
+        Apps.filtering.FilterTypeMapping = FilterTypeMapping
+        
+        # Expose the aggregation functions
+        Apps.filtering.count_aggregation = count_aggregation
+        Apps.filtering.sum_aggregation = sum_aggregation
+        Apps.filtering.avg_aggregation = avg_aggregation
+        Apps.filtering.min_aggregation = min_aggregation
+        Apps.filtering.max_aggregation = max_aggregation
+        Apps.filtering.custom_aggregation = custom_aggregation
+        Apps.filtering.get_aggregation = get_aggregation
+        Apps.filtering.aggregation_registry = aggregation_registry 

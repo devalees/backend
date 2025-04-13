@@ -59,12 +59,12 @@
   - [x] Type mapping for automatic filter creation
 
 ### 3. Core Aggregation System
-- [ ] Implement base aggregation types
-  - [ ] Count aggregations
-  - [ ] Sum aggregations
-  - [ ] Average aggregations
-  - [ ] Min/Max aggregations
-  - [ ] Custom aggregations
+- [x] Implement base aggregation types
+  - [x] Count aggregations
+  - [x] Sum aggregations
+  - [x] Average aggregations
+  - [x] Min/Max aggregations
+  - [x] Custom aggregations
 - [ ] Create aggregation grouping system
   - [ ] Group by fields
   - [ ] Multiple aggregations

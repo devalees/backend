@@ -3,6 +3,7 @@ from django.db.models import Q, QuerySet, Sum, Avg, Min, Max, Count
 from typing import Dict, Any, List, Optional, Union, Callable
 from .base import BaseFilterableModel, BaseAggregatableModel
 from .registry import model_registry, ModelRegistry
+from .aggregations import get_aggregation
 
 class FilterableMixin:
     """
@@ -176,7 +177,7 @@ class AggregatableMixin:
         
         for field_name, agg_types in aggregations.items():
             # Check if field is aggregatable
-            if field_name not in aggregatable_fields:
+            if field_name not in aggregatable_fields and field_name != 'id':
                 raise ValueError(f"Field '{field_name}' is not aggregatable")
             
             # Handle single aggregation type
@@ -185,18 +186,11 @@ class AggregatableMixin:
             
             # Apply each aggregation type
             for agg_type in agg_types:
-                if agg_type == 'sum':
-                    agg_dict[f"{field_name}__sum"] = Sum(field_name)
-                elif agg_type == 'avg':
-                    agg_dict[f"{field_name}__avg"] = Avg(field_name)
-                elif agg_type == 'min':
-                    agg_dict[f"{field_name}__min"] = Min(field_name)
-                elif agg_type == 'max':
-                    agg_dict[f"{field_name}__max"] = Max(field_name)
-                elif agg_type == 'count':
-                    agg_dict[f"{field_name}__count"] = Count(field_name)
-                else:
-                    raise ValueError(f"Invalid aggregation type '{agg_type}' for field '{field_name}'")
+                try:
+                    # Use the new get_aggregation function
+                    agg_dict[f"{field_name}__{agg_type}"] = get_aggregation(agg_type, field_name)
+                except (KeyError, ValueError) as e:
+                    raise ValueError(f"Invalid aggregation type '{agg_type}' for field '{field_name}': {str(e)}")
         
         # Apply aggregations differently based on whether we're grouping
         if group_by:
