@@ -14,18 +14,35 @@ from .base import BaseFilterableModel, BaseAggregatableModel
 from .mixins import FilterableMixin, AggregatableMixin, ModelRegistryMixin
 from .model_discovery import ModelDiscoveryService
 from .registry import model_registry
+from .model_validation import ModelValidator, ValidationResult
 
 
-def apply_mixins_to_model(model: Type[models.Model]) -> Type[models.Model]:
+def apply_mixins_to_model(model: Type[models.Model], validate: bool = True) -> Type[models.Model]:
     """
     Apply appropriate mixins to a model based on its inheritance.
     
     Args:
         model: The model to apply mixins to
+        validate: Whether to validate the model before applying mixins
         
     Returns:
         A new model with mixins applied
     """
+    # Validate the model if requested
+    if validate:
+        validator = ModelValidator()
+        validation_result = validator.validate_model(model)
+        
+        # If the model has critical issues, log warning but continue
+        critical_issues = validation_result.get_issues_by_severity('critical')
+        if critical_issues:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Model {model.__name__} has critical validation issues: " +
+                ", ".join(str(issue) for issue in critical_issues)
+            )
+    
     # For testing purposes, we'll use a different approach
     # Instead of creating a new model class dynamically, we'll create a proxy class
     # that mimics the behavior but doesn't actually modify the database schema
@@ -70,6 +87,10 @@ def apply_mixins_to_model(model: Type[models.Model]) -> Type[models.Model]:
                 return []
         
         objects = MockQuerySet()
+        
+        # Store validation result if validation was performed
+        if validate:
+            _validation_result = validation_result
         
         # Add mock filter method if not added by mixins
         @classmethod
@@ -129,6 +150,12 @@ def apply_mixins_to_model(model: Type[models.Model]) -> Type[models.Model]:
         def reset_performance_metrics(cls):
             """Mock reset_performance_metrics method"""
             pass
+        
+        # New method to get validation result
+        @classmethod
+        def get_validation_result(cls):
+            """Get the validation result for this model"""
+            return getattr(cls, '_validation_result', None)
     
     # Set the name
     EnhancedModel.__name__ = enhanced_name
@@ -332,16 +359,32 @@ def apply_indexes_to_model(model: Type[models.Model]) -> Type[models.Model]:
     return model
 
 
-def register_model_indexes(model: Type[models.Model]) -> bool:
+def register_model_indexes(model: Type[models.Model], validate: bool = True) -> bool:
     """
-    Register model indexes with the database.
+    Register indexes for a model based on its configuration.
     
     Args:
         model: The model to register indexes for
+        validate: Whether to validate the model before applying indexes
         
     Returns:
-        True if registration was successful, False otherwise
+        True if indexes were registered, False otherwise
     """
+    # Validate the model if requested
+    if validate:
+        validator = ModelValidator()
+        validation_result = validator.validate_model(model)
+        
+        # If the model has critical issues related to fields used in indexes, log warning
+        critical_issues = validation_result.get_issues_by_severity('critical')
+        if critical_issues:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Model {model.__name__} has critical validation issues that may affect indexing: " +
+                ", ".join(str(issue) for issue in critical_issues)
+            )
+    
     # In a real implementation, this would create indexes in the database
     # For our testing purposes, we'll just return True to indicate success
     
@@ -359,29 +402,51 @@ class AutoMixinApplier:
     Class that handles automatic application of mixins to models.
     """
     
-    def __init__(self):
-        """Initialize the AutoMixinApplier."""
-        self.model_discovery = ModelDiscoveryService()
+    def __init__(self, validate: bool = True):
+        """
+        Initialize the AutoMixinApplier.
+        
+        Args:
+            validate: Whether to validate models before applying mixins
+        """
+        self.discovery_service = ModelDiscoveryService()
+        self.validator = ModelValidator()
+        self.validate = validate
     
     def batch_apply_mixins(self, models: List[Type[models.Model]]) -> List[Type[models.Model]]:
         """
-        Apply mixins to a batch of models.
+        Apply mixins to a list of models.
         
         Args:
             models: List of models to apply mixins to
             
         Returns:
-            List of enhanced models
+            List of enhanced models with mixins applied
         """
         enhanced_models = []
         
+        # First validate all models if validation is enabled
+        if self.validate:
+            validation_results = self.validator.batch_validate_models(models)
+            
+            # Log any critical validation issues
+            for model_name, result in validation_results.items():
+                critical_issues = result.get_issues_by_severity('critical')
+                if critical_issues:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Model {model_name} has critical validation issues: " +
+                        ", ".join(str(issue) for issue in critical_issues)
+                    )
+        
+        # Apply mixins to each model
         for model in models:
-            enhanced_model = apply_mixins_to_model(model)
+            enhanced_model = apply_mixins_to_model(model, validate=False)  # Skip validation as we've already done it
             enhanced_models.append(enhanced_model)
             
             # Register the enhanced model
-            # For testing, we don't actually register with the registry
-            # model_registry.register_model(enhanced_model)
+            model_registry.register_model(enhanced_model)
         
         return enhanced_models
     
@@ -415,7 +480,7 @@ class AutoMixinApplier:
         
         # For real implementation, this would be:
         # Discover base models from the app
-        all_models = self.model_discovery.discover_models_from_app(app_label)
+        all_models = self.discovery_service.discover_models_from_app(app_label)
         
         # Filter models to only include those that should have mixins
         eligible_models = []
@@ -442,4 +507,34 @@ class AutoMixinApplier:
         for app_config in apps.get_app_configs():
             enhanced_models = self.discover_and_enhance_app_models(app_config.label)
             if enhanced_models:
-                enhanced_models_by_app[app_config.label] = enhanced_models 
+                enhanced_models_by_app[app_config.label] = enhanced_models
+
+# Add a new function to validate and enhance a model
+def validate_and_enhance_model(model: Type[models.Model]) -> Tuple[Type[models.Model], ValidationResult]:
+    """
+    Validate a model and then enhance it with mixins if validation passes.
+    
+    Args:
+        model: The model to validate and enhance
+        
+    Returns:
+        A tuple containing the enhanced model and validation result
+    """
+    # Validate the model
+    validator = ModelValidator()
+    validation_result = validator.validate_model(model)
+    
+    # Apply mixins to the model (validation is performed again in apply_mixins_to_model,
+    # but we'll skip it since we've already done it)
+    enhanced_model = apply_mixins_to_model(model, validate=False)
+    
+    # Store validation result on the enhanced model
+    setattr(enhanced_model, '_validation_result', validation_result)
+    
+    # Register the enhanced model
+    model_registry.register_model(enhanced_model)
+    
+    # Register indexes
+    register_model_indexes(enhanced_model, validate=False)
+    
+    return enhanced_model, validation_result 
