@@ -45,8 +45,7 @@ INSTALLED_APPS = [
     'django_celery_results',  # Celery results backend
     'django_celery_beat',  # Celery beat scheduler
     'drf_spectacular',  # OpenAPI schema generation
-    'Core',  # Core app
-    'Apps.core',
+    'Apps.core',  # Core app
     'Apps.users',
     'Apps.entity',
     'Apps.contacts',

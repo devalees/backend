@@ -14,10 +14,7 @@ class DisableMigrations:
         return True
 
     def __getitem__(self, item):
-        if item == 'entity':
-            return 'entity.migrations'
-        if item == 'rbac':
-            return 'rbac.migrations'
+        # Return None for all apps to disable migrations
         return None
 
 MIGRATION_MODULES = DisableMigrations()
@@ -75,8 +72,7 @@ INSTALLED_APPS = [
     'import_export',  # Django Import Export base package
     'django_celery_results',  # Celery results backend
     'django_celery_beat',  # Celery beat scheduler
-    'Core',  # Core app
-    'Apps.core',
+    'Apps.core',  # Core app
     'Apps.users',
     'Apps.entity',
     'Apps.contacts',

@@ -11,6 +11,7 @@ from django.conf import settings
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 sys.path.insert(0, os.path.join(PROJECT_ROOT, 'Apps'))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, 'Core'))
 
 # Configure Django settings
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Core.settings_test')
