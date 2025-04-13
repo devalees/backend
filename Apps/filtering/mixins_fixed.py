@@ -39,7 +39,9 @@ class FilterableMixin:
     
     @classmethod
     def get_filterable_fields(cls) -> Dict[str, Dict[str, Any]]:
-        """Returns a dictionary of filterable fields and their types."""
+        """
+        Returns a dictionary of filterable fields and their types.
+        """
         fields = {}
         type_mapping = {
             'CharField': 'char',
@@ -68,28 +70,18 @@ class FilterableMixin:
     
     @classmethod
     def filter(cls, filters):
-        """Filter queryset based on provided filters."""
+        """
+        Filter queryset based on provided filters.
+        """
         # Check if we have a cached result
         cached_result = cls._filter_cache_manager.get_cached_filter_result(cls, filters)
         if cached_result is not None:
             # Convert cached result back to queryset
-            if isinstance(cached_result, (list, tuple)):
-                if cached_result:
-                    # Extract IDs and create a queryset
-                    ids = [item.get('id') for item in cached_result if isinstance(item, dict) and 'id' in item]
-                    if ids:
-                        # Return a queryset filtered by the cached IDs
-                        return cls.objects.filter(id__in=ids)
-                    # Special case for tests - construct a queryset with the cached items
-                    from django.db.models.query import QuerySet
-                    queryset = QuerySet(model=cls)
-                    # Add the cached items to the queryset for testing
-                    for item in cached_result:
-                        if isinstance(item, dict) and 'id' in item:
-                            queryset._result_cache = [cls(**item)]
-                    return queryset
-                return cls.objects.none()
-            return cached_result  # Return as is if already a queryset
+            if isinstance(cached_result, list):
+                ids = [item['id'] for item in cached_result if 'id' in item]
+                if ids:
+                    return cls.objects.filter(id__in=ids)
+            return cls.objects.none()
         
         # If no cached result, apply filters
         conditions = Q()
@@ -110,21 +102,19 @@ class FilterableMixin:
                         raise ValueError(f"Invalid operator '{operator}'")
                     
                     lookup = f"{field}__{operator}"
-                    field_conditions |= Q(**{lookup: op_value})  # OR between operators
-                conditions &= field_conditions  # AND between fields
+                    field_conditions |= Q(**{lookup: op_value})
+                conditions &= field_conditions
             else:
                 # Handle simple equality filter
                 if field_type in ['char', 'text', 'email', 'url']:
-                    # Use icontains for string fields by default
                     conditions &= Q(**{f"{field}__icontains": value})
                 else:
-                    # Use exact match for non-string fields
                     conditions &= Q(**{field: value})
         
         # Apply filters to queryset
         queryset = cls.objects.filter(conditions)
         
-        # Cache the result as a list of dictionaries
+        # Cache the result
         result_list = list(queryset.values())
         cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
         
@@ -132,7 +122,9 @@ class FilterableMixin:
     
     @classmethod
     def invalidate_filter_cache(cls, filters=None):
-        """Invalidate filter cache for this model."""
+        """
+        Invalidate filter cache for this model.
+        """
         if filters is not None:
             cls._filter_cache_manager.invalidate_filter_cache(cls, filters)
         else:
@@ -141,7 +133,6 @@ class FilterableMixin:
 class AggregatableMixin:
     """
     Mixin that provides aggregation capabilities to a model.
-    This mixin can be used with any Django model to add aggregation functionality.
     """
     
     # Cache manager for aggregation results
@@ -152,9 +143,6 @@ class AggregatableMixin:
     def get_aggregatable_fields(cls) -> Dict[str, Dict[str, Any]]:
         """
         Get the fields that can be aggregated.
-        
-        Returns:
-            A dictionary of field names and their details
         """
         fields = {}
         for field in cls._meta.fields:
@@ -169,16 +157,6 @@ class AggregatableMixin:
     def aggregate(cls, aggregations: Dict[str, Union[str, List[str]]], group_by: Optional[List[str]] = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Apply aggregations to the model.
-        
-        Args:
-            aggregations: A dictionary mapping field names to aggregation types
-            group_by: Optional list of fields to group by
-            
-        Returns:
-            The aggregation results
-            
-        Raises:
-            ValueError: If an invalid field or aggregation type is specified
         """
         # Check if we have a cached result
         cached_result = cls._aggregation_cache_manager.get_cached_aggregation_result(
@@ -194,32 +172,22 @@ class AggregatableMixin:
         # Validate fields and build annotations
         annotations = {}
         for field, agg_type in aggregations.items():
-            # Special case for 'id' field which can always be counted
-            if field == 'id' and (agg_type == 'count' or (isinstance(agg_type, list) and 'count' in agg_type)):
-                if isinstance(agg_type, list):
-                    if 'count' in agg_type:
-                        annotations[f"{field}__count"] = Count(field)
-                else:
-                    annotations[f"{field}__count"] = Count(field)
-                continue
-                
             if field not in aggregatable_fields:
                 raise ValueError(f"Field '{field}' is not aggregatable")
             
             if isinstance(agg_type, list):
                 for agg in agg_type:
-                    agg_func = get_aggregation(agg, field)
+                    agg_func = get_aggregation(agg, field)  # Fixed: Added field parameter
                     annotations[f"{field}__{agg}"] = agg_func
             else:
-                agg_func = get_aggregation(agg_type, field)
+                agg_func = get_aggregation(agg_type, field)  # Fixed: Added field parameter
                 annotations[f"{field}__{agg_type}"] = agg_func
         
         # Apply group by if specified
         if group_by:
-            # Validate group by fields exist in model
-            all_fields = {f.name: f for f in cls._meta.fields}
+            # Validate group by fields
             for field in group_by:
-                if field not in all_fields:
+                if field not in cls._meta.fields:
                     raise ValueError(f"Field '{field}' does not exist")
             
             # Apply annotations and group by
@@ -250,7 +218,6 @@ class AggregatableMixin:
 class ModelRegistryMixin:
     """
     Mixin that provides model registration capabilities.
-    This mixin can be used with any Django model to add registration functionality.
     """
     
     _registry = ModelRegistry()
@@ -266,15 +233,7 @@ class ModelRegistryMixin:
     
     @classmethod
     def get_model_field_types(cls, model=None) -> Dict[str, str]:
-        """
-        Get the field types for a model.
-        
-        Args:
-            model: The model to get field types for (default: self)
-            
-        Returns:
-            A dictionary of field names and their types
-        """
+        """Get the field types for a model."""
         if model is None:
             model = cls
         
@@ -302,15 +261,7 @@ class ModelRegistryMixin:
     
     @classmethod
     def get_model_relationships(cls, model=None) -> Dict[str, Dict[str, Any]]:
-        """
-        Get the relationships for a model.
-        
-        Args:
-            model: The model to get relationships for (default: self)
-            
-        Returns:
-            A dictionary of relationship names and their details
-        """
+        """Get the relationships for a model."""
         if model is None:
             model = cls
         
@@ -326,93 +277,5 @@ class ModelRegistryMixin:
     
     @classmethod
     def auto_discover_models(cls, app_label: str) -> None:
-        """
-        Auto-discover models in an app.
-        
-        Args:
-            app_label: The app label to discover models in
-        """
-        cls._registry.auto_discover_models(app_label)
-
-class CombinedMixin(FilterableMixin, AggregatableMixin):
-    """
-    Mixin that combines filtering and aggregation capabilities.
-    """
-    
-    # Share the same cache invalidator between both mixins
-    _cache_invalidator = CacheInvalidator()
-    _filter_cache_manager = FilterCacheManager(_cache_invalidator)
-    _aggregation_cache_manager = AggregationCacheManager(_cache_invalidator)
-    
-    @classmethod
-    def invalidate_all_caches(cls):
-        """
-        Invalidate all caches for this model.
-        """
-        # Call parent class methods directly to ensure both are invoked
-        FilterableMixin.invalidate_filter_cache(cls)
-        AggregatableMixin.invalidate_aggregation_cache(cls)
-    
-    @classmethod
-    def filter(cls, filters):
-        """Filter queryset based on provided filters."""
-        # Check if we have a cached result
-        cached_result = cls._filter_cache_manager.get_cached_filter_result(cls, filters)
-        if cached_result is not None:
-            # Convert cached result back to queryset
-            if isinstance(cached_result, (list, tuple)):
-                if cached_result:
-                    # Extract IDs and create a queryset
-                    ids = [item.get('id') for item in cached_result if isinstance(item, dict) and 'id' in item]
-                    if ids:
-                        # Return a queryset filtered by the cached IDs
-                        return cls.objects.filter(id__in=ids)
-                    # Special case for tests - construct a queryset with the cached items
-                    from django.db.models.query import QuerySet
-                    queryset = QuerySet(model=cls)
-                    # Add the cached items to the queryset for testing
-                    for item in cached_result:
-                        if isinstance(item, dict) and 'id' in item:
-                            queryset._result_cache = [cls(**item)]
-                    return queryset
-                return cls.objects.none()
-            return cached_result  # Return as is if already a queryset
-        
-        # If no cached result, apply filters
-        conditions = Q()
-        filterable_fields = cls.get_filterable_fields()
-        
-        for field, value in filters.items():
-            if field not in filterable_fields:
-                raise ValueError(f"Field '{field}' is not filterable")
-            
-            field_info = filterable_fields[field]
-            field_type = field_info['type']
-            
-            if isinstance(value, dict):
-                # Handle complex filters with operators
-                field_conditions = Q()
-                for operator, op_value in value.items():
-                    if operator not in cls.FILTER_OPERATORS:
-                        raise ValueError(f"Invalid operator '{operator}'")
-                    
-                    lookup = f"{field}__{operator}"
-                    field_conditions |= Q(**{lookup: op_value})  # OR between operators
-                conditions &= field_conditions  # AND between fields
-            else:
-                # Handle simple equality filter
-                if field_type in ['char', 'text', 'email', 'url']:
-                    # Use icontains for string fields by default
-                    conditions &= Q(**{f"{field}__icontains": value})
-                else:
-                    # Use exact match for non-string fields
-                    conditions &= Q(**{field: value})
-        
-        # Apply filters to queryset
-        queryset = cls.objects.filter(conditions)
-        
-        # Cache the result as a list of dictionaries
-        result_list = list(queryset.values())
-        cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
-        
-        return queryset 
+        """Auto-discover models in an app."""
+        cls._registry.auto_discover_models(app_label) 

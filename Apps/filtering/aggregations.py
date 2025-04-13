@@ -102,12 +102,16 @@ def get_aggregation(agg_type: str, field_name: str, **kwargs) -> Any:
         The aggregation function
         
     Raises:
-        KeyError: If the aggregation type is not found
+        ValueError: If the aggregation type is invalid or not found in registry
     """
-    if agg_type not in aggregation_registry.aggregations:
-        raise KeyError(f"Aggregation type '{agg_type}' not found in registry")
+    valid_types = aggregation_registry.aggregations.keys()
+    if agg_type not in valid_types:
+        raise ValueError(f"Invalid aggregation type '{agg_type}'. Valid types are: {', '.join(sorted(valid_types))}")
     
-    agg_func = aggregation_registry.get_aggregation(agg_type)
+    try:
+        agg_func = aggregation_registry.get_aggregation(agg_type)
+    except KeyError:
+        raise ValueError(f"Aggregation type '{agg_type}' not found in registry")
     
     if agg_type == 'custom':
         if 'expression' not in kwargs:

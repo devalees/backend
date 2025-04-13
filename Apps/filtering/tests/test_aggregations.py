@@ -121,8 +121,12 @@ class TestAggregations(TestCase):
     def test_get_aggregation_with_invalid_type(self):
         """Test getting an aggregation with an invalid type"""
         # Try to get an aggregation with an invalid type
-        with self.assertRaises(KeyError):
+        expected_message = "Invalid aggregation type 'invalid_type'. Valid types are: avg, count, custom, max, min, sum"
+        with self.assertRaises(ValueError) as context:
             get_aggregation('invalid_type', 'value')
+        
+        # Verify the error message
+        self.assertEqual(str(context.exception), expected_message)
     
     def test_get_custom_aggregation_without_expression(self):
         """Test getting a custom aggregation without an expression"""

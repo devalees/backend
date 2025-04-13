@@ -10,6 +10,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 import pyotp
 from django.conf import settings
+from django.core.cache import cache
 
 User = get_user_model()
 
@@ -342,11 +343,14 @@ class TestUserViewSet:
         secret = user.generate_2fa_secret()
         user.enable_2fa()
         
-        # Generate valid code
+        # Clear any existing cache
+        cache.clear()
+        
+        # Generate valid code and use it immediately
         totp = pyotp.TOTP(secret)
         code = totp.now()
         
-        # Disable 2FA
+        # Disable 2FA immediately after generating code
         url = reverse('users:users-disable-2fa')
         data = {'code': code}
         response = authenticated_client.post(url, data)
