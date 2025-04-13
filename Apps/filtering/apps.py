@@ -44,6 +44,12 @@ class FilteringConfig(AppConfig):
             get_aggregation,
             aggregation_registry
         )
+        from .aggregation_validation import (
+            AggregationFieldValidator,
+            AggregationTypeValidator,
+            AggregationGroupValidator,
+            AggregationValidator
+        )
         
         # Import the __init__.py module properly
         import Apps.filtering
@@ -75,4 +81,10 @@ class FilteringConfig(AppConfig):
         Apps.filtering.max_aggregation = max_aggregation
         Apps.filtering.custom_aggregation = custom_aggregation
         Apps.filtering.get_aggregation = get_aggregation
-        Apps.filtering.aggregation_registry = aggregation_registry 
+        Apps.filtering.aggregation_registry = aggregation_registry
+        
+        # Expose the aggregation validation classes
+        Apps.filtering.AggregationFieldValidator = AggregationFieldValidator
+        Apps.filtering.AggregationTypeValidator = AggregationTypeValidator
+        Apps.filtering.AggregationGroupValidator = AggregationGroupValidator
+        Apps.filtering.AggregationValidator = AggregationValidator 
