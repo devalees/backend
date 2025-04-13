@@ -2,8 +2,8 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, Communication, CommunicationTemplate, CommunicationMonitoring
-from .serializers import ContactSerializer, ContactGroupSerializer, ContactTemplateSerializer, CommunicationSerializer, CommunicationTemplateSerializer, CommunicationMonitoringSerializer
+from .models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, Communication, CommunicationTemplate, CommunicationMonitoring, ContactList
+from .serializers import ContactSerializer, ContactGroupSerializer, ContactTemplateSerializer, CommunicationSerializer, CommunicationTemplateSerializer, CommunicationMonitoringSerializer, ContactListSerializer
 from .cache_manager import ContactCache, CommunicationCache
 import logging
 
@@ -684,3 +684,56 @@ class CommunicationMonitoringViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(activity_type=activity_type)
             
         return queryset
+
+class ContactListViewSet(viewsets.ModelViewSet):
+    """ViewSet for ContactList model"""
+    queryset = ContactList.objects.all()
+    serializer_class = ContactListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter contact lists by organization"""
+        organization_id = self.request.query_params.get('organization', None)
+        if organization_id:
+            return ContactList.objects.filter(organization_id=organization_id, is_active=True)
+        return ContactList.objects.filter(is_active=True)
+    
+    def perform_create(self, serializer):
+        """Set created_by and updated_by on create"""
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+        logger.info(
+            f"Contact list created by {self.request.user.username} "
+            f"for organization {serializer.validated_data.get('organization').id}"
+        )
+    
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(updated_by=self.request.user)
+        logger.info(
+            f"Contact list {serializer.instance.id} updated by {self.request.user.username} "
+            f"for organization {serializer.instance.organization.id}"
+        )
+    
+    def perform_destroy(self, instance):
+        """Override destroy to perform soft delete"""
+        instance.delete()
+        logger.info(
+            f"Contact list {instance.id} soft-deleted by {self.request.user.username} "
+            f"for organization {instance.organization.id}"
+        )
+    
+    @action(detail=True, methods=['delete'])
+    def hard_delete(self, request, pk=None):
+        """Hard delete endpoint"""
+        instance = self.get_object()
+        instance.hard_delete()
+        
+        logger.info(
+            f"Contact list {pk} hard-deleted by {request.user.username} "
+            f"for organization {instance.organization.id}"
+        )
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -37,8 +37,8 @@
 - [x] Add communication monitoring
 
 ## 4. Contact Planning
-- [ ] Create ContactList model and migrations
-- [ ] Implement list CRUD operations
+- [x] Create ContactList model and migrations
+- [x] Implement list CRUD operations
 - [ ] Add list validation
 - [ ] Create contact segments
 - [ ] Implement list templates

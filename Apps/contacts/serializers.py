@@ -190,3 +190,59 @@ class CommunicationMonitoringSerializer(serializers.ModelSerializer):
             'created_at', 'ip_address', 'user_agent', 'metadata'
         )
         read_only_fields = ('id', 'created_at') 
+
+class ContactListSerializer(serializers.ModelSerializer):
+    """Serializer for ContactList model"""
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    contacts = ContactSerializer(many=True, read_only=True)
+    contact_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
+    class Meta:
+        from .models import ContactList
+        model = ContactList
+        fields = (
+            'id', 'name', 'description', 'organization', 'organization_name',
+            'contacts', 'contact_ids', 'is_active', 'metadata',
+            'created_at', 'updated_at', 'created_by', 'created_by_name',
+            'updated_by', 'updated_by_name'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        
+    def create(self, validated_data):
+        """Create a contact list and add contacts if provided"""
+        contact_ids = validated_data.pop('contact_ids', [])
+        contact_list = super().create(validated_data)
+        if contact_ids:
+            contact_list.contacts.set(contact_ids)
+        return contact_list
+        
+    def update(self, instance, validated_data):
+        """Update a contact list and update contacts if provided"""
+        contact_ids = validated_data.pop('contact_ids', None)
+        contact_list = super().update(instance, validated_data)
+        if contact_ids is not None:
+            contact_list.contacts.set(contact_ids)
+        return contact_list
+        
+    def validate(self, data):
+        """Validate the data"""
+        # Check that all contacts belong to the same organization if both are provided
+        if 'contact_ids' in data and 'organization' in data:
+            from .models import Contact
+            
+            contact_ids = data['contact_ids']
+            organization = data['organization']
+            
+            # Find any contacts that don't belong to the organization
+            invalid_contacts = Contact.objects.filter(
+                id__in=contact_ids
+            ).exclude(organization=organization)
+            
+            if invalid_contacts.exists():
+                raise serializers.ValidationError(
+                    {'contact_ids': 'All contacts must belong to the specified organization.'}
+                )
+        
+        return data 

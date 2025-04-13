@@ -114,4 +114,84 @@ class TestContactList:
         """Test counting contacts in a list"""
         contact_list = ContactListFactory()
         # Verify that our factory correctly creates 5 contacts
-        assert contact_list.contacts.count() == 5 
+        assert contact_list.contacts.count() == 5
+        
+    def test_update_contact_list(self):
+        """Test updating contact list attributes"""
+        contact_list = ContactListFactory()
+        original_name = contact_list.name
+        
+        # Update name
+        new_name = "Updated Contact List"
+        contact_list.name = new_name
+        contact_list.save()
+        
+        # Refresh from database
+        contact_list.refresh_from_db()
+        assert contact_list.name == new_name
+        assert contact_list.name != original_name
+        
+    def test_bulk_update_contacts(self):
+        """Test adding multiple contacts at once"""
+        contact_list = ContactListFactory(contacts=[])  # Start with no contacts
+        organization = contact_list.organization
+        
+        # Create multiple contacts
+        contacts = ContactFactory.create_batch(10, organization=organization)
+        
+        # Add all contacts at once
+        contact_list.contacts.set(contacts)
+        assert contact_list.contacts.count() == 10
+        
+        # Clear all contacts
+        contact_list.contacts.clear()
+        assert contact_list.contacts.count() == 0
+        
+    def test_metadata_field(self):
+        """Test using the metadata JSON field"""
+        contact_list = ContactListFactory()
+        
+        # Set metadata
+        test_metadata = {
+            "category": "VIP",
+            "source": "Import",
+            "tags": ["important", "follow-up"]
+        }
+        
+        contact_list.metadata = test_metadata
+        contact_list.save()
+        
+        # Refresh from database
+        contact_list.refresh_from_db()
+        
+        # Verify metadata was saved correctly
+        assert contact_list.metadata == test_metadata
+        assert contact_list.metadata["category"] == "VIP"
+        assert "important" in contact_list.metadata["tags"]
+        
+    def test_contacts_from_different_organization(self):
+        """Test validation prevents adding contacts from different organizations"""
+        contact_list = ContactListFactory()
+        other_org = OrganizationFactory()
+        other_contact = ContactFactory(organization=other_org)
+        
+        # Add contact from different organization
+        contact_list.contacts.add(other_contact)
+        
+        # Try to validate the model - should raise ValidationError
+        with pytest.raises(ValidationError):
+            contact_list.clean()
+            
+    def test_get_active_lists(self):
+        """Test filtering active versus inactive lists"""
+        org = OrganizationFactory()
+        
+        # Create active and inactive lists
+        active_list = ContactListFactory(organization=org, is_active=True)
+        inactive_list = ContactListFactory(organization=org, is_active=False)
+        
+        # Get only active lists
+        active_lists = ContactList.objects.filter(is_active=True)
+        
+        assert active_list in active_lists
+        assert inactive_list not in active_lists 
