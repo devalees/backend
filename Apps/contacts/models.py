@@ -34,6 +34,7 @@ class Contact(TaskAwareModel):
         related_name='contacts_updated'
     )
     name = models.CharField(max_length=255)
+    first_name = models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20)
     organization = models.ForeignKey(
@@ -1337,3 +1338,157 @@ class ContactList(models.Model):
                 raise ValidationError({
                     'contacts': _('All contacts must belong to the same organization as the contact list')
                 })
+
+class ContactSegment(models.Model):
+    """ContactSegment model for defining segments within a contact list based on filter criteria"""
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_segments_created'
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_segments_updated'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    contact_list = models.ForeignKey(
+        ContactList,
+        on_delete=models.CASCADE,
+        related_name='segments'
+    )
+    filter_criteria = models.JSONField(
+        help_text="JSON structure defining the filter criteria for the segment"
+    )
+    is_active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        verbose_name = 'Contact Segment'
+        verbose_name_plural = 'Contact Segments'
+        ordering = ['name']
+        unique_together = ['name', 'contact_list']
+    
+    def __str__(self):
+        return self.name
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    def hard_delete(self, user=None, request_meta=None):
+        """Permanently delete the contact segment"""
+        super().delete()
+    
+    def delete(self, *args, **kwargs):
+        """Soft delete the contact segment"""
+        self.is_active = False
+        self.save()
+    
+    def clean(self):
+        """Validate the contact segment"""
+        if not self.name:
+            raise ValidationError({'name': _('Name is required')})
+        
+        if self.contact_list is None:
+            raise ValidationError({'contact_list': _('Contact list is required')})
+        
+        # Validate filter criteria
+        if not isinstance(self.filter_criteria, dict):
+            raise ValidationError({'filter_criteria': _('Filter criteria must be a dictionary')})
+        
+        # Validate filter criteria structure
+        self._validate_filter_criteria(self.filter_criteria)
+        
+        # Validate metadata is a dictionary
+        if not isinstance(self.metadata, dict):
+            raise ValidationError({'metadata': _('Metadata must be a dictionary')})
+    
+    def _validate_filter_criteria(self, criteria):
+        """Validate the structure of filter criteria"""
+        # Check for simple criteria
+        if 'field' in criteria and 'operator' in criteria and 'value' in criteria:
+            return
+        
+        # Check for complex criteria with AND/OR operators
+        if 'operator' in criteria and criteria['operator'] in ['and', 'or']:
+            if 'criteria' not in criteria or not isinstance(criteria['criteria'], list):
+                raise ValidationError({
+                    'filter_criteria': _('Complex criteria must have a list of sub-criteria')
+                })
+            
+            # Validate each sub-criteria
+            for sub_criteria in criteria['criteria']:
+                self._validate_filter_criteria(sub_criteria)
+        else:
+            raise ValidationError({
+                'filter_criteria': _('Invalid filter criteria structure')
+            })
+    
+    def get_matching_contacts(self):
+        """Get contacts that match the filter criteria"""
+        contacts = self.contact_list.contacts.all()
+        return self._apply_filter_criteria(contacts, self.filter_criteria)
+    
+    def _apply_filter_criteria(self, contacts, criteria):
+        """Apply filter criteria to a queryset of contacts"""
+        # Handle simple criteria
+        if 'field' in criteria and 'operator' in criteria and 'value' in criteria:
+            field = criteria['field']
+            operator = criteria['operator']
+            value = criteria['value']
+            
+            if operator == 'equals':
+                return contacts.filter(**{field: value})
+            elif operator == 'contains':
+                # Use icontains for case-insensitive contains
+                return contacts.filter(**{f"{field}__icontains": value})
+            elif operator == 'startswith':
+                return contacts.filter(**{f"{field}__istartswith": value})
+            elif operator == 'endswith':
+                return contacts.filter(**{f"{field}__iendswith": value})
+            elif operator == 'gt':
+                return contacts.filter(**{f"{field}__gt": value})
+            elif operator == 'gte':
+                return contacts.filter(**{f"{field}__gte": value})
+            elif operator == 'lt':
+                return contacts.filter(**{f"{field}__lt": value})
+            elif operator == 'lte':
+                return contacts.filter(**{f"{field}__lte": value})
+            elif operator == 'in':
+                return contacts.filter(**{f"{field}__in": value})
+            else:
+                return contacts.none()
+        
+        # Handle complex criteria with AND/OR operators
+        if 'operator' in criteria and criteria['operator'] in ['and', 'or']:
+            sub_criteria = criteria['criteria']
+            
+            if not sub_criteria:
+                return contacts
+            
+            # Start with the first sub-criteria
+            result = self._apply_filter_criteria(contacts, sub_criteria[0])
+            
+            # Apply the rest of the sub-criteria
+            for sub_criteria_item in sub_criteria[1:]:
+                sub_result = self._apply_filter_criteria(contacts, sub_criteria_item)
+                
+                if criteria['operator'] == 'and':
+                    # Use filter() instead of intersection() to avoid subquery issues
+                    result = result.filter(id__in=sub_result.values_list('id', flat=True))
+                else:  # 'or'
+                    # Use union() with distinct() to avoid duplicates
+                    result = result.union(sub_result).distinct()
+            
+            return result
+        
+        return contacts.none()

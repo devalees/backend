@@ -4,7 +4,7 @@ from factory import (
     post_generation
 )
 from factory.declarations import Iterator
-from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList
+from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList, ContactSegment
 from Apps.core.tests.factories import UserFactory, BaseModelFactory
 from Apps.entity.tests.factories import OrganizationFactory, DepartmentFactory, TeamFactory
 
@@ -14,9 +14,11 @@ class ContactFactory(BaseModelFactory):
         skip_postgeneration_save = True
 
     name = Sequence(lambda n: f'Contact {n}')
-    email = LazyAttribute(lambda obj: f'contact{obj.name.lower().replace(" ", "")}@example.com')
-    phone = Sequence(lambda n: f'+1555{str(n).zfill(7)}'[:20])
+    email = Sequence(lambda n: f'contact{n}@example.com')
+    phone = Sequence(lambda n: f'+1{str(n).zfill(10)}')
     organization = SubFactory(OrganizationFactory)
+    first_name = Faker('first_name')
+    is_active = True
 
     @post_generation
     def department(self, create, extracted, **kwargs):
@@ -35,6 +37,20 @@ class ContactFactory(BaseModelFactory):
             self.team = extracted
         else:
             self.team = TeamFactory(department=self.department)
+
+    @post_generation
+    def contact_list(self, create, extracted, **kwargs):
+        if not create:
+            return
+        if extracted:
+            extracted.contacts.add(self)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override _create to ensure validation runs"""
+        instance = super()._create(model_class, *args, **kwargs)
+        instance.full_clean()
+        return instance
 
 class ContactGroupFactory(BaseModelFactory):
     class Meta:
@@ -194,36 +210,55 @@ class CommunicationMonitoringFactory(factory.django.DjangoModelFactory):
             kwargs['organization'] = kwargs['communication'].organization
         return super()._build(model_class, *args, **kwargs)
 
-class ContactListFactory(BaseModelFactory):
+class ContactListFactory(factory.django.DjangoModelFactory):
+    """Factory for ContactList model"""
+    
     class Meta:
-        model = ContactList
-        skip_postgeneration_save = True
-
-    name = Sequence(lambda n: f'Contact List {n}')
-    description = Faker('text')
-    organization = SubFactory(OrganizationFactory)
-    created_by = SubFactory(UserFactory)
-    updated_by = SubFactory(UserFactory)
-
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        if 'organization' not in kwargs:
-            from Apps.entity.models import Organization
-            if Organization.objects.exists():
-                kwargs['organization'] = Organization.objects.first()
-            else:
-                kwargs['organization'] = OrganizationFactory()
-        return super()._create(model_class, *args, **kwargs)
-
-    @post_generation
+        model = 'contacts.ContactList'
+        
+    name = factory.Sequence(lambda n: f'Contact List {n}')
+    description = factory.Faker('paragraph')
+    organization = factory.SubFactory(OrganizationFactory)
+    created_by = factory.SelfAttribute('organization.created_by')
+    updated_by = factory.SelfAttribute('organization.created_by')
+    is_active = True
+    metadata = {}
+    
+    @factory.post_generation
     def contacts(self, create, extracted, **kwargs):
+        """Add contacts to the list"""
         if not create:
+            # Build, not create
             return
+            
         if extracted:
+            # Add the specified contacts
             for contact in extracted:
                 self.contacts.add(contact)
         else:
-            # Create exactly 5 contacts by default as expected by test_contact_list_count
+            # Create exactly 5 contacts by default to match test expectations
             for _ in range(5):
                 contact = ContactFactory(organization=self.organization)
                 self.contacts.add(contact)
+
+class ContactSegmentFactory(BaseModelFactory):
+    class Meta:
+        model = ContactSegment
+        skip_postgeneration_save = True
+
+    name = Sequence(lambda n: f'Contact Segment {n}')
+    description = Faker('text')
+    contact_list = SubFactory(ContactListFactory)
+    created_by = SubFactory(UserFactory)
+    updated_by = SubFactory(UserFactory)
+    is_active = True
+    filter_criteria = LazyAttribute(lambda _: {
+        "field": "email",
+        "operator": "contains",
+        "value": "example.com"
+    })
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        manager = cls._get_manager(model_class)
+        return manager.create(*args, **kwargs)

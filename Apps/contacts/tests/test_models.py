@@ -46,19 +46,25 @@ class TestContact:
         """Test that email must be unique"""
         contact = ContactFactory()
         with pytest.raises(ValidationError):
-            ContactFactory(email=contact.email)
+            # Create a new contact with the same email
+            new_contact = ContactFactory.build(email=contact.email)
+            new_contact.full_clean()
 
     def test_contact_validation(self):
         """Test contact validation"""
         # Test invalid email
         with pytest.raises(ValidationError):
-            contact = ContactFactory(email="invalid-email")
+            contact = ContactFactory.build(email="invalid-email")
             contact.full_clean()
 
         # Test invalid phone
         with pytest.raises(ValidationError):
-            contact = ContactFactory(phone="invalid-phone")
+            contact = ContactFactory.build(phone="123")  # Too short
             contact.full_clean()
+
+        # Test valid contact
+        contact = ContactFactory()
+        contact.full_clean()  # Should not raise any errors
 
 @pytest.mark.django_db
 class TestContactGroup:

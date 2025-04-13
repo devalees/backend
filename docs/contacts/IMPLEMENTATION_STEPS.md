@@ -40,7 +40,7 @@
 - [x] Create ContactList model and migrations
 - [x] Implement list CRUD operations
 - [x] Add list validation
-- [ ] Create contact segments
+- [x] Create contact segments
 - [ ] Implement list templates
 - [ ] Add list caching
 - [ ] Create list API endpoints
