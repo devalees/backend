@@ -14,7 +14,11 @@ __all__ = [
     'FieldTypeValidator',
     'OperatorValidator',
     'ValueValidator',
-    'FilterValidator'
+    'FilterValidator',
+    'FilterFactory',
+    'BasicFilterFactory',
+    'AdvancedFilterFactory',
+    'FilterTypeMapping'
 ]
 
 # These will be populated by the AppConfig when Django is ready
@@ -30,4 +34,8 @@ FilterValidationError = None
 FieldTypeValidator = None
 OperatorValidator = None
 ValueValidator = None
-FilterValidator = None 
+FilterValidator = None
+FilterFactory = None
+BasicFilterFactory = None
+AdvancedFilterFactory = None
+FilterTypeMapping = None 

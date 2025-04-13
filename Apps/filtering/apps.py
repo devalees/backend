@@ -28,6 +28,12 @@ class FilteringConfig(AppConfig):
             ValueValidator,
             FilterValidator
         )
+        from .filter_factory import (
+            FilterFactory,
+            BasicFilterFactory,
+            AdvancedFilterFactory,
+            FilterTypeMapping
+        )
         
         # Import the __init__.py module properly
         import Apps.filtering
@@ -45,4 +51,8 @@ class FilteringConfig(AppConfig):
         Apps.filtering.FieldTypeValidator = FieldTypeValidator
         Apps.filtering.OperatorValidator = OperatorValidator
         Apps.filtering.ValueValidator = ValueValidator
-        Apps.filtering.FilterValidator = FilterValidator 
+        Apps.filtering.FilterValidator = FilterValidator
+        Apps.filtering.FilterFactory = FilterFactory
+        Apps.filtering.BasicFilterFactory = BasicFilterFactory
+        Apps.filtering.AdvancedFilterFactory = AdvancedFilterFactory
+        Apps.filtering.FilterTypeMapping = FilterTypeMapping 
