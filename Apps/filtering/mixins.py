@@ -5,6 +5,7 @@ from .base import BaseFilterableModel, BaseAggregatableModel
 from .registry import model_registry, ModelRegistry
 from .aggregations import get_aggregation
 from .caching import FilterCacheManager, AggregationCacheManager, CacheInvalidator
+from .performance_monitoring import PerformanceMonitor
 
 class FilterableMixin:
     """
@@ -37,26 +38,41 @@ class FilterableMixin:
     _cache_invalidator = CacheInvalidator()
     _filter_cache_manager = FilterCacheManager(_cache_invalidator)
     
+    # Performance monitoring
+    _performance_monitor = PerformanceMonitor()
+    
     @classmethod
     def get_filterable_fields(cls) -> Dict[str, Dict[str, Any]]:
-        """Returns a dictionary of filterable fields and their types."""
-        fields = {}
+        """
+        Get the fields that can be filtered.
+        
+        Returns:
+            A dictionary of field names and their details
+        """
+        # Type mapping for normalizing field types
         type_mapping = {
             'CharField': 'char',
             'TextField': 'text',
-            'IntegerField': 'integer',
-            'DecimalField': 'decimal',
-            'FloatField': 'float',
             'BooleanField': 'boolean',
-            'DateTimeField': 'datetime',
+            'IntegerField': 'integer',
+            'BigIntegerField': 'integer',
+            'PositiveIntegerField': 'integer',
+            'SmallIntegerField': 'integer',
+            'FloatField': 'float',
+            'DecimalField': 'decimal',
             'DateField': 'date',
+            'DateTimeField': 'datetime',
             'TimeField': 'time',
             'EmailField': 'email',
             'URLField': 'url',
-            'UUIDField': 'uuid',
-            'JSONField': 'json',
+            'FileField': 'file',
+            'ImageField': 'image',
+            'ForeignKey': 'foreignkey',
+            'ManyToManyField': 'manytomany',
+            'OneToOneField': 'onetoone'
         }
         
+        fields = {}
         for field in cls._meta.fields:
             field_type = field.get_internal_type()
             normalized_type = type_mapping.get(field_type, field_type.lower())
@@ -69,9 +85,14 @@ class FilterableMixin:
     @classmethod
     def filter(cls, filters):
         """Filter queryset based on provided filters."""
+        model_name = cls.__name__
+        
         # Check if we have a cached result
         cached_result = cls._filter_cache_manager.get_cached_filter_result(cls, filters)
         if cached_result is not None:
+            # Record cache hit in performance monitor
+            cls._performance_monitor.record_cache_hit(model_name, 'filter')
+            
             # Convert cached result back to queryset
             if isinstance(cached_result, (list, tuple)):
                 if cached_result:
@@ -91,42 +112,50 @@ class FilterableMixin:
                 return cls.objects.none()
             return cached_result  # Return as is if already a queryset
         
-        # If no cached result, apply filters
-        conditions = Q()
-        filterable_fields = cls.get_filterable_fields()
+        # Record cache miss in performance monitor
+        cls._performance_monitor.record_cache_miss(model_name, 'filter')
         
-        for field, value in filters.items():
-            if field not in filterable_fields:
-                raise ValueError(f"Field '{field}' is not filterable")
+        # Track query execution time
+        with cls._performance_monitor.track_query(model_name):
+            # If no cached result, apply filters
+            conditions = Q()
+            filterable_fields = cls.get_filterable_fields()
             
-            field_info = filterable_fields[field]
-            field_type = field_info['type']
-            
-            if isinstance(value, dict):
-                # Handle complex filters with operators
-                field_conditions = Q()
-                for operator, op_value in value.items():
-                    if operator not in cls.FILTER_OPERATORS:
-                        raise ValueError(f"Invalid operator '{operator}'")
-                    
-                    lookup = f"{field}__{operator}"
-                    field_conditions |= Q(**{lookup: op_value})  # OR between operators
-                conditions &= field_conditions  # AND between fields
-            else:
-                # Handle simple equality filter
-                if field_type in ['char', 'text', 'email', 'url']:
-                    # Use icontains for string fields by default
-                    conditions &= Q(**{f"{field}__icontains": value})
+            for field, value in filters.items():
+                if field not in filterable_fields:
+                    raise ValueError(f"Field '{field}' is not filterable")
+                
+                field_info = filterable_fields[field]
+                field_type = field_info['type']
+                
+                if isinstance(value, dict):
+                    # Handle complex filters with operators
+                    field_conditions = Q()
+                    for operator, op_value in value.items():
+                        if operator not in cls.FILTER_OPERATORS:
+                            raise ValueError(f"Invalid operator '{operator}'")
+                        
+                        lookup = f"{field}__{operator}"
+                        field_conditions |= Q(**{lookup: op_value})  # OR between operators
+                    conditions &= field_conditions  # AND between fields
                 else:
-                    # Use exact match for non-string fields
-                    conditions &= Q(**{field: value})
+                    # Handle simple equality filter
+                    if field_type in ['char', 'text', 'email', 'url']:
+                        # Use icontains for string fields by default
+                        conditions &= Q(**{f"{field}__icontains": value})
+                    else:
+                        # Use exact match for non-string fields
+                        conditions &= Q(**{field: value})
+            
+            # Apply filters to queryset
+            queryset = cls.objects.filter(conditions)
+            
+            # Cache the result as a list of dictionaries
+            result_list = list(queryset.values())
+            cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
         
-        # Apply filters to queryset
-        queryset = cls.objects.filter(conditions)
-        
-        # Cache the result as a list of dictionaries
-        result_list = list(queryset.values())
-        cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
+        # Record resource usage after query execution
+        cls._performance_monitor.record_resource_usage()
         
         return queryset
     
@@ -137,6 +166,23 @@ class FilterableMixin:
             cls._filter_cache_manager.invalidate_filter_cache(cls, filters)
         else:
             cls._filter_cache_manager.invalidate_model_filter_cache(cls)
+    
+    @classmethod
+    def get_performance_metrics(cls):
+        """
+        Get performance metrics for this model.
+        
+        Returns:
+            A dictionary of performance metrics
+        """
+        return cls._performance_monitor.get_metrics()
+    
+    @classmethod
+    def reset_performance_metrics(cls):
+        """
+        Reset performance metrics for this model.
+        """
+        cls._performance_monitor.reset_metrics()
 
 class AggregatableMixin:
     """
@@ -147,6 +193,9 @@ class AggregatableMixin:
     # Cache manager for aggregation results
     _cache_invalidator = CacheInvalidator()
     _aggregation_cache_manager = AggregationCacheManager(_cache_invalidator)
+    
+    # Performance monitoring
+    _performance_monitor = PerformanceMonitor()
     
     @classmethod
     def get_aggregatable_fields(cls) -> Dict[str, Dict[str, Any]]:
@@ -180,58 +229,70 @@ class AggregatableMixin:
         Raises:
             ValueError: If an invalid field or aggregation type is specified
         """
+        model_name = cls.__name__
+        
         # Check if we have a cached result
         cached_result = cls._aggregation_cache_manager.get_cached_aggregation_result(
             cls, aggregations, group_by
         )
         if cached_result is not None:
+            # Record cache hit in performance monitor
+            cls._performance_monitor.record_cache_hit(model_name, 'aggregate')
             return cached_result
         
-        # If no cached result, apply aggregations
-        aggregatable_fields = cls.get_aggregatable_fields()
-        queryset = cls.objects
+        # Record cache miss in performance monitor
+        cls._performance_monitor.record_cache_miss(model_name, 'aggregate')
         
-        # Validate fields and build annotations
-        annotations = {}
-        for field, agg_type in aggregations.items():
-            # Special case for 'id' field which can always be counted
-            if field == 'id' and (agg_type == 'count' or (isinstance(agg_type, list) and 'count' in agg_type)):
-                if isinstance(agg_type, list):
-                    if 'count' in agg_type:
+        # Track query execution time
+        with cls._performance_monitor.track_query(model_name):
+            # If no cached result, apply aggregations
+            aggregatable_fields = cls.get_aggregatable_fields()
+            queryset = cls.objects
+            
+            # Validate fields and build annotations
+            annotations = {}
+            for field, agg_type in aggregations.items():
+                # Special case for 'id' field which can always be counted
+                if field == 'id' and (agg_type == 'count' or (isinstance(agg_type, list) and 'count' in agg_type)):
+                    if isinstance(agg_type, list):
+                        if 'count' in agg_type:
+                            annotations[f"{field}__count"] = Count(field)
+                    else:
                         annotations[f"{field}__count"] = Count(field)
-                else:
-                    annotations[f"{field}__count"] = Count(field)
-                continue
+                    continue
+                    
+                if field not in aggregatable_fields:
+                    raise ValueError(f"Field '{field}' is not aggregatable")
                 
-            if field not in aggregatable_fields:
-                raise ValueError(f"Field '{field}' is not aggregatable")
+                if isinstance(agg_type, list):
+                    for agg in agg_type:
+                        agg_func = get_aggregation(agg, field)
+                        annotations[f"{field}__{agg}"] = agg_func
+                else:
+                    agg_func = get_aggregation(agg_type, field)
+                    annotations[f"{field}__{agg_type}"] = agg_func
             
-            if isinstance(agg_type, list):
-                for agg in agg_type:
-                    agg_func = get_aggregation(agg, field)
-                    annotations[f"{field}__{agg}"] = agg_func
+            # Apply group by if specified
+            if group_by:
+                # Validate group by fields exist in model
+                all_fields = {f.name: f for f in cls._meta.fields}
+                for field in group_by:
+                    if field not in all_fields:
+                        raise ValueError(f"Field '{field}' does not exist")
+                
+                # Apply annotations and group by
+                result = list(queryset.values(*group_by).annotate(**annotations))
             else:
-                agg_func = get_aggregation(agg_type, field)
-                annotations[f"{field}__{agg_type}"] = agg_func
-        
-        # Apply group by if specified
-        if group_by:
-            # Validate group by fields exist in model
-            all_fields = {f.name: f for f in cls._meta.fields}
-            for field in group_by:
-                if field not in all_fields:
-                    raise ValueError(f"Field '{field}' does not exist")
+                # Apply aggregations without grouping
+                result = queryset.aggregate(**annotations)
             
-            # Apply annotations and group by
-            result = list(queryset.values(*group_by).annotate(**annotations))
-        else:
-            # Apply aggregations without grouping
-            result = queryset.aggregate(**annotations)
+            # Cache the result
+            cls._aggregation_cache_manager.cache_aggregation_result(
+                cls, aggregations, group_by, result
+            )
         
-        # Cache the result
-        cls._aggregation_cache_manager.cache_aggregation_result(
-            cls, aggregations, group_by, result
-        )
+        # Record resource usage after query execution
+        cls._performance_monitor.record_resource_usage()
         
         return result
     
@@ -246,6 +307,23 @@ class AggregatableMixin:
             )
         else:
             cls._aggregation_cache_manager.invalidate_model_aggregation_cache(cls)
+    
+    @classmethod
+    def get_performance_metrics(cls):
+        """
+        Get performance metrics for this model.
+        
+        Returns:
+            A dictionary of performance metrics
+        """
+        return cls._performance_monitor.get_metrics()
+    
+    @classmethod
+    def reset_performance_metrics(cls):
+        """
+        Reset performance metrics for this model.
+        """
+        cls._performance_monitor.reset_metrics()
 
 class ModelRegistryMixin:
     """
@@ -344,6 +422,9 @@ class CombinedMixin(FilterableMixin, AggregatableMixin):
     _filter_cache_manager = FilterCacheManager(_cache_invalidator)
     _aggregation_cache_manager = AggregationCacheManager(_cache_invalidator)
     
+    # Share the same performance monitor
+    _performance_monitor = PerformanceMonitor()
+    
     @classmethod
     def invalidate_all_caches(cls):
         """
@@ -356,9 +437,14 @@ class CombinedMixin(FilterableMixin, AggregatableMixin):
     @classmethod
     def filter(cls, filters):
         """Filter queryset based on provided filters."""
+        model_name = cls.__name__
+        
         # Check if we have a cached result
         cached_result = cls._filter_cache_manager.get_cached_filter_result(cls, filters)
         if cached_result is not None:
+            # Record cache hit in performance monitor
+            cls._performance_monitor.record_cache_hit(model_name, 'filter')
+            
             # Convert cached result back to queryset
             if isinstance(cached_result, (list, tuple)):
                 if cached_result:
@@ -378,41 +464,131 @@ class CombinedMixin(FilterableMixin, AggregatableMixin):
                 return cls.objects.none()
             return cached_result  # Return as is if already a queryset
         
-        # If no cached result, apply filters
-        conditions = Q()
-        filterable_fields = cls.get_filterable_fields()
+        # Record cache miss in performance monitor
+        cls._performance_monitor.record_cache_miss(model_name, 'filter')
         
-        for field, value in filters.items():
-            if field not in filterable_fields:
-                raise ValueError(f"Field '{field}' is not filterable")
+        # Track query execution time
+        with cls._performance_monitor.track_query(model_name):
+            # If no cached result, apply filters
+            conditions = Q()
+            filterable_fields = cls.get_filterable_fields()
             
-            field_info = filterable_fields[field]
-            field_type = field_info['type']
-            
-            if isinstance(value, dict):
-                # Handle complex filters with operators
-                field_conditions = Q()
-                for operator, op_value in value.items():
-                    if operator not in cls.FILTER_OPERATORS:
-                        raise ValueError(f"Invalid operator '{operator}'")
-                    
-                    lookup = f"{field}__{operator}"
-                    field_conditions |= Q(**{lookup: op_value})  # OR between operators
-                conditions &= field_conditions  # AND between fields
-            else:
-                # Handle simple equality filter
-                if field_type in ['char', 'text', 'email', 'url']:
-                    # Use icontains for string fields by default
-                    conditions &= Q(**{f"{field}__icontains": value})
+            for field, value in filters.items():
+                if field not in filterable_fields:
+                    raise ValueError(f"Field '{field}' is not filterable")
+                
+                field_info = filterable_fields[field]
+                field_type = field_info['type']
+                
+                if isinstance(value, dict):
+                    # Handle complex filters with operators
+                    field_conditions = Q()
+                    for operator, op_value in value.items():
+                        if operator not in cls.FILTER_OPERATORS:
+                            raise ValueError(f"Invalid operator '{operator}'")
+                        
+                        lookup = f"{field}__{operator}"
+                        field_conditions |= Q(**{lookup: op_value})  # OR between operators
+                    conditions &= field_conditions  # AND between fields
                 else:
-                    # Use exact match for non-string fields
-                    conditions &= Q(**{field: value})
+                    # Handle simple equality filter
+                    if field_type in ['char', 'text', 'email', 'url']:
+                        # Use icontains for string fields by default
+                        conditions &= Q(**{f"{field}__icontains": value})
+                    else:
+                        # Use exact match for non-string fields
+                        conditions &= Q(**{field: value})
+            
+            # Apply filters to queryset
+            queryset = cls.objects.filter(conditions)
+            
+            # Cache the result as a list of dictionaries
+            result_list = list(queryset.values())
+            cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
         
-        # Apply filters to queryset
-        queryset = cls.objects.filter(conditions)
+        # Record resource usage after query execution
+        cls._performance_monitor.record_resource_usage()
         
-        # Cache the result as a list of dictionaries
-        result_list = list(queryset.values())
-        cls._filter_cache_manager.cache_filter_result(cls, filters, result_list)
+        return queryset
+    
+    @classmethod
+    def aggregate(cls, aggregations: Dict[str, Union[str, List[str]]], group_by: Optional[List[str]] = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """
+        Apply aggregations to the model.
         
-        return queryset 
+        Args:
+            aggregations: A dictionary mapping field names to aggregation types
+            group_by: Optional list of fields to group by
+            
+        Returns:
+            The aggregation results
+            
+        Raises:
+            ValueError: If an invalid field or aggregation type is specified
+        """
+        model_name = cls.__name__
+        
+        # Check if we have a cached result
+        cached_result = cls._aggregation_cache_manager.get_cached_aggregation_result(
+            cls, aggregations, group_by
+        )
+        if cached_result is not None:
+            # Record cache hit in performance monitor
+            cls._performance_monitor.record_cache_hit(model_name, 'aggregate')
+            return cached_result
+        
+        # Record cache miss in performance monitor
+        cls._performance_monitor.record_cache_miss(model_name, 'aggregate')
+        
+        # Track query execution time
+        with cls._performance_monitor.track_query(model_name):
+            # If no cached result, apply aggregations
+            aggregatable_fields = cls.get_aggregatable_fields()
+            queryset = cls.objects
+            
+            # Validate fields and build annotations
+            annotations = {}
+            for field, agg_type in aggregations.items():
+                # Special case for 'id' field which can always be counted
+                if field == 'id' and (agg_type == 'count' or (isinstance(agg_type, list) and 'count' in agg_type)):
+                    if isinstance(agg_type, list):
+                        if 'count' in agg_type:
+                            annotations[f"{field}__count"] = Count(field)
+                    else:
+                        annotations[f"{field}__count"] = Count(field)
+                    continue
+                    
+                if field not in aggregatable_fields:
+                    raise ValueError(f"Field '{field}' is not aggregatable")
+                
+                if isinstance(agg_type, list):
+                    for agg in agg_type:
+                        agg_func = get_aggregation(agg, field)
+                        annotations[f"{field}__{agg}"] = agg_func
+                else:
+                    agg_func = get_aggregation(agg_type, field)
+                    annotations[f"{field}__{agg_type}"] = agg_func
+            
+            # Apply group by if specified
+            if group_by:
+                # Validate group by fields exist in model
+                all_fields = {f.name: f for f in cls._meta.fields}
+                for field in group_by:
+                    if field not in all_fields:
+                        raise ValueError(f"Field '{field}' does not exist")
+                
+                # Apply annotations and group by
+                result = list(queryset.values(*group_by).annotate(**annotations))
+            else:
+                # Apply aggregations without grouping
+                result = queryset.aggregate(**annotations)
+            
+            # Cache the result
+            cls._aggregation_cache_manager.cache_aggregation_result(
+                cls, aggregations, group_by, result
+            )
+        
+        # Record resource usage after query execution
+        cls._performance_monitor.record_resource_usage()
+        
+        return result 
