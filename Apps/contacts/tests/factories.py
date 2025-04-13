@@ -226,20 +226,46 @@ class ContactListFactory(factory.django.DjangoModelFactory):
     
     @factory.post_generation
     def contacts(self, create, extracted, **kwargs):
-        """Add contacts to the list"""
         if not create:
-            # Build, not create
             return
             
         if extracted:
-            # Add the specified contacts
             for contact in extracted:
                 self.contacts.add(contact)
         else:
-            # Create exactly 5 contacts by default to match test expectations
-            for _ in range(5):
+            # Create 3 contacts by default
+            for _ in range(3):
                 contact = ContactFactory(organization=self.organization)
                 self.contacts.add(contact)
+
+class ContactListTemplateFactory(BaseModelFactory):
+    """Factory for ContactListTemplate model"""
+    
+    class Meta:
+        model = 'contacts.ContactListTemplate'
+        skip_postgeneration_save = True
+        
+    name = Sequence(lambda n: f'Contact List Template {n}')
+    description = Faker('text')
+    organization = SubFactory(OrganizationFactory)
+    created_by = SubFactory(UserFactory)
+    updated_by = SubFactory(UserFactory)
+    fields = LazyAttribute(lambda _: {
+        'name': {'required': True, 'type': 'text'},
+        'description': {'required': False, 'type': 'textarea'},
+        'contacts': {'required': False, 'type': 'multiselect'}
+    })
+    is_active = True
+    version = 1
+    parent = None
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        """Override _create to ensure validation runs"""
+        instance = super()._create(model_class, *args, **kwargs)
+        instance.clean()
+        instance.save()
+        return instance
 
 class ContactSegmentFactory(BaseModelFactory):
     class Meta:

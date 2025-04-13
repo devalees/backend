@@ -122,9 +122,9 @@ class TestContactSegment:
         # Get matching contacts
         matching_contacts = segment.get_matching_contacts()
         
-        # ContactListFactory now creates 5 contacts by default and we added 2 more with example.com
-        # Total matching should be 7 contacts with example.com in their email
-        assert matching_contacts.count() == 7
+        # ContactListFactory creates 3 contacts by default and we added 2 more with example.com
+        # Total matching should be 5 contacts with example.com in their email
+        assert matching_contacts.count() == 5
         # Check that all contacts have example.com in their email
         for contact in matching_contacts:
             assert "example.com" in contact.email.lower()

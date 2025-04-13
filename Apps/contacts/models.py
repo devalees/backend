@@ -1339,6 +1339,151 @@ class ContactList(models.Model):
                     'contacts': _('All contacts must belong to the same organization as the contact list')
                 })
 
+class ContactListTemplate(models.Model):
+    """ContactListTemplate model for defining contact list templates"""
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_list_templates_created'
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_list_templates_updated'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='contact_list_templates'
+    )
+    fields = models.JSONField(
+        help_text="JSON structure defining the template fields and their properties"
+    )
+    is_active = models.BooleanField(default=True)
+    version = models.IntegerField(default=1)
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+
+    class Meta:
+        verbose_name = 'Contact List Template'
+        verbose_name_plural = 'Contact List Templates'
+        ordering = ['name']
+        unique_together = ['name', 'organization']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def hard_delete(self):
+        """Hard delete the template"""
+        super().delete()
+
+    def delete(self, *args, **kwargs):
+        """Soft delete the template"""
+        self.is_active = False
+        self.save()
+
+    def clean(self):
+        """Validate the template."""
+        super().clean()
+        
+        if not self.name:
+            raise ValidationError({'name': _('Name is required')})
+        
+        if not self.organization_id:
+            raise ValidationError({'organization': _('Organization is required')})
+
+        # Check name uniqueness within organization
+        if ContactListTemplate.objects.filter(
+            organization=self.organization,
+            name=self.name
+        ).exclude(pk=self.pk).exists():
+            raise ValidationError({
+                'name': _('A template with this name already exists in this organization')
+            })
+        
+        # Validate fields format
+        if not isinstance(self.fields, dict):
+            raise ValidationError({'fields': _('Fields must be a valid JSON object')})
+        
+        # Validate required fields
+        required_fields = ['name']
+        for field in required_fields:
+            if field not in self.fields:
+                raise ValidationError({
+                    'fields': _(f'Fields must contain a {field} field')
+                })
+        
+        # Validate field properties
+        for field_name, field_props in self.fields.items():
+            if not isinstance(field_props, dict):
+                raise ValidationError({
+                    'fields': _(f'Field {field_name} must be a valid JSON object')
+                })
+            
+            if 'type' not in field_props:
+                raise ValidationError({
+                    'fields': _(f'Field {field_name} must have a type property')
+                })
+            
+            if 'required' not in field_props:
+                raise ValidationError({
+                    'fields': _(f'Field {field_name} must have a required property')
+                })
+
+    def create_contact_list(self, user=None):
+        """Create a new contact list from this template"""
+        contact_list = ContactList(
+            name=self.name,
+            description=self.description,
+            organization=self.organization,
+            created_by=user or self.created_by,
+            updated_by=user or self.updated_by
+        )
+        contact_list.save()
+        return contact_list
+
+    def apply_template(self, contact_list):
+        """Apply this template to an existing contact list"""
+        contact_list.name = self.name
+        contact_list.description = self.description
+        contact_list.save()
+
+    def get_ancestors(self):
+        """Get all ancestors of this template"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+
+    def get_descendants(self):
+        """Get all descendants of this template"""
+        descendants = []
+        children = ContactListTemplate.objects.filter(parent=self)
+        for child in children:
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+
 class ContactSegment(models.Model):
     """ContactSegment model for defining segments within a contact list based on filter criteria"""
     

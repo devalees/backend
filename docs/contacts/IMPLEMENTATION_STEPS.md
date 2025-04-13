@@ -41,7 +41,7 @@
 - [x] Implement list CRUD operations
 - [x] Add list validation
 - [x] Create contact segments
-- [ ] Implement list templates
+- [x] Implement list templates
 - [ ] Add list caching
 - [ ] Create list API endpoints
 - [ ] Add list documentation

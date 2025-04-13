@@ -113,8 +113,8 @@ class TestContactList:
     def test_contact_list_count(self):
         """Test counting contacts in a list"""
         contact_list = ContactListFactory()
-        # Verify that our factory correctly creates 5 contacts
-        assert contact_list.contacts.count() == 5
+        # Verify that our factory correctly creates 3 contacts
+        assert contact_list.contacts.count() == 3
         
     def test_update_contact_list(self):
         """Test updating contact list attributes"""
