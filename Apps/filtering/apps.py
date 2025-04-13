@@ -57,7 +57,19 @@ class FilteringConfig(AppConfig):
         from .model_auto_discovery import (
             discover_and_register_app_models,
             discover_and_register_all_models,
-            generate_model_report
+            generate_model_report,
+            # New automatic mixin application functions
+            discover_and_enhance_app_models,
+            discover_and_enhance_all_models,
+            enhance_existing_model
+        )
+        
+        # Import automatic mixin application module
+        from .auto_mixin_applier import (
+            AutoMixinApplier,
+            apply_mixins_to_model,
+            apply_indexes_to_model,
+            register_model_indexes
         )
         
         # Import the __init__.py module properly
@@ -104,4 +116,13 @@ class FilteringConfig(AppConfig):
         # Expose model auto-discovery functions
         Apps.filtering.discover_and_register_app_models = discover_and_register_app_models
         Apps.filtering.discover_and_register_all_models = discover_and_register_all_models
-        Apps.filtering.generate_model_report = generate_model_report 
+        Apps.filtering.generate_model_report = generate_model_report
+        
+        # Expose automatic mixin application functions
+        Apps.filtering.discover_and_enhance_app_models = discover_and_enhance_app_models
+        Apps.filtering.discover_and_enhance_all_models = discover_and_enhance_all_models
+        Apps.filtering.enhance_existing_model = enhance_existing_model
+        Apps.filtering.AutoMixinApplier = AutoMixinApplier
+        Apps.filtering.apply_mixins_to_model = apply_mixins_to_model
+        Apps.filtering.apply_indexes_to_model = apply_indexes_to_model
+        Apps.filtering.register_model_indexes = register_model_indexes 

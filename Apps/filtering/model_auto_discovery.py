@@ -10,6 +10,7 @@ from django.apps import apps
 from .model_discovery import ModelDiscoveryService
 from .registry import ModelRegistry, model_registry
 from .base import BaseFilterableModel, BaseAggregatableModel
+from .auto_mixin_applier import AutoMixinApplier, apply_mixins_to_model, register_model_indexes
 
 
 def discover_and_register_app_models(app_label: str) -> List[Type[models.Model]]:
@@ -124,4 +125,65 @@ def generate_model_report(app_label: str = None) -> Dict[str, Any]:
             report['aggregatable_models'] += app_report['aggregatable_models']
             report['both_capability_models'] += app_report['both_capability_models']
     
-    return report 
+    return report
+
+
+# New functions for automatic mixin application
+
+def discover_and_enhance_app_models(app_label: str) -> List[Type[models.Model]]:
+    """
+    Discover models from a specific app and enhance them with mixins.
+    
+    Args:
+        app_label: The label of the Django app
+        
+    Returns:
+        A list of enhanced models with mixins applied
+    """
+    mixin_applier = AutoMixinApplier()
+    enhanced_models = mixin_applier.discover_and_enhance_app_models(app_label)
+    
+    # Register indexes for all enhanced models
+    for model in enhanced_models:
+        register_model_indexes(model)
+    
+    return enhanced_models
+
+
+def discover_and_enhance_all_models() -> Dict[str, List[Type[models.Model]]]:
+    """
+    Discover models from all installed apps and enhance them with mixins.
+    
+    Returns:
+        A dictionary mapping app labels to lists of enhanced models
+    """
+    mixin_applier = AutoMixinApplier()
+    enhanced_models_by_app = mixin_applier.discover_and_enhance_all_models()
+    
+    # Register indexes for all enhanced models
+    for app_label, models_list in enhanced_models_by_app.items():
+        for model in models_list:
+            register_model_indexes(model)
+    
+    return enhanced_models_by_app
+
+
+def enhance_existing_model(model: Type[models.Model]) -> Type[models.Model]:
+    """
+    Enhance an existing model with mixins.
+    
+    Args:
+        model: The model to enhance
+        
+    Returns:
+        The enhanced model with mixins applied
+    """
+    enhanced_model = apply_mixins_to_model(model)
+    
+    # Register the enhanced model
+    model_registry.register_model(enhanced_model)
+    
+    # Register indexes
+    register_model_indexes(enhanced_model)
+    
+    return enhanced_model 

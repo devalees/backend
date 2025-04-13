@@ -43,7 +43,16 @@ __all__ = [
     # Model Auto-Discovery Helpers
     'discover_and_register_app_models',
     'discover_and_register_all_models',
-    'generate_model_report'
+    'generate_model_report',
+    
+    # Automatic Mixin Application
+    'AutoMixinApplier',
+    'apply_mixins_to_model',
+    'apply_indexes_to_model',
+    'register_model_indexes',
+    'discover_and_enhance_app_models',
+    'discover_and_enhance_all_models',
+    'enhance_existing_model'
 ]
 
 # These will be populated by the AppConfig when Django is ready
@@ -69,4 +78,13 @@ ModelDiscoveryService = None
 # Model Auto-Discovery Helpers
 discover_and_register_app_models = None
 discover_and_register_all_models = None
-generate_model_report = None 
+generate_model_report = None
+
+# Automatic Mixin Application
+AutoMixinApplier = None
+apply_mixins_to_model = None
+apply_indexes_to_model = None
+register_model_indexes = None
+discover_and_enhance_app_models = None
+discover_and_enhance_all_models = None
+enhance_existing_model = None 
