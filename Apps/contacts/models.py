@@ -1245,3 +1245,88 @@ class CommunicationMonitoring(models.Model):
         activity.save()
         
         return activity
+
+class ContactList(models.Model):
+    """ContactList model representing a list of contacts for planning and segmentation"""
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_lists_created'
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contact_lists_updated'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='contact_lists'
+    )
+    contacts = models.ManyToManyField(
+        Contact,
+        related_name='lists',
+        blank=True
+    )
+    is_active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Contact List'
+        verbose_name_plural = 'Contact Lists'
+        ordering = ['name']
+        unique_together = ['name', 'organization']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def hard_delete(self, user=None, request_meta=None):
+        """Hard delete the contact list"""
+        self.delete(hard_delete=True)
+
+    def delete(self, *args, **kwargs):
+        """Delete the contact list"""
+        hard_delete = kwargs.pop('hard_delete', False)
+        if hard_delete:
+            super().delete(*args, **kwargs)
+        else:
+            self.is_active = False
+            self.save()
+
+    def clean(self):
+        """Validate the contact list"""
+        super().clean()
+        
+        if not self.name:
+            raise ValidationError({'name': _('Name is required')})
+        
+        if not self.organization:
+            raise ValidationError({'organization': _('Organization is required')})
+            
+        # Check name uniqueness within organization
+        if ContactList.objects.filter(
+            name=self.name,
+            organization=self.organization
+        ).exclude(pk=self.pk).exists():
+            raise ValidationError({'name': _('A contact list with this name already exists in this organization.')})
+            
+        # Validate contacts belong to the same organization
+        if self.pk and self.contacts.exists():
+            invalid_contacts = self.contacts.exclude(organization=self.organization)
+            if invalid_contacts.exists():
+                raise ValidationError({
+                    'contacts': _('All contacts must belong to the same organization as the contact list.')
+                })

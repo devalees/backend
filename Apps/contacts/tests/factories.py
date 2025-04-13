@@ -4,7 +4,7 @@ from factory import (
     post_generation
 )
 from factory.declarations import Iterator
-from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring
+from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList
 from Apps.core.tests.factories import UserFactory, BaseModelFactory
 from Apps.entity.tests.factories import OrganizationFactory, DepartmentFactory, TeamFactory
 
@@ -193,3 +193,37 @@ class CommunicationMonitoringFactory(factory.django.DjangoModelFactory):
         if 'organization' not in kwargs and 'communication' in kwargs:
             kwargs['organization'] = kwargs['communication'].organization
         return super()._build(model_class, *args, **kwargs)
+
+class ContactListFactory(BaseModelFactory):
+    class Meta:
+        model = ContactList
+        skip_postgeneration_save = True
+
+    name = Sequence(lambda n: f'Contact List {n}')
+    description = Faker('text')
+    organization = SubFactory(OrganizationFactory)
+    created_by = SubFactory(UserFactory)
+    updated_by = SubFactory(UserFactory)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs:
+            from Apps.entity.models import Organization
+            if Organization.objects.exists():
+                kwargs['organization'] = Organization.objects.first()
+            else:
+                kwargs['organization'] = OrganizationFactory()
+        return super()._create(model_class, *args, **kwargs)
+
+    @post_generation
+    def contacts(self, create, extracted, **kwargs):
+        if not create:
+            return
+        if extracted:
+            for contact in extracted:
+                self.contacts.add(contact)
+        else:
+            # Create exactly 5 contacts by default as expected by test_contact_list_count
+            for _ in range(5):
+                contact = ContactFactory(organization=self.organization)
+                self.contacts.add(contact)
