@@ -70,32 +70,98 @@ class Contact(TaskAwareModel):
     def save(self, *args, **kwargs):
         """Save the contact and validate data"""
         skip_validation = kwargs.pop('skip_validation', False)
+        user = kwargs.pop('user', None)
+        request_meta = kwargs.pop('request_meta', {})
+        
+        # Determine if this is a create or update
+        is_create = self._state.adding
+        
         if not skip_validation:
             self.full_clean()
+            
         super().save(*args, **kwargs)
+        
         # Cache the contact after saving
         ContactCache.set_contact(self, include_related=True)
+        
+        # Log the activity
+        if hasattr(self, '__class__') and hasattr(self.__class__, 'objects'):
+            activity_type = 'create' if is_create else 'update'
+            ip_address = request_meta.get('REMOTE_ADDR')
+            user_agent = request_meta.get('HTTP_USER_AGENT')
+            
+            # Import here to avoid circular import, and only if needed
+            from Apps.contacts.models import ContactMonitoring
+            ContactMonitoring.log_activity(
+                contact=self,
+                user=user,
+                activity_type=activity_type,
+                description=f"{'Created' if is_create else 'Updated'} via model save",
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
 
-    def hard_delete(self):
+    def hard_delete(self, user=None, request_meta=None):
         """Hard delete the contact"""
-        org_id = self.organization_id
-        self.delete(hard_delete=True)
-        # Invalidate cache after hard delete
-        ContactCache.delete_contact(self.id, org_id)
+        # Call delete with hard_delete=True
+        self.delete(hard_delete=True, user=user, request_meta=request_meta)
 
     def delete(self, *args, **kwargs):
         """Delete the contact"""
         hard_delete = kwargs.pop('hard_delete', False)
+        user = kwargs.pop('user', None)
+        request_meta = kwargs.pop('request_meta', {})
         org_id = self.organization_id
+        org = self.organization
+        
+        print("\nDebug delete method:")
+        print(f"hard_delete: {hard_delete}")
+        print(f"user: {user}")
+        print(f"request_meta: {request_meta}")
+        print(f"org_id: {org_id}")
+        print(f"organization: {org}")
+        
         if hard_delete:
+            # Log before deleting
+            if org:
+                ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
+                user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
+                from Apps.contacts.models import ContactMonitoring
+                print("\nCreating hard delete monitoring record...")
+                record = ContactMonitoring.log_activity(
+                    contact=None,  # Don't set contact since it will be deleted
+                    user=user,
+                    activity_type='delete',
+                    description='Hard delete',
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    metadata={'method': 'hard_delete', 'contact_id': self.id},
+                    organization=org  # Explicitly set organization
+                )
+                print(f"Created record: {record.id}, {record.description}")
+                
+            # Call the parent class's delete method
             super().delete(*args, **kwargs)
-            # Invalidate cache after hard delete
-            ContactCache.delete_contact(self.id, org_id)
         else:
+            # Soft delete - set is_active to False
             self.is_active = False
-            self.save()
-            # Update cache with inactive status
-            ContactCache.set_contact(self, include_related=True)
+            self.save(skip_validation=True)
+            
+            # Log the soft delete activity
+            if org:
+                ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
+                user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
+                from Apps.contacts.models import ContactMonitoring
+                ContactMonitoring.log_activity(
+                    contact=self,
+                    user=user,
+                    activity_type='delete',
+                    description='Soft delete',
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    metadata={'method': 'soft_delete', 'contact_id': self.id},
+                    organization=org
+                )
 
     def clean(self):
         """Validate contact data"""
@@ -312,3 +378,109 @@ class ContactTemplate(models.Model):
                 raise ValidationError({
                     'organization': ['Cannot change the organization of a template.']
                 })
+
+class ContactMonitoring(models.Model):
+    """ContactMonitoring model for tracking interactions and activity with contacts"""
+    
+    ACTIVITY_TYPES = (
+        ('view', 'View'),
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('email', 'Email'),
+        ('call', 'Call'),
+        ('export', 'Export'),
+        ('import', 'Import'),
+        ('other', 'Other')
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.CASCADE,
+        related_name='monitoring_records',
+        null=True,  # Allow recording events for deleted contacts
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,  # Allow system-generated events
+        related_name='contact_activities'
+    )
+    activity_type = models.CharField(
+        max_length=20,
+        choices=ACTIVITY_TYPES,
+    )
+    description = models.TextField(blank=True, null=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='contact_monitoring_records'
+    )
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Contact Activity Record'
+        verbose_name_plural = 'Contact Activity Records'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['contact', 'activity_type']),
+            models.Index(fields=['organization', 'activity_type']),
+            models.Index(fields=['user', 'activity_type']),
+        ]
+
+    def __str__(self):
+        contact_name = self.contact.name if self.contact else "Unknown Contact"
+        return f"{self.get_activity_type_display()} - {contact_name} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
+
+    @classmethod
+    def log_activity(cls, contact=None, user=None, activity_type=None, description=None, 
+                    ip_address=None, user_agent=None, metadata=None, organization=None):
+        """
+        Log an activity record for a contact.
+        
+        Args:
+            contact: The contact this activity is for
+            user: The user performing the activity
+            activity_type: Type of activity (must be in ACTIVITY_TYPES)
+            description: Description of the activity
+            ip_address: IP address of the request
+            user_agent: User agent of the request
+            metadata: Additional metadata about the activity
+            organization: The organization this activity is for (if not provided, will be taken from contact)
+        """
+        if activity_type not in [t[0] for t in cls.ACTIVITY_TYPES]:
+            print(f"Warning: Invalid activity type '{activity_type}'")
+            return None
+            
+        # Get organization from contact if available and not explicitly provided
+        if not organization and contact:
+            organization = getattr(contact, 'organization', None)
+            
+        if not organization:
+            print("Warning: No organization available for monitoring record")
+            return None
+            
+        try:
+            # Ensure metadata is a dictionary
+            metadata = metadata or {}
+            
+            # Create monitoring record
+            record = cls.objects.create(
+                contact=contact,
+                user=user,
+                activity_type=activity_type,
+                description=description,
+                organization=organization,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                metadata=metadata
+            )
+            print(f"Created monitoring record: {record.id}, type: {record.activity_type}, desc: {record.description}")
+            return record
+        except Exception as e:
+            print(f"Error creating monitoring record: {str(e)}")
+            return None

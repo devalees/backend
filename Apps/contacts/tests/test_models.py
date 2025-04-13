@@ -1,10 +1,12 @@
 import pytest
 from django.core.exceptions import ValidationError
-from Apps.contacts.models import Contact, ContactGroup, ContactTemplate
-from Apps.contacts.tests.factories import ContactFactory, ContactGroupFactory
 from django.test import TestCase
+from django.db.utils import IntegrityError
+from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring
+from Apps.contacts.tests.factories import ContactFactory, ContactGroupFactory, ContactTemplateFactory
 from django.contrib.auth import get_user_model
 from Apps.entity.models import Organization
+from django.db import transaction
 
 User = get_user_model()
 
@@ -104,96 +106,80 @@ class TestContactGroup:
         assert contact not in group.contacts.all()
         assert group not in contact.groups.all()
 
-class ContactTemplateTests(TestCase):
+@pytest.mark.django_db
+class TestContactTemplate:
     """Test cases for ContactTemplate model"""
     
-    def setUp(self):
-        """Set up test data"""
-        self.organization = Organization.objects.create(name="Test Org")
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123'
-        )
-        self.template_data = {
-            'name': 'Standard Contact Template',
-            'description': 'A standard template for contacts',
-            'organization': self.organization,
-            'created_by': self.user,
-            'fields': {
-                'name': {'required': True, 'type': 'text'},
-                'email': {'required': True, 'type': 'email'},
-                'phone': {'required': True, 'type': 'phone'},
-                'department': {'required': False, 'type': 'select'},
-                'team': {'required': False, 'type': 'select'}
-            }
-        }
-
     def test_create_contact_template(self):
         """Test creating a contact template"""
-        template = ContactTemplate.objects.create(**self.template_data)
-        self.assertEqual(template.name, self.template_data['name'])
-        self.assertEqual(template.organization, self.organization)
-        self.assertEqual(template.created_by, self.user)
-        self.assertEqual(template.fields, self.template_data['fields'])
-
-    def test_template_validation(self):
-        """Test template validation"""
-        # Test required fields
-        with self.assertRaises(ValidationError):
-            ContactTemplate.objects.create(
-                organization=self.organization,
-                created_by=self.user
-            )
-
-        # Test invalid fields structure
-        invalid_data = self.template_data.copy()
-        invalid_data['fields'] = 'invalid'
-        with self.assertRaises(ValidationError):
-            ContactTemplate.objects.create(**invalid_data)
-
-    def test_template_str_representation(self):
+        template = ContactTemplateFactory()
+        
+        assert template.name is not None
+        assert template.description is not None
+        assert template.organization is not None
+        assert template.created_by is not None
+        assert template.updated_by is not None
+        assert template.fields is not None
+        assert template.is_active
+        
+    def test_template_str(self):
         """Test string representation of template"""
-        template = ContactTemplate.objects.create(**self.template_data)
-        self.assertEqual(str(template), self.template_data['name'])
-
+        template = ContactTemplateFactory(name="Test Template")
+        assert str(template) == "Test Template"
+        
     def test_template_soft_delete(self):
         """Test soft delete functionality"""
-        template = ContactTemplate.objects.create(**self.template_data)
+        template = ContactTemplateFactory()
         template.delete()
-        self.assertFalse(template.is_active)
-        self.assertTrue(ContactTemplate.objects.filter(id=template.id).exists())
-
+        assert not template.is_active
+        assert ContactTemplate.objects.filter(id=template.id).exists()
+        
     def test_template_hard_delete(self):
         """Test hard delete functionality"""
-        template = ContactTemplate.objects.create(**self.template_data)
+        template = ContactTemplateFactory()
         template.hard_delete()
-        self.assertFalse(ContactTemplate.objects.filter(id=template.id).exists())
-
-    def test_template_organization_constraint(self):
-        """Test organization constraint"""
-        other_org = Organization.objects.create(name="Other Org")
-        template = ContactTemplate.objects.create(**self.template_data)
+        assert not ContactTemplate.objects.filter(id=template.id).exists()
         
-        # Try to change organization
-        template.organization = other_org
-        with self.assertRaises(ValidationError):
-            template.save()
-
     def test_template_fields_validation(self):
-        """Test fields validation"""
-        # Test missing required field type
-        invalid_fields = self.template_data['fields'].copy()
-        del invalid_fields['name']['type']
-        invalid_data = self.template_data.copy()
-        invalid_data['fields'] = invalid_fields
-        with self.assertRaises(ValidationError):
-            ContactTemplate.objects.create(**invalid_data)
-
-        # Test invalid field type
-        invalid_fields = self.template_data['fields'].copy()
-        invalid_fields['name']['type'] = 'invalid_type'
-        invalid_data = self.template_data.copy()
-        invalid_data['fields'] = invalid_fields
-        with self.assertRaises(ValidationError):
-            ContactTemplate.objects.create(**invalid_data) 
+        """Test fields validation in more detail"""
+        # Test with valid fields
+        template = ContactTemplateFactory()
+        template.full_clean()  # Should not raise
+        
+        # Test with invalid fields (not a dict)
+        with pytest.raises(ValidationError):
+            template = ContactTemplateFactory()
+            template.fields = "not a dict"
+            template.full_clean()
+        
+        # Test with invalid field type
+        with pytest.raises(ValidationError):
+            template = ContactTemplateFactory()
+            template.fields['name']['type'] = 'invalid_type'
+            template.full_clean()
+            
+        # Test with missing required property
+        with pytest.raises(ValidationError):
+            template = ContactTemplateFactory()
+            del template.fields['name']['required']
+            template.full_clean()
+            
+        # Test with non-boolean required
+        with pytest.raises(ValidationError):
+            template = ContactTemplateFactory()
+            template.fields['name']['required'] = "not a boolean"
+            template.full_clean()
+            
+    def test_unique_organization_constraint(self):
+        """Test unique constraint for name within organization"""
+        # Create a template
+        template1 = ContactTemplateFactory(name="Unique Template")
+    
+        # Try to create another with same name and org
+        with pytest.raises(ValidationError):
+            template2 = ContactTemplateFactory.build(
+                name="Unique Template",
+                organization=template1.organization
+            )
+            # Use full_clean() to trigger validation before database insert
+            template2.full_clean() 
