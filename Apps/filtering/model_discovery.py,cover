@@ -1,0 +1,227 @@
+> from typing import List, Dict, Any, Type, Optional, Set
+> from django.db import models
+> from django.apps import apps
+> from .base import BaseFilterableModel, BaseAggregatableModel
+  
+  
+> class ModelDiscoveryService:
+>     """
+>     Service for discovering models in the Django project.
+>     This service is responsible for:
+>     - Scanning apps for models
+>     - Detecting field types in models
+>     - Mapping relationships between models
+>     """
+  
+>     def __init__(self):
+>         """Initialize the ModelDiscoveryService."""
+>         self.field_type_mapping = {
+>             'CharField': 'char',
+>             'TextField': 'text',
+>             'BooleanField': 'boolean',
+>             'IntegerField': 'integer',
+>             'BigIntegerField': 'integer',
+>             'PositiveIntegerField': 'integer',
+>             'SmallIntegerField': 'integer',
+>             'FloatField': 'float',
+>             'DecimalField': 'decimal',
+>             'DateField': 'date',
+>             'DateTimeField': 'datetime',
+>             'TimeField': 'time',
+>             'EmailField': 'email',
+>             'URLField': 'url',
+>             'FileField': 'file',
+>             'ImageField': 'image',
+>             'ForeignKey': 'foreignkey',
+>             'ManyToManyField': 'manytomany',
+>             'OneToOneField': 'onetoone',
+>             'UUIDField': 'uuid',
+>             'SlugField': 'slug',
+>             'GenericIPAddressField': 'ip',
+>             'JSONField': 'json',
+>         }
+>         self.relationship_field_types = [
+>             models.ForeignKey,
+>             models.ManyToManyField,
+>             models.OneToOneField
+>         ]
+  
+>     def discover_models_from_app(self, app_label: str, base_model_class: Type = None) -> List[Type[models.Model]]:
+>         """
+>         Discover models from a specific Django app.
+          
+>         Args:
+>             app_label: The label of the Django app to discover models from
+>             base_model_class: Optional base model class to filter discovered models
+>                               (e.g., BaseFilterableModel or BaseAggregatableModel)
+                                
+>         Returns:
+>             A list of discovered model classes
+>         """
+>         discovered_models = []
+          
+>         try:
+>             app_config = apps.get_app_config(app_label)
+              
+>             for model in app_config.get_models():
+                  # If base_model_class is specified, only include models that inherit from it
+>                 if base_model_class:
+>                     if issubclass(model, base_model_class):
+>                         discovered_models.append(model)
+                  # Otherwise, include models that inherit from either base model
+>                 else:
+>                     if issubclass(model, (BaseFilterableModel, BaseAggregatableModel)):
+>                         discovered_models.append(model)
+              
+>             return discovered_models
+!         except LookupError:
+              # If the app doesn't exist, return an empty list
+!             return []
+  
+>     def discover_all_models(self, base_model_class: Type = None) -> List[Type[models.Model]]:
+>         """
+>         Discover models from all installed Django apps.
+          
+>         Args:
+>             base_model_class: Optional base model class to filter discovered models
+                                
+>         Returns:
+>             A list of discovered model classes
+>         """
+>         discovered_models = []
+          
+>         for app_config in apps.get_app_configs():
+>             app_models = self.discover_models_from_app(app_config.label, base_model_class)
+>             discovered_models.extend(app_models)
+          
+>         return discovered_models
+  
+>     def detect_field_types(self, model: Type[models.Model]) -> Dict[str, str]:
+>         """
+>         Detect field types for a model.
+          
+>         Args:
+>             model: The model class to detect field types for
+              
+>         Returns:
+>             A dictionary mapping field names to their normalized types
+>         """
+>         field_types = {}
+          
+>         for field in model._meta.fields:
+>             field_type = field.get_internal_type()
+>             normalized_type = self.field_type_mapping.get(field_type, field_type.lower())
+>             field_types[field.name] = normalized_type
+          
+          # Also include many-to-many fields which aren't in _meta.fields
+>         for field in model._meta.many_to_many:
+!             field_type = field.get_internal_type()
+!             normalized_type = self.field_type_mapping.get(field_type, field_type.lower())
+!             field_types[field.name] = normalized_type
+              
+>         return field_types
+  
+>     def map_relationships(self, model: Type[models.Model]) -> Dict[str, Dict[str, Any]]:
+>         """
+>         Map relationships for a model.
+          
+>         Args:
+>             model: The model class to map relationships for
+              
+>         Returns:
+>             A dictionary mapping field names to relationship information
+>         """
+>         relationships = {}
+          
+          # Process regular relation fields (ForeignKey, OneToOne)
+>         for field in model._meta.fields:
+              # First determine the correct relationship type
+>             field_type = None
+              
+              # Check if it's a OneToOneField
+>             if isinstance(field, models.OneToOneField):
+>                 field_type = 'onetoone'
+              # Check if it's a ForeignKey
+>             elif isinstance(field, models.ForeignKey):
+>                 field_type = 'foreignkey'
+              
+              # If we identified a relationship type, add it to our relationships dict
+>             if field_type:
+>                 relationships[field.name] = {
+>                     'type': field_type,
+>                     'model': field.related_model,
+>                     'field': field
+>                 }
+          
+          # Process many-to-many fields separately
+>         for field in model._meta.many_to_many:
+>             relationships[field.name] = {
+>                 'type': 'manytomany',
+>                 'model': field.related_model,
+>                 'field': field
+>             }
+          
+>         return relationships
+      
+>     def discover_and_register_models(self, app_labels: List[str] = None) -> Dict[str, List[Type[models.Model]]]:
+>         """
+>         Discover and register models from specified apps.
+>         If no app labels are provided, discover from all installed apps.
+          
+>         Args:
+>             app_labels: Optional list of app labels to discover models from
+              
+>         Returns:
+>             A dictionary mapping app labels to lists of discovered model classes
+>         """
+!         from .registry import model_registry
+          
+!         discovered_models_by_app = {}
+          
+!         if app_labels:
+              # Discover models from specified apps
+!             for app_label in app_labels:
+!                 discovered_models = self.discover_models_from_app(app_label)
+!                 if discovered_models:
+!                     discovered_models_by_app[app_label] = discovered_models
+                      # Register each discovered model
+!                     for model in discovered_models:
+!                         model_registry.register_model(model)
+!         else:
+              # Discover models from all installed apps
+!             for app_config in apps.get_app_configs():
+!                 discovered_models = self.discover_models_from_app(app_config.label)
+!                 if discovered_models:
+!                     discovered_models_by_app[app_config.label] = discovered_models
+                      # Register each discovered model
+!                     for model in discovered_models:
+!                         model_registry.register_model(model)
+          
+!         return discovered_models_by_app
+  
+>     def get_app_models_info(self, app_label: str) -> Dict[str, Dict[str, Any]]:
+>         """
+>         Get detailed information about models in a specific app.
+          
+>         Args:
+>             app_label: The label of the Django app
+              
+>         Returns:
+>             A dictionary mapping model names to detailed information
+>         """
+!         models_info = {}
+!         models = self.discover_models_from_app(app_label)
+          
+!         for model in models:
+!             field_types = self.detect_field_types(model)
+!             relationships = self.map_relationships(model)
+              
+!             models_info[model.__name__] = {
+!                 'model': model,
+!                 'field_types': field_types,
+!                 'relationships': relationships,
+!                 'is_filterable': issubclass(model, BaseFilterableModel),
+!                 'is_aggregatable': issubclass(model, BaseAggregatableModel)
+!             }
+          
+!         return models_info 

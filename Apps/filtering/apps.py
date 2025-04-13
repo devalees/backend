@@ -50,6 +50,15 @@ class FilteringConfig(AppConfig):
             AggregationGroupValidator,
             AggregationValidator
         )
+        # Import model discovery service
+        from .model_discovery import ModelDiscoveryService
+        
+        # Import model auto-discovery helpers
+        from .model_auto_discovery import (
+            discover_and_register_app_models,
+            discover_and_register_all_models,
+            generate_model_report
+        )
         
         # Import the __init__.py module properly
         import Apps.filtering
@@ -87,4 +96,12 @@ class FilteringConfig(AppConfig):
         Apps.filtering.AggregationFieldValidator = AggregationFieldValidator
         Apps.filtering.AggregationTypeValidator = AggregationTypeValidator
         Apps.filtering.AggregationGroupValidator = AggregationGroupValidator
-        Apps.filtering.AggregationValidator = AggregationValidator 
+        Apps.filtering.AggregationValidator = AggregationValidator
+        
+        # Expose the model discovery service
+        Apps.filtering.ModelDiscoveryService = ModelDiscoveryService
+        
+        # Expose model auto-discovery functions
+        Apps.filtering.discover_and_register_app_models = discover_and_register_app_models
+        Apps.filtering.discover_and_register_all_models = discover_and_register_all_models
+        Apps.filtering.generate_model_report = generate_model_report 

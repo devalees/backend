@@ -35,7 +35,15 @@ __all__ = [
     'max_aggregation',
     'custom_aggregation',
     'get_aggregation',
-    'aggregation_registry'
+    'aggregation_registry',
+    
+    # Model Discovery
+    'ModelDiscoveryService',
+    
+    # Model Auto-Discovery Helpers
+    'discover_and_register_app_models',
+    'discover_and_register_all_models',
+    'generate_model_report'
 ]
 
 # These will be populated by the AppConfig when Django is ready
@@ -55,4 +63,10 @@ FilterValidator = None
 FilterFactory = None
 BasicFilterFactory = None
 AdvancedFilterFactory = None
-FilterTypeMapping = None 
+FilterTypeMapping = None
+ModelDiscoveryService = None
+
+# Model Auto-Discovery Helpers
+discover_and_register_app_models = None
+discover_and_register_all_models = None
+generate_model_report = None 
