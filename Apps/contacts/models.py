@@ -232,6 +232,14 @@ class ContactGroup(models.Model):
         blank=True
     )
     is_active = models.BooleanField(default=True)
+    # Add parent field for hierarchy
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
 
     class Meta:
         verbose_name = 'Contact Group'
@@ -243,13 +251,57 @@ class ContactGroup(models.Model):
 
     def save(self, *args, **kwargs):
         """Save the contact group"""
+        user = kwargs.pop('user', None)
+        request_meta = kwargs.pop('request_meta', {})
+        
+        # Determine if this is a create or update
+        is_create = self._state.adding
+        
+        # Validate before saving
+        self.full_clean()
+        
         super().save(*args, **kwargs)
+        
         if hasattr(self, '_contacts'):
             self.contacts.set(self._contacts)
+            
+        # Cache the group after saving
+        from .cache_manager import ContactGroupCache
+        ContactGroupCache.set_group(self, include_related=True)
+        
+        # Log the activity
+        if hasattr(self, '__class__') and hasattr(self.__class__, 'objects'):
+            activity_type = 'create' if is_create else 'update'
+            ip_address = request_meta.get('REMOTE_ADDR')
+            user_agent = request_meta.get('HTTP_USER_AGENT')
+            
+            # Import here to avoid circular import
+            from Apps.contacts.models import ContactGroupMonitoring
+            ContactGroupMonitoring.log_activity(
+                group=self,
+                user=user,
+                activity_type=activity_type,
+                description=f"{'Created' if is_create else 'Updated'} via model save",
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
 
     def clean(self):
         """Validate the contact group"""
         super().clean()
+        
+        # Check for circular references
+        if self.parent:
+            if self.parent == self:
+                raise ValidationError("A group cannot be its own parent.")
+            
+            # Check for circular references in the hierarchy
+            current = self.parent
+            while current:
+                if current == self:
+                    raise ValidationError("Circular reference detected in group hierarchy.")
+                current = current.parent
+        
         if self.pk and self.contacts.exists():
             # Check if all contacts belong to the same organization
             contacts_orgs = self.contacts.values_list('organization', flat=True).distinct()
@@ -259,15 +311,113 @@ class ContactGroup(models.Model):
     def delete(self, *args, **kwargs):
         """Delete the contact group"""
         hard_delete = kwargs.pop('hard_delete', False)
+        user = kwargs.pop('user', None)
+        request_meta = kwargs.pop('request_meta', {})
+        
         if hard_delete:
+            # Log activity before hard delete
+            if user:
+                from Apps.contacts.models import ContactGroupMonitoring
+                ContactGroupMonitoring.log_activity(
+                    group=None,  # Set to None since the group will be deleted
+                    user=user,
+                    activity_type='delete',
+                    description='Hard delete',
+                    ip_address=request_meta.get('REMOTE_ADDR'),
+                    user_agent=request_meta.get('HTTP_USER_AGENT'),
+                    metadata={'method': 'hard_delete', 'group_id': self.id},
+                    organization=self.organization
+                )
+            
+            # Delete from cache
+            from .cache_manager import ContactGroupCache
+            ContactGroupCache.delete_group(self.id, self.organization_id, force_delete=True)
+            
+            # Delete all children recursively first
+            for child in self.children.all():
+                child.delete(hard_delete=True, user=user, request_meta=request_meta)
+                
+            # Now delete self after children
             super().delete(*args, **kwargs)
         else:
+            # Log activity for soft delete
+            if user:
+                from Apps.contacts.models import ContactGroupMonitoring
+                ContactGroupMonitoring.log_activity(
+                    group=self,
+                    user=user,
+                    activity_type='delete',
+                    description='Soft delete',
+                    ip_address=request_meta.get('REMOTE_ADDR'),
+                    user_agent=request_meta.get('HTTP_USER_AGENT'),
+                    metadata={'method': 'soft_delete'}
+                )
+            
             self.is_active = False
             self.save()
+            
+            # Soft delete all children recursively
+            for child in self.children.all():
+                # Use hard_delete=False explicitly to ensure we're doing soft delete
+                child.delete(hard_delete=False, user=user, request_meta=request_meta)
 
-    def hard_delete(self):
+    def hard_delete(self, user=None, request_meta=None):
         """Hard delete the contact group"""
-        self.delete(hard_delete=True)
+        # Log activity before hard delete
+        if user and self.organization:
+            from Apps.contacts.models import ContactGroupMonitoring
+            ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
+            user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
+            
+            # Create monitoring record with explicit organization
+            ContactGroupMonitoring.log_activity(
+                group=None,  # Group will be deleted, so don't reference it directly
+                user=user,
+                activity_type='delete',
+                description='Hard delete',
+                ip_address=ip_address,
+                user_agent=user_agent,
+                metadata={'method': 'hard_delete', 'group_id': self.id},
+                organization=self.organization
+            )
+            
+        # Call delete with hard_delete=True
+        self.delete(hard_delete=True, user=user, request_meta=request_meta)
+        
+    def get_ancestors(self):
+        """Get all ancestors of this group"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return ancestors
+        
+    def get_descendants(self):
+        """Get all descendants of this group"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+        
+    @classmethod
+    def create_from_template(cls, template, **kwargs):
+        """Create a new group from a template"""
+        group = cls(
+            name=template.name,
+            description=template.description,
+            organization=template.organization,
+            **kwargs
+        )
+        group.save()
+        return group
+        
+    def apply_template(self, template):
+        """Apply a template to this group"""
+        self.name = template.name
+        self.description = template.description
+        self.save()
 
 class ContactTemplate(models.Model):
     """ContactTemplate model for defining contact field templates"""
@@ -310,18 +460,15 @@ class ContactTemplate(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Save the template and validate data"""
-        skip_validation = kwargs.pop('skip_validation', False)
-        if not skip_validation:
-            self.full_clean()
+        """Save the contact template"""
         super().save(*args, **kwargs)
 
     def hard_delete(self):
-        """Hard delete the template"""
+        """Hard delete the contact template"""
         self.delete(hard_delete=True)
 
     def delete(self, *args, **kwargs):
-        """Delete the template"""
+        """Delete the contact template"""
         hard_delete = kwargs.pop('hard_delete', False)
         if hard_delete:
             super().delete(*args, **kwargs)
@@ -330,54 +477,136 @@ class ContactTemplate(models.Model):
             self.save()
 
     def clean(self):
-        """Validate template data"""
-        # Validate required fields
-        if not self.name:
-            raise ValidationError({'name': ['Name is required.']})
-        if not self.organization:
-            raise ValidationError({'organization': ['Organization is required.']})
-
+        """Validate the contact template"""
+        super().clean()
+        
         # Validate fields structure
         if not isinstance(self.fields, dict):
-            raise ValidationError({'fields': ['Fields must be a dictionary.']})
+            raise ValidationError("Fields must be a dictionary.")
+            
+        # Define allowed field types
+        allowed_types = ['text', 'number', 'email', 'phone', 'date', 'boolean', 'select']
+            
+        for field_name, field_props in self.fields.items():
+            if not isinstance(field_props, dict):
+                raise ValidationError(f"Field properties for {field_name} must be a dictionary.")
+                
+            # Check required properties
+            if 'type' not in field_props:
+                raise ValidationError(f"Field {field_name} must have a type.")
+                
+            # Check if type is valid
+            if field_props['type'] not in allowed_types:
+                raise ValidationError(f"Field {field_name} has invalid type '{field_props['type']}'. Allowed types: {', '.join(allowed_types)}")
+                
+            if 'required' not in field_props:
+                raise ValidationError(f"Field {field_name} must specify if it's required.")
+                
+            if not isinstance(field_props['required'], bool):
+                raise ValidationError(f"Field {field_name} 'required' property must be a boolean.")
 
-        # Validate each field in the template
-        valid_field_types = {'text', 'email', 'phone', 'select', 'number', 'date'}
-        for field_name, field_config in self.fields.items():
-            if not isinstance(field_config, dict):
-                raise ValidationError({
-                    'fields': [f'Field {field_name} configuration must be a dictionary.']
-                })
-            
-            # Check required field properties
-            if 'type' not in field_config:
-                raise ValidationError({
-                    'fields': [f'Field {field_name} must have a type.']
-                })
-            
-            if field_config['type'] not in valid_field_types:
-                raise ValidationError({
-                    'fields': [f'Invalid type for field {field_name}. Must be one of {valid_field_types}']
-                })
-            
-            # Check required property
-            if 'required' not in field_config:
-                raise ValidationError({
-                    'fields': [f'Field {field_name} must specify if it is required.']
-                })
-            
-            if not isinstance(field_config['required'], bool):
-                raise ValidationError({
-                    'fields': [f'Required property for field {field_name} must be a boolean.']
-                })
+class ContactGroupTemplate(models.Model):
+    """ContactGroupTemplate model for defining group templates"""
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='group_templates_created'
+    )
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='group_templates_updated'
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='group_templates'
+    )
+    fields = models.JSONField(
+        help_text="JSON structure defining the template fields and their properties"
+    )
+    is_active = models.BooleanField(default=True)
+    version = models.IntegerField(default=1)
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
 
-        # Validate organization constraint
-        if self.pk:  # Only check on update
-            original = ContactTemplate.objects.get(pk=self.pk)
-            if original.organization != self.organization:
-                raise ValidationError({
-                    'organization': ['Cannot change the organization of a template.']
-                })
+    class Meta:
+        verbose_name = 'Contact Group Template'
+        verbose_name_plural = 'Contact Group Templates'
+        ordering = ['name']
+        unique_together = ['name', 'organization']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """Save the group template"""
+        # Increment version on update
+        if self.pk:
+            self.version += 1
+            
+        super().save(*args, **kwargs)
+
+    def hard_delete(self):
+        """Hard delete the group template"""
+        self.delete(hard_delete=True)
+
+    def delete(self, *args, **kwargs):
+        """Delete the group template"""
+        hard_delete = kwargs.pop('hard_delete', False)
+        if hard_delete:
+            super().delete(*args, **kwargs)
+        else:
+            self.is_active = False
+            self.save()
+
+    def clean(self):
+        """Validate the group template"""
+        super().clean()
+        
+        # Validate fields structure
+        if not isinstance(self.fields, dict):
+            raise ValidationError("Fields must be a dictionary.")
+            
+        for field_name, field_props in self.fields.items():
+            if not isinstance(field_props, dict):
+                raise ValidationError(f"Field properties for {field_name} must be a dictionary.")
+                
+            # Check required properties
+            if 'type' not in field_props:
+                raise ValidationError(f"Field {field_name} must have a type.")
+                
+            if 'required' not in field_props:
+                raise ValidationError(f"Field {field_name} must specify if it's required.")
+                
+            if not isinstance(field_props['required'], bool):
+                raise ValidationError(f"Field {field_name} 'required' property must be a boolean.")
+                
+        # Check for circular references
+        if self.parent:
+            if self.parent == self:
+                raise ValidationError("A template cannot be its own parent.")
+            
+            # Check for circular references in the hierarchy
+            current = self.parent
+            while current:
+                if current == self:
+                    raise ValidationError("Circular reference detected in template hierarchy.")
+                current = current.parent
 
 class ContactMonitoring(models.Model):
     """ContactMonitoring model for tracking interactions and activity with contacts"""
@@ -428,59 +657,141 @@ class ContactMonitoring(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['contact', 'activity_type']),
-            models.Index(fields=['organization', 'activity_type']),
             models.Index(fields=['user', 'activity_type']),
+            models.Index(fields=['organization', 'activity_type']),
         ]
 
     def __str__(self):
-        contact_name = self.contact.name if self.contact else "Unknown Contact"
-        return f"{self.get_activity_type_display()} - {contact_name} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
+        return f"{self.get_activity_type_display()} - {self.contact.name if self.contact else 'Deleted Contact'} - {self.created_at}"
 
     @classmethod
     def log_activity(cls, contact=None, user=None, activity_type=None, description=None, 
                     ip_address=None, user_agent=None, metadata=None, organization=None):
         """
-        Log an activity record for a contact.
+        Log an activity for a contact
         
         Args:
-            contact: The contact this activity is for
-            user: The user performing the activity
-            activity_type: Type of activity (must be in ACTIVITY_TYPES)
+            contact: Contact instance or None
+            user: User instance or None
+            activity_type: Type of activity
             description: Description of the activity
             ip_address: IP address of the request
             user_agent: User agent of the request
-            metadata: Additional metadata about the activity
-            organization: The organization this activity is for (if not provided, will be taken from contact)
+            metadata: Additional metadata
+            organization: Organization instance or None
+            
+        Returns:
+            Created monitoring record
         """
-        if activity_type not in [t[0] for t in cls.ACTIVITY_TYPES]:
-            print(f"Warning: Invalid activity type '{activity_type}'")
-            return None
+        if contact and not organization:
+            organization = contact.organization
             
-        # Get organization from contact if available and not explicitly provided
         if not organization and contact:
-            organization = getattr(contact, 'organization', None)
+            organization = contact.organization
             
-        if not organization:
-            print("Warning: No organization available for monitoring record")
-            return None
+        record = cls.objects.create(
+            contact=contact,
+            user=user,
+            activity_type=activity_type,
+            description=description,
+            organization=organization,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata=metadata or {}
+        )
+        
+        return record
+
+class ContactGroupMonitoring(models.Model):
+    """ContactGroupMonitoring model for tracking interactions and activity with contact groups"""
+    
+    ACTIVITY_TYPES = (
+        ('view', 'View'),
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('add_contact', 'Add Contact'),
+        ('remove_contact', 'Remove Contact'),
+        ('export', 'Export'),
+        ('import', 'Import'),
+        ('other', 'Other')
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    group = models.ForeignKey(
+        ContactGroup,
+        on_delete=models.CASCADE,
+        related_name='monitoring_records',
+        null=True,  # Allow recording events for deleted groups
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,  # Allow system-generated events
+        related_name='group_activities'
+    )
+    activity_type = models.CharField(
+        max_length=20,
+        choices=ACTIVITY_TYPES,
+    )
+    description = models.TextField(blank=True, null=True)
+    organization = models.ForeignKey(
+        'entity.Organization',
+        on_delete=models.CASCADE,
+        related_name='group_monitoring_records'
+    )
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Contact Group Activity Record'
+        verbose_name_plural = 'Contact Group Activity Records'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['group', 'activity_type']),
+            models.Index(fields=['user', 'activity_type']),
+            models.Index(fields=['organization', 'activity_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_activity_type_display()} - {self.group.name if self.group else 'Deleted Group'} - {self.created_at}"
+
+    @classmethod
+    def log_activity(cls, group=None, user=None, activity_type=None, description=None, 
+                    ip_address=None, user_agent=None, metadata=None, organization=None):
+        """
+        Log an activity for a contact group
+        
+        Args:
+            group: ContactGroup instance or None
+            user: User instance or None
+            activity_type: Type of activity
+            description: Description of the activity
+            ip_address: IP address of the request
+            user_agent: User agent of the request
+            metadata: Additional metadata
+            organization: Organization instance or None
             
-        try:
-            # Ensure metadata is a dictionary
-            metadata = metadata or {}
+        Returns:
+            Created monitoring record
+        """
+        if group and not organization:
+            organization = group.organization
             
-            # Create monitoring record
-            record = cls.objects.create(
-                contact=contact,
-                user=user,
-                activity_type=activity_type,
-                description=description,
-                organization=organization,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata=metadata
-            )
-            print(f"Created monitoring record: {record.id}, type: {record.activity_type}, desc: {record.description}")
-            return record
-        except Exception as e:
-            print(f"Error creating monitoring record: {str(e)}")
-            return None
+        if not organization and group:
+            organization = group.organization
+            
+        record = cls.objects.create(
+            group=group,
+            user=user,
+            activity_type=activity_type,
+            description=description,
+            organization=organization,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata=metadata or {}
+        )
+        
+        return record

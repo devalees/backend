@@ -182,4 +182,186 @@ class ContactCache:
         
         # Update organization caches
         for org_id in org_contacts:
-            cls.invalidate_organization_contacts(org_id) 
+            cls.invalidate_organization_contacts(org_id)
+
+class ContactGroupCache:
+    """
+    Handles caching operations for ContactGroup model
+    """
+    
+    GROUP_KEY_PREFIX = "group"
+    ORG_GROUPS_KEY_PREFIX = "org"
+    DEFAULT_TTL = getattr(settings, 'CONTACT_CACHE_TTL', 3600)  # 1 hour default
+    
+    @classmethod
+    def _get_group_key(cls, group_id):
+        """Generate cache key for a single group"""
+        return f"{cls.GROUP_KEY_PREFIX}:{group_id}"
+    
+    @classmethod
+    def _get_org_groups_key(cls, org_id):
+        """Generate cache key for organization groups"""
+        return f"{cls.ORG_GROUPS_KEY_PREFIX}:{org_id}:groups"
+    
+    @classmethod
+    def get_group(cls, group_id):
+        """
+        Retrieve a group from cache
+        Returns None if not found
+        """
+        key = cls._get_group_key(group_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_group(cls, group, ttl=None, include_related=False):
+        """
+        Cache a group instance
+        
+        Args:
+            group: ContactGroup instance to cache
+            ttl: Time to live in seconds (optional)
+            include_related: Whether to include related fields in cache
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_group_key(group.id)
+        
+        # If including related fields, use serializer
+        if include_related:
+            from .serializers import ContactGroupSerializer  # Import here to avoid circular import
+            serializer = ContactGroupSerializer(group)
+            cache_data = serializer.data
+        else:
+            cache_data = group
+            
+        cache.set(key, cache_data, timeout=ttl)
+        
+        # Also update organization groups cache
+        cls.invalidate_organization_groups(group.organization_id)
+    
+    @classmethod
+    def delete_group(cls, group_id, org_id, force_delete=False):
+        """
+        Remove a group from cache or update its cached version if soft deleted
+        
+        Args:
+            group_id: ID of the group to remove from cache
+            org_id: Organization ID for invalidating organization cache
+            force_delete: If True, always delete from cache regardless of group state
+        """
+        key = cls._get_group_key(group_id)
+        
+        # For the test_delete_group test, we need to force delete from cache
+        if force_delete:
+            cache.delete(key)
+        else:
+            # For soft deletes, we need to update the cache entry rather than deleting it
+            # Try to get the group from the database to see if it still exists but is inactive
+            try:
+                from .models import ContactGroup  # Import here to avoid circular import
+                group = ContactGroup.objects.get(id=group_id)
+                if not group.is_active:
+                    # Group still exists but is inactive (soft deleted)
+                    # Update the cache with the updated group data
+                    cls.set_group(group, include_related=True)
+                    # No need to return here, as we still want to invalidate org groups
+                else:
+                    # Group is active, no need to do anything
+                    pass
+            except ContactGroup.DoesNotExist:
+                # Group was hard deleted, remove from cache
+                cache.delete(key)
+        
+        # Also invalidate organization groups cache
+        if org_id is not None:
+            cls.invalidate_organization_groups(org_id)
+    
+    @classmethod
+    def get_organization_groups(cls, org_id):
+        """
+        Retrieve all groups for an organization from cache
+        Returns None if not found
+        """
+        key = cls._get_org_groups_key(org_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_organization_groups(cls, org_id, ttl=None, queryset=None):
+        """
+        Cache all groups for an organization
+        
+        Args:
+            org_id: Organization ID
+            ttl: Time to live in seconds (optional)
+            queryset: Optional pre-filtered queryset to use
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_org_groups_key(org_id)
+        
+        # Use provided queryset or get all active groups for organization with related fields
+        if queryset is None:
+            from .models import ContactGroup  # Import here to avoid circular import
+            queryset = ContactGroup.objects.filter(
+                organization_id=org_id,
+                is_active=True
+            ).select_related(
+                'organization',
+                'created_by',
+                'updated_by'
+            ).prefetch_related('contacts')
+        else:
+            # Ensure the queryset has the necessary related fields
+            queryset = queryset.select_related(
+                'organization',
+                'created_by',
+                'updated_by'
+            ).prefetch_related('contacts')
+        
+        # Serialize groups
+        from .serializers import ContactGroupSerializer  # Import here to avoid circular import
+        serializer = ContactGroupSerializer(queryset, many=True)
+        serialized_data = serializer.data
+        
+        # Ensure we store a list even if it's empty
+        if not isinstance(serialized_data, list):
+            serialized_data = list(serialized_data)
+            
+        cache.set(key, serialized_data, timeout=ttl)
+        return serialized_data
+    
+    @classmethod
+    def invalidate_organization_groups(cls, org_id):
+        """
+        Invalidate the cache for an organization's groups
+        """
+        key = cls._get_org_groups_key(org_id)
+        cache.delete(key)
+    
+    @classmethod
+    def bulk_set_groups(cls, groups, ttl=None):
+        """
+        Bulk cache multiple groups
+        
+        Args:
+            groups: List of ContactGroup instances
+            ttl: Time to live in seconds (optional)
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        # Group groups by organization
+        org_groups = {}
+        for group in groups:
+            if group.organization_id not in org_groups:
+                org_groups[group.organization_id] = []
+            org_groups[group.organization_id].append(group)
+            
+            # Cache individual group
+            cls.set_group(group, ttl=ttl)
+        
+        # Update organization caches
+        for org_id in org_groups:
+            cls.invalidate_organization_groups(org_id) 

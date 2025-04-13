@@ -2,7 +2,7 @@ import pytest
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from Apps.contacts.models import Contact, ContactGroup
-from Apps.contacts.cache_manager import ContactCache
+from Apps.contacts.cache_manager import ContactCache, ContactGroupCache
 from Apps.contacts.tests.factories import ContactFactory, ContactGroupFactory
 from Apps.contacts.serializers import ContactSerializer
 from unittest.mock import patch, MagicMock
@@ -185,4 +185,155 @@ class TestContactCache:
         self.contact.hard_delete()
         
         # Cache should be invalidated
-        assert ContactCache.get_contact(contact_id) is None 
+        assert ContactCache.get_contact(contact_id) is None
+
+@pytest.mark.django_db
+class TestContactGroupCache:
+    """Test cases for ContactGroupCache manager"""
+    
+    def setup_method(self):
+        """Setup for tests"""
+        # Clear cache before each test
+        cache.clear()
+        self.group = ContactGroupFactory()
+        self.org_id = self.group.organization.id
+        
+    def teardown_method(self):
+        """Teardown after tests"""
+        # Clear cache after each test
+        cache.clear()
+        
+    def test_get_group_key(self):
+        """Test generation of group cache key"""
+        group_id = 123
+        expected_key = f"{ContactGroupCache.GROUP_KEY_PREFIX}:{group_id}"
+        assert ContactGroupCache._get_group_key(group_id) == expected_key
+        
+    def test_get_org_groups_key(self):
+        """Test generation of organization groups cache key"""
+        org_id = 456
+        expected_key = f"{ContactGroupCache.ORG_GROUPS_KEY_PREFIX}:{org_id}:groups"
+        assert ContactGroupCache._get_org_groups_key(org_id) == expected_key
+        
+    def test_set_and_get_group(self):
+        """Test setting and getting a group from cache"""
+        # Set group in cache
+        ContactGroupCache.set_group(self.group)
+        
+        # Get group from cache
+        cached_group = ContactGroupCache.get_group(self.group.id)
+        
+        # Verify group is retrieved correctly
+        assert cached_group is not None
+        assert hasattr(cached_group, 'id')
+        assert cached_group.id == self.group.id
+        assert cached_group.name == self.group.name
+        
+    def test_set_group_with_serializer(self):
+        """Test setting a group with serializer"""
+        # Set group in cache with include_related=True to use serializer
+        ContactGroupCache.set_group(self.group, include_related=True)
+        
+        # Get group from cache
+        cached_group = ContactGroupCache.get_group(self.group.id)
+        
+        # Verify it's a serialized dict
+        assert isinstance(cached_group, dict)
+        assert cached_group['id'] == self.group.id
+        assert cached_group['name'] == self.group.name
+        
+    def test_delete_group(self):
+        """Test deleting a group from cache"""
+        # First set the group in cache
+        ContactGroupCache.set_group(self.group)
+        
+        # Verify it exists in cache
+        assert ContactGroupCache.get_group(self.group.id) is not None
+        
+        # Delete from cache with force_delete=True
+        ContactGroupCache.delete_group(self.group.id, self.org_id, force_delete=True)
+        
+        # Verify it's gone
+        assert ContactGroupCache.get_group(self.group.id) is None
+        
+    def test_organization_groups_operations(self):
+        """Test operations for organization groups"""
+        # Create multiple groups for the same organization
+        groups = [self.group]
+        for _ in range(3):
+            groups.append(ContactGroupFactory(organization=self.group.organization))
+        
+        # Cache organization groups
+        ContactGroupCache.set_organization_groups(self.org_id)
+        
+        # Get cached groups
+        cached_groups = ContactGroupCache.get_organization_groups(self.org_id)
+        
+        # Verify
+        assert cached_groups is not None
+        assert isinstance(cached_groups, list)
+        assert len(cached_groups) == len(groups)
+        
+        # Invalidate cache
+        ContactGroupCache.invalidate_organization_groups(self.org_id)
+        
+        # Verify it's gone
+        assert ContactGroupCache.get_organization_groups(self.org_id) is None
+        
+    def test_bulk_set_groups(self):
+        """Test bulk setting of groups"""
+        # Create some groups
+        groups = [self.group]
+        for _ in range(3):
+            groups.append(ContactGroupFactory())
+        
+        # Bulk set
+        ContactGroupCache.bulk_set_groups(groups)
+        
+        # Verify each group is cached
+        for group in groups:
+            cached = ContactGroupCache.get_group(group.id)
+            assert cached is not None
+            assert hasattr(cached, 'id')
+            assert cached.id == group.id
+            
+    def test_save_updates_cache(self):
+        """Test that saving a group updates the cache"""
+        # First set group in cache
+        ContactGroupCache.set_group(self.group, include_related=True)
+        
+        # Update group
+        new_name = "Updated Group Name"
+        self.group.name = new_name
+        self.group.save()
+        
+        # Get from cache
+        cached_group = ContactGroupCache.get_group(self.group.id)
+        
+        # Verify cache was updated
+        assert cached_group['name'] == new_name
+        
+    def test_delete_removes_from_cache(self):
+        """Test that deleting a group removes it from cache"""
+        # First set group in cache
+        ContactGroupCache.set_group(self.group)
+        
+        # Verify it's in cache
+        assert ContactGroupCache.get_group(self.group.id) is not None
+        
+        # Delete the group (soft delete)
+        self.group.delete()
+        
+        # Get from cache
+        cached_group = ContactGroupCache.get_group(self.group.id)
+        
+        # Should still exist but be marked inactive
+        assert cached_group is not None
+        
+        # Now hard delete
+        org_id = self.group.organization_id
+        group_id = self.group.id
+        self.group.hard_delete()
+        
+        # Cache should be invalidated
+        assert ContactGroupCache.get_group(group_id) is None 

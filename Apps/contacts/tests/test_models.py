@@ -2,8 +2,8 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.db.utils import IntegrityError
-from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring
-from Apps.contacts.tests.factories import ContactFactory, ContactGroupFactory, ContactTemplateFactory
+from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring
+from Apps.contacts.tests.factories import ContactFactory, ContactGroupFactory, ContactTemplateFactory, ContactGroupTemplateFactory
 from django.contrib.auth import get_user_model
 from Apps.entity.models import Organization
 from django.db import transaction
@@ -105,6 +105,213 @@ class TestContactGroup:
         group.contacts.remove(contact)
         assert contact not in group.contacts.all()
         assert group not in contact.groups.all()
+
+@pytest.mark.django_db
+class TestContactGroupHierarchy:
+    """Test cases for ContactGroup hierarchy functionality"""
+    
+    def test_create_parent_child_relationship(self):
+        """Test creating a parent-child relationship between groups"""
+        parent_group = ContactGroupFactory()
+        child_group = ContactGroupFactory()
+        
+        # Set parent-child relationship
+        child_group.parent = parent_group
+        child_group.save()
+        
+        # Verify relationship
+        assert child_group.parent == parent_group
+        assert child_group in parent_group.children.all()
+        
+    def test_multiple_level_hierarchy(self):
+        """Test creating a multi-level hierarchy"""
+        grandparent = ContactGroupFactory()
+        parent = ContactGroupFactory()
+        child = ContactGroupFactory()
+        
+        # Set up hierarchy
+        parent.parent = grandparent
+        parent.save()
+        child.parent = parent
+        child.save()
+        
+        # Verify relationships
+        assert parent.parent == grandparent
+        assert child.parent == parent
+        assert child in parent.children.all()
+        assert parent in grandparent.children.all()
+        
+    def test_circular_reference_prevention(self):
+        """Test that circular references are prevented"""
+        group_a = ContactGroupFactory()
+        group_b = ContactGroupFactory()
+        
+        # Set up initial relationship
+        group_b.parent = group_a
+        group_b.save()
+        
+        # Attempt to create circular reference
+        with pytest.raises(ValidationError):
+            group_a.parent = group_b
+            group_a.full_clean()
+            
+    def test_self_reference_prevention(self):
+        """Test that self-references are prevented"""
+        group = ContactGroupFactory()
+        
+        # Attempt to set parent to self
+        with pytest.raises(ValidationError):
+            group.parent = group
+            group.full_clean()
+            
+    def test_get_ancestors(self):
+        """Test getting all ancestors of a group"""
+        level1 = ContactGroupFactory()
+        level2 = ContactGroupFactory(parent=level1)
+        level3 = ContactGroupFactory(parent=level2)
+        
+        # Get ancestors
+        ancestors = level3.get_ancestors()
+        
+        # Verify ancestors
+        assert len(ancestors) == 2
+        assert level2 in ancestors
+        assert level1 in ancestors
+        
+    def test_get_descendants(self):
+        """Test getting all descendants of a group"""
+        parent = ContactGroupFactory()
+        child1 = ContactGroupFactory(parent=parent)
+        child2 = ContactGroupFactory(parent=parent)
+        grandchild = ContactGroupFactory(parent=child1)
+        
+        # Get descendants
+        descendants = parent.get_descendants()
+        
+        # Verify descendants
+        assert len(descendants) == 3
+        assert child1 in descendants
+        assert child2 in descendants
+        assert grandchild in descendants
+        
+    def test_delete_cascades_to_children(self):
+        """Test that deleting a parent group cascades to children"""
+        parent = ContactGroupFactory()
+        child1 = ContactGroupFactory(parent=parent)
+        child2 = ContactGroupFactory(parent=parent)
+        
+        # Delete parent with hard_delete=True to actually delete from database
+        parent.delete(hard_delete=True)
+        
+        # Verify children are also deleted
+        assert not ContactGroup.objects.filter(id=child1.id).exists()
+        assert not ContactGroup.objects.filter(id=child2.id).exists()
+        
+    def test_move_group_in_hierarchy(self):
+        """Test moving a group to a different parent"""
+        original_parent = ContactGroupFactory()
+        new_parent = ContactGroupFactory()
+        child = ContactGroupFactory(parent=original_parent)
+        
+        # Move child to new parent
+        child.parent = new_parent
+        child.save()
+        
+        # Verify new relationship
+        assert child.parent == new_parent
+        assert child not in original_parent.children.all()
+        assert child in new_parent.children.all()
+
+@pytest.mark.django_db
+class TestContactGroupTemplate:
+    """Test cases for ContactGroup template functionality"""
+    
+    def test_create_group_from_template(self):
+        """Test creating a group from a template"""
+        template = ContactGroupTemplateFactory()
+        group = ContactGroup.create_from_template(template)
+        
+        # Verify group was created with template properties
+        assert group.name == template.name
+        assert group.description == template.description
+        assert group.organization == template.organization
+        
+    def test_template_fields_validation(self):
+        """Test validation of template fields"""
+        # Test with valid fields
+        template = ContactGroupTemplateFactory()
+        template.full_clean()  # Should not raise
+        
+        # Test with invalid fields (not a dict)
+        with pytest.raises(ValidationError):
+            template = ContactGroupTemplateFactory()
+            template.fields = "not a dict"
+            template.full_clean()
+            
+        # Test with missing required property
+        with pytest.raises(ValidationError):
+            template = ContactGroupTemplateFactory()
+            del template.fields['name']['required']
+            template.full_clean()
+            
+    def test_template_unique_constraint(self):
+        """Test unique constraint for name within organization"""
+        # Create a template
+        template1 = ContactGroupTemplateFactory(name="Unique Template")
+        
+        # Try to create another with same name and org
+        with pytest.raises(ValidationError):
+            template2 = ContactGroupTemplateFactory.build(
+                name="Unique Template",
+                organization=template1.organization
+            )
+            template2.full_clean()
+            
+    def test_apply_template_to_existing_group(self):
+        """Test applying a template to an existing group"""
+        template = ContactGroupTemplateFactory()
+        group = ContactGroupFactory()
+        
+        # Apply template
+        group.apply_template(template)
+        
+        # Verify group was updated with template properties
+        assert group.name == template.name
+        assert group.description == template.description
+        
+    def test_template_inheritance(self):
+        """Test template inheritance"""
+        parent_template = ContactGroupTemplateFactory()
+        child_template = ContactGroupTemplateFactory(parent=parent_template)
+        
+        # Verify child template inherits from parent
+        assert child_template.parent == parent_template
+        assert child_template in parent_template.children.all()
+        
+    def test_template_versioning(self):
+        """Test template versioning"""
+        template = ContactGroupTemplateFactory()
+        initial_version = template.version
+        
+        # Update template
+        template.name = "Updated Name"
+        template.save()
+        
+        # Verify version was incremented
+        assert template.version > initial_version
+        
+    def test_template_soft_delete(self):
+        """Test soft delete functionality"""
+        template = ContactGroupTemplateFactory()
+        template.delete()
+        assert not template.is_active
+        assert ContactGroupTemplate.objects.filter(id=template.id).exists()
+        
+    def test_template_hard_delete(self):
+        """Test hard delete functionality"""
+        template = ContactGroupTemplateFactory()
+        template.hard_delete()
+        assert not ContactGroupTemplate.objects.filter(id=template.id).exists()
 
 @pytest.mark.django_db
 class TestContactTemplate:

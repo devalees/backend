@@ -1,7 +1,7 @@
 import pytest
 from django.test import RequestFactory
-from Apps.contacts.models import Contact, ContactMonitoring
-from Apps.contacts.tests.factories import ContactFactory, ContactMonitoringFactory
+from Apps.contacts.models import Contact, ContactMonitoring, ContactGroup, ContactGroupMonitoring
+from Apps.contacts.tests.factories import ContactFactory, ContactMonitoringFactory, ContactGroupFactory, ContactGroupMonitoringFactory
 from Apps.entity.tests.factories import OrganizationFactory
 from Apps.core.tests.factories import UserFactory
 from unittest.mock import patch
@@ -172,6 +172,169 @@ class TestContactMonitoring:
         # Verify the record was created with the right attributes
         assert record.id is not None
         assert record.contact == contact
+        assert record.user == user
+        assert record.activity_type == 'view'
+        assert record.description == 'Test description'
+        assert record.ip_address == '192.168.1.5'
+        assert record.user_agent == 'Test Agent'
+        assert record.metadata == {'test_key': 'test_value'}
+
+@pytest.mark.django_db
+class TestContactGroupMonitoring:
+    """Test cases for ContactGroupMonitoring model"""
+    
+    def test_create_group_monitoring_record(self):
+        """Test creating a group monitoring record directly"""
+        group = ContactGroupFactory()
+        record = ContactGroupMonitoringFactory(group=group)
+        assert record.id is not None
+        assert record.group is not None
+        assert record.user is not None
+        assert record.activity_type == 'view'
+        assert record.organization == group.organization
+        
+    def test_str_representation(self):
+        """Test string representation of group monitoring record"""
+        group = ContactGroupFactory()
+        record = ContactGroupMonitoringFactory(group=group)
+        # String should include activity type, group name, and timestamp
+        assert record.get_activity_type_display() in str(record)
+        assert group.name in str(record)
+        
+    def test_monitoring_on_group_create(self):
+        """Test monitoring record creation when group is created"""
+        user = UserFactory()
+        organization = OrganizationFactory.create()
+        request_factory = RequestFactory()
+        request = request_factory.get('/')
+        request.META['REMOTE_ADDR'] = '192.168.1.1'
+        request.META['HTTP_USER_AGENT'] = 'Test Browser'
+        
+        # Create group with explicit organization and request metadata
+        group = ContactGroup(
+            name='Test Group',
+            description='Test Description',
+            organization=organization,
+            created_by=user,
+            updated_by=user
+        )
+        group.save(user=user, request_meta=request.META)
+        
+        # Verify monitoring record was created
+        records = ContactGroupMonitoring.objects.filter(
+            group=group,
+            activity_type='create'
+        )
+        assert records.count() >= 1, "No create monitoring records found"
+        record = records.first()
+        assert record.ip_address == '192.168.1.1'
+        assert record.user_agent == 'Test Browser'
+        
+    def test_monitoring_on_group_update(self):
+        """Test monitoring record creation when group is updated"""
+        # First create a group
+        group = ContactGroupFactory()
+        
+        # Now update it
+        user = UserFactory()
+        request_factory = RequestFactory()
+        request = request_factory.get('/')
+        request.META['REMOTE_ADDR'] = '192.168.1.2'
+        request.META['HTTP_USER_AGENT'] = 'Test Browser 2'
+        
+        group.name = 'Updated Name'
+        group.save(user=user, request_meta=request.META)
+        
+        # Verify monitoring record was created
+        records = ContactGroupMonitoring.objects.filter(
+            group=group,
+            user=user,
+            activity_type='update'
+        )
+        assert records.count() == 1
+        record = records.first()
+        assert record.ip_address == '192.168.1.2'
+        assert record.user_agent == 'Test Browser 2'
+        
+    def test_monitoring_on_group_soft_delete(self):
+        """Test monitoring record creation on soft delete"""
+        group = ContactGroupFactory()
+        user = UserFactory()
+        request_factory = RequestFactory()
+        request = request_factory.get('/')
+        request.META['REMOTE_ADDR'] = '192.168.1.3'
+        
+        # Soft delete
+        group.delete(user=user, request_meta=request.META)
+        
+        # Verify monitoring records
+        records = ContactGroupMonitoring.objects.filter(
+            group=group,
+            user=user,
+            activity_type='delete'
+        )
+        assert records.count() == 1
+        record = records.first()
+        assert 'Soft delete' in record.description
+        
+    def test_monitoring_on_group_hard_delete(self):
+        """Test monitoring record creation on hard delete"""
+        with transaction.atomic():
+            group = ContactGroupFactory()
+            group_id = group.id
+            org_id = group.organization.id
+            user = UserFactory()
+            request_factory = RequestFactory()
+            request = request_factory.get('/')
+            request.META['REMOTE_ADDR'] = '192.168.1.4'
+            request.META['HTTP_USER_AGENT'] = 'Test Browser'
+            
+            # Create a monitoring record before deletion
+            pre_delete_record = ContactGroupMonitoring.log_activity(
+                group=group,
+                user=user,
+                activity_type='view',
+                description='Pre-delete view',
+                ip_address='192.168.1.4',
+                user_agent='Test Browser',
+                metadata={'pre_delete': True}
+            )
+            
+            # Hard delete
+            group.hard_delete(user=user, request_meta=request.META)
+            
+            # Verify monitoring record was created
+            records = ContactGroupMonitoring.objects.filter(
+                organization_id=org_id,
+                activity_type='delete',
+                description='Hard delete'
+            ).order_by('-created_at')
+            
+            assert records.exists(), "No delete monitoring records found"
+            record = records.first()
+            assert record.ip_address == '192.168.1.4'
+            assert record.user_agent == 'Test Browser'
+            assert record.metadata.get('method') == 'hard_delete'
+            
+    def test_activity_log_class_method(self):
+        """Test the log_activity class method"""
+        group = ContactGroupFactory()
+        user = UserFactory()
+        
+        # Use the class method directly
+        record = ContactGroupMonitoring.log_activity(
+            group=group,
+            user=user,
+            activity_type='view',
+            description='Test description',
+            ip_address='192.168.1.5',
+            user_agent='Test Agent',
+            metadata={'test_key': 'test_value'}
+        )
+        
+        # Verify the record was created with the right attributes
+        assert record.id is not None
+        assert record.group == group
         assert record.user == user
         assert record.activity_type == 'view'
         assert record.description == 'Test description'
