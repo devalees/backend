@@ -390,3 +390,224 @@ class TestContactTemplate:
             )
             # Use full_clean() to trigger validation before database insert
             template2.full_clean() 
+
+@pytest.mark.django_db
+class TestCommunication:
+    """Test cases for Communication model"""
+    
+    def test_create_communication(self):
+        """Test creating a communication"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        
+        communication = CommunicationFactory()
+        assert communication.subject is not None
+        assert communication.message is not None
+        assert communication.contact is not None
+        assert communication.organization is not None
+        assert communication.created_by is not None
+        assert communication.updated_by is not None
+        assert communication.communication_type == 'email'
+        assert communication.status == 'draft'
+        assert communication.is_active
+        
+    def test_communication_str(self):
+        """Test string representation of communication"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        
+        communication = CommunicationFactory()
+        assert str(communication) == communication.subject
+        
+    def test_communication_soft_delete(self):
+        """Test soft delete functionality"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from Apps.contacts.models import Communication
+        
+        communication = CommunicationFactory()
+        communication.delete()
+        assert not communication.is_active
+        assert Communication.objects.filter(id=communication.id).exists()
+        
+    def test_communication_hard_delete(self):
+        """Test hard delete functionality"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from Apps.contacts.models import Communication
+        
+        communication = CommunicationFactory()
+        communication.hard_delete()
+        assert not Communication.objects.filter(id=communication.id).exists()
+        
+    def test_communication_status_transitions(self):
+        """Test communication status transitions"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from Apps.contacts.models import Communication
+        
+        communication = CommunicationFactory(status='draft')
+        
+        # Test sending a draft communication
+        communication.status = 'sending'
+        communication.save()
+        assert communication.status == 'sending'
+        
+        # Test completing the send
+        communication.status = 'sent'
+        communication.save()
+        assert communication.status == 'sent'
+        
+        # Test marking as failed
+        communication = CommunicationFactory(status='sending')
+        communication.status = 'failed'
+        communication.save()
+        assert communication.status == 'failed'
+        
+    def test_communication_validation(self):
+        """Test communication validation"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from django.core.exceptions import ValidationError
+        
+        # Test invalid communication type
+        with pytest.raises(ValidationError):
+            communication = CommunicationFactory(communication_type='invalid_type')
+            communication.full_clean()
+            
+        # Test invalid status
+        with pytest.raises(ValidationError):
+            communication = CommunicationFactory(status='invalid_status')
+            communication.full_clean()
+            
+    def test_scheduled_communication(self):
+        """Test scheduling a communication"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from django.utils import timezone
+        import datetime
+        
+        # Schedule for future
+        future_time = timezone.now() + datetime.timedelta(hours=1)
+        communication = CommunicationFactory(scheduled_at=future_time, status='scheduled')
+        
+        assert communication.scheduled_at == future_time
+        assert communication.status == 'scheduled'
+        assert not communication.is_sent
+        
+        # Test is_sent property
+        sent_communication = CommunicationFactory(status='sent')
+        assert sent_communication.is_sent
+        
+        # Test is_failed property
+        failed_communication = CommunicationFactory(status='failed')
+        assert failed_communication.is_failed
+
+@pytest.mark.django_db
+class TestCommunicationTemplate:
+    """Test cases for CommunicationTemplate model"""
+    
+    def test_create_communication_template(self):
+        """Test creating a communication template"""
+        from Apps.contacts.models import CommunicationTemplate
+        from Apps.entity.tests.factories import OrganizationFactory
+        from Apps.core.tests.factories import UserFactory
+        
+        organization = OrganizationFactory()
+        user = UserFactory()
+        
+        template = CommunicationTemplate.objects.create(
+            name='Test Template',
+            description='Test description',
+            organization=organization,
+            created_by=user,
+            updated_by=user,
+            subject_template='Hello {{contact.name}}',
+            message_template='This is a test message for {{contact.name}}',
+            communication_type='email'
+        )
+        
+        assert template.name == 'Test Template'
+        assert template.description == 'Test description'
+        assert template.subject_template == 'Hello {{contact.name}}'
+        assert template.message_template == 'This is a test message for {{contact.name}}'
+        assert template.communication_type == 'email'
+        assert template.organization == organization
+        assert template.created_by == user
+        assert template.updated_by == user
+        
+    def test_template_render(self):
+        """Test rendering a template with contact data"""
+        from Apps.contacts.models import CommunicationTemplate
+        from Apps.contacts.tests.factories import ContactFactory
+        from Apps.entity.tests.factories import OrganizationFactory
+        from Apps.core.tests.factories import UserFactory
+        
+        organization = OrganizationFactory()
+        user = UserFactory()
+        contact = ContactFactory(name='Test Contact', organization=organization)
+        
+        template = CommunicationTemplate.objects.create(
+            name='Test Template',
+            description='Test description',
+            organization=organization,
+            created_by=user,
+            updated_by=user,
+            subject_template='Hello {{contact.name}}',
+            message_template='This is a test message for {{contact.name}}',
+            communication_type='email'
+        )
+        
+        communication = template.create_communication(contact, user)
+        
+        assert communication.subject == 'Hello Test Contact'
+        assert communication.message == 'This is a test message for Test Contact'
+        assert communication.contact == contact
+        assert communication.communication_type == 'email'
+        assert communication.status == 'draft'
+        
+    def test_template_validation(self):
+        """Test template validation"""
+        from Apps.contacts.models import CommunicationTemplate
+        from Apps.entity.tests.factories import OrganizationFactory
+        from Apps.core.tests.factories import UserFactory
+        from django.core.exceptions import ValidationError
+        
+        organization = OrganizationFactory()
+        user = UserFactory()
+        
+        # Test invalid communication type
+        with pytest.raises(ValidationError):
+            template = CommunicationTemplate(
+                name='Test Template',
+                organization=organization,
+                created_by=user,
+                updated_by=user,
+                subject_template='Test',
+                message_template='Test',
+                communication_type='invalid_type'
+            )
+            template.full_clean()
+
+@pytest.mark.django_db
+class TestCommunicationMonitoring:
+    """Test cases for CommunicationMonitoring model"""
+    
+    def test_log_activity(self):
+        """Test logging communication activity"""
+        from Apps.contacts.tests.factories import CommunicationFactory
+        from Apps.contacts.models import CommunicationMonitoring
+        from Apps.core.tests.factories import UserFactory
+        
+        communication = CommunicationFactory()
+        user = UserFactory()
+        
+        activity = CommunicationMonitoring.log_activity(
+            communication=communication,
+            user=user,
+            activity_type='view',
+            description='Test view',
+            ip_address='192.168.1.1',
+            user_agent='Test Browser'
+        )
+        
+        assert activity.communication == communication
+        assert activity.user == user
+        assert activity.activity_type == 'view'
+        assert activity.description == 'Test view'
+        assert activity.ip_address == '192.168.1.1'
+        assert activity.user_agent == 'Test Browser'
+        assert activity.organization == communication.organization 

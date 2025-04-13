@@ -90,3 +90,103 @@ class ContactTemplateSerializer(serializers.ModelSerializer):
                 )
         
         return value 
+
+class CommunicationSerializer(serializers.ModelSerializer):
+    """Serializer for Communication model"""
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    contact_name = serializers.CharField(source='contact.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
+    class Meta:
+        from .models import Communication
+        model = Communication
+        fields = (
+            'id', 'subject', 'message', 'communication_type', 'status',
+            'contact', 'contact_name', 'organization', 'organization_name',
+            'created_at', 'updated_at', 'scheduled_at', 'sent_at',
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
+            'is_active', 'metadata'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at', 'sent_at')
+        
+    def validate(self, data):
+        """Validate the data"""
+        # Check that contact belongs to organization if both are provided
+        if 'contact' in data and 'organization' in data:
+            if data['contact'].organization != data['organization']:
+                raise serializers.ValidationError(
+                    {'contact': 'Contact must belong to the specified organization.'}
+                )
+        
+        # Validate communication_type
+        if 'communication_type' in data:
+            from .models import Communication
+            valid_types = dict(Communication.COMMUNICATION_TYPES).keys()
+            if data['communication_type'] not in valid_types:
+                raise serializers.ValidationError(
+                    {'communication_type': f'Invalid communication type. Must be one of {valid_types}'}
+                )
+                
+        # Validate status
+        if 'status' in data:
+            from .models import Communication
+            valid_statuses = dict(Communication.STATUS_TYPES).keys()
+            if data['status'] not in valid_statuses:
+                raise serializers.ValidationError(
+                    {'status': f'Invalid status. Must be one of {valid_statuses}'}
+                )
+                
+        # Validate scheduled communications
+        if data.get('status') == 'scheduled' and not data.get('scheduled_at'):
+            raise serializers.ValidationError(
+                {'scheduled_at': 'Scheduled communications must have a scheduled date and time.'}
+            )
+            
+        return data
+
+class CommunicationTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for CommunicationTemplate model"""
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
+    class Meta:
+        from .models import CommunicationTemplate
+        model = CommunicationTemplate
+        fields = (
+            'id', 'name', 'description', 'subject_template', 'message_template',
+            'communication_type', 'organization', 'organization_name', 
+            'created_at', 'updated_at', 'created_by', 'created_by_name',
+            'updated_by', 'updated_by_name', 'is_active'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+        
+    def validate(self, data):
+        """Validate the data"""
+        # Validate communication_type
+        if 'communication_type' in data:
+            from .models import Communication
+            valid_types = dict(Communication.COMMUNICATION_TYPES).keys()
+            if data['communication_type'] not in valid_types:
+                raise serializers.ValidationError(
+                    {'communication_type': f'Invalid communication type. Must be one of {valid_types}'}
+                )
+                
+        return data
+        
+class CommunicationMonitoringSerializer(serializers.ModelSerializer):
+    """Serializer for CommunicationMonitoring model"""
+    communication_subject = serializers.CharField(source='communication.subject', read_only=True, allow_null=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True, allow_null=True)
+    
+    class Meta:
+        from .models import CommunicationMonitoring
+        model = CommunicationMonitoring
+        fields = (
+            'id', 'communication', 'communication_subject', 'user', 'user_name',
+            'activity_type', 'description', 'organization', 'organization_name',
+            'created_at', 'ip_address', 'user_agent', 'metadata'
+        )
+        read_only_fields = ('id', 'created_at') 

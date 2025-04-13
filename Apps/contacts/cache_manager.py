@@ -364,4 +364,266 @@ class ContactGroupCache:
         
         # Update organization caches
         for org_id in org_groups:
-            cls.invalidate_organization_groups(org_id) 
+            cls.invalidate_organization_groups(org_id)
+
+class CommunicationCache:
+    """
+    Handles caching operations for Communication model
+    """
+    
+    COMMUNICATION_KEY_PREFIX = "communication"
+    CONTACT_COMMUNICATIONS_KEY_PREFIX = "contact"
+    ORG_COMMUNICATIONS_KEY_PREFIX = "org"
+    DEFAULT_TTL = getattr(settings, 'CONTACT_CACHE_TTL', 3600)  # 1 hour default
+    
+    @classmethod
+    def _get_communication_key(cls, communication_id):
+        """Generate cache key for a single communication"""
+        return f"{cls.COMMUNICATION_KEY_PREFIX}:{communication_id}"
+    
+    @classmethod
+    def _get_contact_communications_key(cls, contact_id):
+        """Generate cache key for contact communications"""
+        return f"{cls.CONTACT_COMMUNICATIONS_KEY_PREFIX}:{contact_id}:communications"
+    
+    @classmethod
+    def _get_org_communications_key(cls, org_id):
+        """Generate cache key for organization communications"""
+        return f"{cls.ORG_COMMUNICATIONS_KEY_PREFIX}:{org_id}:communications"
+    
+    @classmethod
+    def get_communication(cls, communication_id):
+        """
+        Retrieve a communication from cache
+        Returns None if not found
+        """
+        key = cls._get_communication_key(communication_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_communication(cls, communication, ttl=None, include_related=False):
+        """
+        Cache a communication instance
+        
+        Args:
+            communication: Communication instance to cache
+            ttl: Time to live in seconds (optional)
+            include_related: Whether to include related fields in cache
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_communication_key(communication.id)
+        
+        # If including related fields, use serializer
+        if include_related:
+            from .serializers import CommunicationSerializer  # Import here to avoid circular import
+            serializer = CommunicationSerializer(communication)
+            cache_data = serializer.data
+        else:
+            cache_data = communication
+            
+        cache.set(key, cache_data, timeout=ttl)
+        
+    @classmethod
+    def delete_communication(cls, communication_id, org_id, force_delete=False):
+        """
+        Remove a communication from cache or update its cached version if soft deleted
+        
+        Args:
+            communication_id: ID of the communication to remove from cache
+            org_id: Organization ID for invalidating organization cache
+            force_delete: If True, always delete from cache regardless of communication state
+        """
+        key = cls._get_communication_key(communication_id)
+        
+        if force_delete:
+            cache.delete(key)
+        else:
+            # For soft deletes, we need to update the cache entry rather than deleting it
+            # Try to get the communication from the database to see if it still exists but is inactive
+            try:
+                from .models import Communication  # Import here to avoid circular import
+                communication = Communication.objects.get(id=communication_id)
+                if not communication.is_active:
+                    # Communication still exists but is inactive (soft deleted)
+                    # Update the cache with the updated communication data
+                    cls.set_communication(communication, include_related=True)
+                    # No need to return here, as we still want to invalidate related caches
+                else:
+                    # Communication is active, no need to do anything
+                    pass
+            except Communication.DoesNotExist:
+                # Communication was hard deleted, remove from cache
+                cache.delete(key)
+        
+        # Invalidate related caches
+        if org_id is not None:
+            cls.invalidate_organization_communications(org_id)
+    
+    @classmethod
+    def get_contact_communications(cls, contact_id):
+        """
+        Retrieve all communications for a contact from cache
+        Returns None if not found
+        """
+        key = cls._get_contact_communications_key(contact_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_contact_communications(cls, contact_id, ttl=None, queryset=None):
+        """
+        Cache all communications for a contact
+        
+        Args:
+            contact_id: Contact ID
+            ttl: Time to live in seconds (optional)
+            queryset: Optional pre-filtered queryset to use
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_contact_communications_key(contact_id)
+        
+        # Use provided queryset or get all active communications for contact with related fields
+        if queryset is None:
+            from .models import Communication  # Import here to avoid circular import
+            queryset = Communication.objects.filter(
+                contact_id=contact_id,
+                is_active=True
+            ).select_related(
+                'organization',
+                'contact',
+                'created_by',
+                'updated_by'
+            )
+        else:
+            # Ensure the queryset has the necessary related fields
+            queryset = queryset.select_related(
+                'organization',
+                'contact',
+                'created_by',
+                'updated_by'
+            )
+        
+        # Serialize communications
+        from .serializers import CommunicationSerializer  # Import here to avoid circular import
+        serializer = CommunicationSerializer(queryset, many=True)
+        serialized_data = serializer.data
+        
+        # Ensure we store a list even if it's empty
+        if not isinstance(serialized_data, list):
+            serialized_data = list(serialized_data)
+            
+        cache.set(key, serialized_data, timeout=ttl)
+        return serialized_data
+    
+    @classmethod
+    def invalidate_contact_communications(cls, contact_id):
+        """
+        Invalidate the cache for a contact's communications
+        """
+        key = cls._get_contact_communications_key(contact_id)
+        cache.delete(key)
+    
+    @classmethod
+    def get_organization_communications(cls, org_id):
+        """
+        Retrieve all communications for an organization from cache
+        Returns None if not found
+        """
+        key = cls._get_org_communications_key(org_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_organization_communications(cls, org_id, ttl=None, queryset=None):
+        """
+        Cache all communications for an organization
+        
+        Args:
+            org_id: Organization ID
+            ttl: Time to live in seconds (optional)
+            queryset: Optional pre-filtered queryset to use
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_org_communications_key(org_id)
+        
+        # Use provided queryset or get all active communications for organization with related fields
+        if queryset is None:
+            from .models import Communication  # Import here to avoid circular import
+            queryset = Communication.objects.filter(
+                organization_id=org_id,
+                is_active=True
+            ).select_related(
+                'organization',
+                'contact',
+                'created_by',
+                'updated_by'
+            )
+        else:
+            # Ensure the queryset has the necessary related fields
+            queryset = queryset.select_related(
+                'organization',
+                'contact',
+                'created_by',
+                'updated_by'
+            )
+        
+        # Serialize communications
+        from .serializers import CommunicationSerializer  # Import here to avoid circular import
+        serializer = CommunicationSerializer(queryset, many=True)
+        serialized_data = serializer.data
+        
+        # Ensure we store a list even if it's empty
+        if not isinstance(serialized_data, list):
+            serialized_data = list(serialized_data)
+            
+        cache.set(key, serialized_data, timeout=ttl)
+        return serialized_data
+    
+    @classmethod
+    def invalidate_organization_communications(cls, org_id):
+        """
+        Invalidate the cache for an organization's communications
+        """
+        key = cls._get_org_communications_key(org_id)
+        cache.delete(key)
+    
+    @classmethod
+    def bulk_set_communications(cls, communications, ttl=None):
+        """
+        Bulk cache multiple communications
+        
+        Args:
+            communications: List of Communication instances
+            ttl: Time to live in seconds (optional)
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        # Group communications by organization and contact
+        org_communications = {}
+        contact_communications = {}
+        
+        for communication in communications:
+            # Group by organization
+            if communication.organization_id not in org_communications:
+                org_communications[communication.organization_id] = []
+            org_communications[communication.organization_id].append(communication)
+            
+            # Group by contact
+            if communication.contact_id not in contact_communications:
+                contact_communications[communication.contact_id] = []
+            contact_communications[communication.contact_id].append(communication)
+            
+            # Cache individual communication
+            cls.set_communication(communication, ttl=ttl)
+        
+        # Update organization and contact caches
+        for org_id in org_communications:
+            cls.invalidate_organization_communications(org_id)
+            
+        for contact_id in contact_communications:
+            cls.invalidate_contact_communications(contact_id) 

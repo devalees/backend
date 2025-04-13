@@ -141,3 +141,55 @@ class ContactGroupMonitoringFactory(factory.django.DjangoModelFactory):
         if 'organization' not in kwargs and 'group' in kwargs:
             kwargs['organization'] = kwargs['group'].organization
         return super()._build(model_class, *args, **kwargs)
+
+class CommunicationFactory(BaseModelFactory):
+    class Meta:
+        model = 'contacts.Communication'
+        skip_postgeneration_save = True
+        
+    subject = Sequence(lambda n: f'Communication Subject {n}')
+    message = Faker('text')
+    contact = SubFactory(ContactFactory)
+    organization = LazyAttribute(lambda o: o.contact.organization)
+    created_by = SubFactory(UserFactory)
+    updated_by = SubFactory(UserFactory)
+    communication_type = 'email'
+    status = 'draft'
+    scheduled_at = None
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        return super()._create(model_class, *args, **kwargs)
+    
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        return super()._build(model_class, *args, **kwargs)
+
+class CommunicationMonitoringFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'contacts.CommunicationMonitoring'
+        
+    communication = factory.SubFactory(CommunicationFactory)
+    user = factory.SubFactory('Apps.core.tests.factories.UserFactory')
+    activity_type = 'view'
+    description = factory.LazyAttribute(lambda o: f"{o.activity_type.title()} of {o.communication.subject}")
+    ip_address = '192.168.1.1'
+    user_agent = 'Test Browser'
+    metadata = factory.LazyFunction(lambda: {})
+    organization = factory.LazyAttribute(lambda o: o.communication.organization)
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'communication' in kwargs:
+            kwargs['organization'] = kwargs['communication'].organization
+        return super()._create(model_class, *args, **kwargs)
+        
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'communication' in kwargs:
+            kwargs['organization'] = kwargs['communication'].organization
+        return super()._build(model_class, *args, **kwargs)
