@@ -65,10 +65,10 @@
   - [x] Average aggregations
   - [x] Min/Max aggregations
   - [x] Custom aggregations
-- [ ] Create aggregation grouping system
-  - [ ] Group by fields
-  - [ ] Multiple aggregations
-  - [ ] Nested aggregations
+- [x] Create aggregation grouping system
+  - [x] Group by fields
+  - [x] Multiple aggregations
+  - [x] Nested aggregations
 - [ ] Implement aggregation validation
   - [ ] Field validation
   - [ ] Type validation
