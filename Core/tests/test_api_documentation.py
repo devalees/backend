@@ -24,25 +24,28 @@ class TestAPIDocumentation:
         """Test that the schema includes Role endpoints"""
         response = client.get('/api/schema/')
         schema = response.json()
-        assert '/api/roles/' in schema['paths']
-        assert 'get' in schema['paths']['/api/roles/']
-        assert 'post' in schema['paths']['/api/roles/']
+        # Updated to match the actual URL path in the project
+        assert '/api/v1/rbac/api/roles/' in schema['paths']
+        assert 'get' in schema['paths']['/api/v1/rbac/api/roles/']
+        assert 'post' in schema['paths']['/api/v1/rbac/api/roles/']
 
     def test_schema_contains_permission_endpoints(self, client):
         """Test that the schema includes Permission endpoints"""
         response = client.get('/api/schema/')
         schema = response.json()
-        assert '/api/permissions/' in schema['paths']
-        assert 'get' in schema['paths']['/api/permissions/']
-        assert 'post' in schema['paths']['/api/permissions/']
+        # Updated to match the actual URL path in the project
+        assert '/api/v1/rbac/api/permissions/' in schema['paths']
+        assert 'get' in schema['paths']['/api/v1/rbac/api/permissions/']
+        assert 'post' in schema['paths']['/api/v1/rbac/api/permissions/']
 
     def test_schema_contains_user_role_endpoints(self, client):
         """Test that the schema includes User-Role endpoints"""
         response = client.get('/api/schema/')
         schema = response.json()
-        assert '/api/user-roles/' in schema['paths']
-        assert 'get' in schema['paths']['/api/user-roles/']
-        assert 'post' in schema['paths']['/api/user-roles/']
+        # Updated to match the actual URL path in the project
+        assert '/api/v1/rbac/user-roles/' in schema['paths']
+        assert 'get' in schema['paths']['/api/v1/rbac/user-roles/']
+        assert 'post' in schema['paths']['/api/v1/rbac/user-roles/']
 
     def test_schema_contains_rate_limit_info(self, client):
         """Test that the schema includes rate limit information"""
