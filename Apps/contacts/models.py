@@ -1307,26 +1307,33 @@ class ContactList(models.Model):
             self.save()
 
     def clean(self):
-        """Validate the contact list"""
+        """Validate the contact list."""
         super().clean()
         
         if not self.name:
             raise ValidationError({'name': _('Name is required')})
         
-        if not self.organization:
+        if not self.organization_id:
             raise ValidationError({'organization': _('Organization is required')})
-            
+
         # Check name uniqueness within organization
         if ContactList.objects.filter(
-            name=self.name,
-            organization=self.organization
+            organization=self.organization,
+            name=self.name
         ).exclude(pk=self.pk).exists():
-            raise ValidationError({'name': _('A contact list with this name already exists in this organization.')})
-            
-        # Validate contacts belong to the same organization
+            raise ValidationError({
+                'name': _('A contact list with this name already exists in this organization')
+            })
+        
+        # Validate metadata format
+        if self.metadata and not isinstance(self.metadata, dict):
+            raise ValidationError({'metadata': _('Metadata must be a valid JSON object')})
+
+        # Only check contacts if the instance has been saved
         if self.pk and self.contacts.exists():
+            # Check that all contacts belong to the same organization
             invalid_contacts = self.contacts.exclude(organization=self.organization)
             if invalid_contacts.exists():
                 raise ValidationError({
-                    'contacts': _('All contacts must belong to the same organization as the contact list.')
+                    'contacts': _('All contacts must belong to the same organization as the contact list')
                 })

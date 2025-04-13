@@ -39,7 +39,7 @@
 ## 4. Contact Planning
 - [x] Create ContactList model and migrations
 - [x] Implement list CRUD operations
-- [ ] Add list validation
+- [x] Add list validation
 - [ ] Create contact segments
 - [ ] Implement list templates
 - [ ] Add list caching
