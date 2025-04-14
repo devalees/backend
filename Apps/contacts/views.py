@@ -6,6 +6,7 @@ from .models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, C
 from .serializers import ContactSerializer, ContactGroupSerializer, ContactTemplateSerializer, CommunicationSerializer, CommunicationTemplateSerializer, CommunicationMonitoringSerializer, ContactListSerializer
 from .cache_manager import ContactCache, CommunicationCache
 import logging
+from django.http import Http404
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -693,10 +694,37 @@ class ContactListViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter contact lists by organization"""
+        # Start with only active lists
+        queryset = ContactList.objects.filter(is_active=True)
+        
+        # Get the user's organization
+        user_org = None
+        if hasattr(self.request.user, 'team_memberships'):
+            # Get the first active team membership's organization
+            team_membership = self.request.user.team_memberships.filter(is_active=True).first()
+            if team_membership:
+                user_org = team_membership.team.department.organization
+        
+        # Filter by organization from URL parameters if provided
         organization_id = self.request.query_params.get('organization', None)
+        
         if organization_id:
-            return ContactList.objects.filter(organization_id=organization_id, is_active=True)
-        return ContactList.objects.filter(is_active=True)
+            try:
+                # Convert to integer to ensure type consistency
+                org_id = int(organization_id)
+                queryset = queryset.filter(organization_id=org_id)
+                
+                # If user doesn't belong to this organization, return empty queryset
+                if user_org and user_org.id != org_id:
+                    return ContactList.objects.none()
+            except (ValueError, TypeError):
+                # If organization_id is invalid, return empty queryset
+                return ContactList.objects.none()
+        elif user_org:
+            # If no specific organization requested, filter to user's organization
+            queryset = queryset.filter(organization=user_org)
+                
+        return queryset
     
     def perform_create(self, serializer):
         """Set created_by and updated_by on create"""
@@ -704,36 +732,22 @@ class ContactListViewSet(viewsets.ModelViewSet):
             created_by=self.request.user,
             updated_by=self.request.user
         )
-        logger.info(
-            f"Contact list created by {self.request.user.username} "
-            f"for organization {serializer.validated_data.get('organization').id}"
-        )
     
     def perform_update(self, serializer):
         """Set updated_by on update"""
-        serializer.save(updated_by=self.request.user)
-        logger.info(
-            f"Contact list {serializer.instance.id} updated by {self.request.user.username} "
-            f"for organization {serializer.instance.organization.id}"
+        serializer.save(
+            updated_by=self.request.user
         )
     
     def perform_destroy(self, instance):
-        """Override destroy to perform soft delete"""
-        instance.delete()
-        logger.info(
-            f"Contact list {instance.id} soft-deleted by {self.request.user.username} "
-            f"for organization {instance.organization.id}"
-        )
+        """Override destroy to use soft delete"""
+        instance.is_active = False
+        instance.save()
     
     @action(detail=True, methods=['delete'])
     def hard_delete(self, request, pk=None):
-        """Hard delete endpoint"""
+        """Hard delete a contact list"""
         instance = self.get_object()
-        instance.hard_delete()
-        
-        logger.info(
-            f"Contact list {pk} hard-deleted by {request.user.username} "
-            f"for organization {instance.organization.id}"
-        )
-        
+        # Use the model's delete method with hard_delete=True instead of default delete()
+        instance.delete(hard_delete=True)
         return Response(status=status.HTTP_204_NO_CONTENT)

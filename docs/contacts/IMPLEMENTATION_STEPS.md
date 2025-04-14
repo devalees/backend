@@ -43,9 +43,9 @@
 - [x] Create contact segments
 - [x] Implement list templates
 - [x] Add list caching
-- [ ] Create list API endpoints
+- [x] Create list API endpoints
 - [ ] Add list documentation
-- [ ] Implement list tests
+- [x] Implement list tests
 - [ ] Add list monitoring
 
 ## 5. Contact Monitoring
