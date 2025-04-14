@@ -12,8 +12,34 @@ import re
 from django.db.models.signals import pre_save, post_save, post_delete, pre_delete
 from django.dispatch import receiver
 from .cache_manager import ContactListCache
+from .models.contact import Contact
+from .models.contact_group import ContactGroup
+from .models.communication import Communication, CommunicationTemplate
+from .models.contact_list import ContactList, ContactListTemplate
+from .models.contact_segment import ContactSegment
+from .models.templates import ContactTemplate, ContactGroupTemplate
+from .models.monitoring import (
+    ContactMonitoring,
+    ContactGroupMonitoring,
+    CommunicationMonitoring
+)
 
 User = get_user_model()
+
+__all__ = [
+    'Contact',
+    'ContactGroup',
+    'Communication',
+    'CommunicationTemplate',
+    'ContactList',
+    'ContactListTemplate',
+    'ContactSegment',
+    'ContactTemplate',
+    'ContactGroupTemplate',
+    'ContactMonitoring',
+    'ContactGroupMonitoring',
+    'CommunicationMonitoring',
+]
 
 class Contact(TaskAwareModel):
     """Contact model representing a person or organization with task handling capabilities"""
