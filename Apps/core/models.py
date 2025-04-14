@@ -231,4 +231,15 @@ class Config(BaseModel):
         """Prevent deletion of non-editable configurations"""
         if not self.is_editable:
             raise ValidationError("This configuration setting cannot be deleted")
-        super().delete(*args, **kwargs) 
+        super().delete(*args, **kwargs)
+
+class TimeStampedModel(models.Model):
+    """
+    An abstract base class model that provides self-updating
+    created_at and updated_at fields.
+    """
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True 

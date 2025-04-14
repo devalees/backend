@@ -807,4 +807,104 @@ class ContactListCache:
         for org_id, org_contact_lists in org_lists.items():
             # Cache the organization's lists
             key = cls._get_org_lists_key(org_id)
-            cache.set(key, org_contact_lists, timeout=ttl) 
+            cache.set(key, org_contact_lists, timeout=ttl)
+
+class ContactNoteCache:
+    """Cache manager for contact notes"""
+    
+    NOTE_KEY_PREFIX = 'contact_note'
+    NOTE_LIST_KEY_PREFIX = 'contact_note_list'
+    
+    @classmethod
+    def get_note_key(cls, note_id):
+        """Get cache key for a note"""
+        return f"{cls.NOTE_KEY_PREFIX}:{note_id}"
+    
+    @classmethod
+    def get_note_list_key(cls, contact_id):
+        """Get cache key for a contact's note list"""
+        return f"{cls.NOTE_LIST_KEY_PREFIX}:{contact_id}"
+    
+    @classmethod
+    def set_note(cls, note, include_related=True):
+        """Cache a note and optionally its related data"""
+        from django.core.cache import cache
+        from django.forms.models import model_to_dict
+        
+        # Cache individual note
+        note_key = cls.get_note_key(note.id)
+        note_data = model_to_dict(note)
+        cache.set(note_key, note_data, timeout=3600)  # 1 hour timeout
+        
+        # Update note list cache
+        list_key = cls.get_note_list_key(note.contact_id)
+        cache.delete(list_key)  # Invalidate list cache
+        
+        if include_related:
+            # Cache related monitoring records
+            monitoring_records = note.monitoring_records.all()[:10]  # Cache last 10 records
+            monitoring_data = [model_to_dict(record) for record in monitoring_records]
+            cache.set(f"{note_key}:monitoring", monitoring_data, timeout=3600)
+            
+            # Cache related notifications
+            notifications = note.notifications.all()[:10]  # Cache last 10 notifications
+            notification_data = [model_to_dict(notif) for notif in notifications]
+            cache.set(f"{note_key}:notifications", notification_data, timeout=3600)
+    
+    @classmethod
+    def get_note(cls, note_id):
+        """Get a note from cache"""
+        from django.core.cache import cache
+        from .models import ContactNote
+        
+        note_key = cls.get_note_key(note_id)
+        note_data = cache.get(note_key)
+        
+        if note_data is None:
+            try:
+                note = ContactNote.objects.get(id=note_id)
+                cls.set_note(note)
+                return note
+            except ContactNote.DoesNotExist:
+                return None
+        
+        return ContactNote(**note_data)
+    
+    @classmethod
+    def get_contact_notes(cls, contact_id, limit=None):
+        """Get a contact's notes from cache"""
+        from django.core.cache import cache
+        from .models import ContactNote
+        
+        list_key = cls.get_note_list_key(contact_id)
+        note_list = cache.get(list_key)
+        
+        if note_list is None:
+            notes = ContactNote.objects.filter(
+                contact_id=contact_id,
+                is_active=True
+            ).order_by('-created_at')
+            
+            if limit:
+                notes = notes[:limit]
+            
+            note_list = [model_to_dict(note) for note in notes]
+            cache.set(list_key, note_list, timeout=3600)
+        
+        return [ContactNote(**note_data) for note_data in note_list]
+    
+    @classmethod
+    def delete_note_cache(cls, note_id, contact_id=None):
+        """Delete note cache entries"""
+        from django.core.cache import cache
+        
+        # Delete individual note cache
+        note_key = cls.get_note_key(note_id)
+        cache.delete(note_key)
+        cache.delete(f"{note_key}:monitoring")
+        cache.delete(f"{note_key}:notifications")
+        
+        # Delete list cache if contact_id is provided
+        if contact_id:
+            list_key = cls.get_note_list_key(contact_id)
+            cache.delete(list_key) 

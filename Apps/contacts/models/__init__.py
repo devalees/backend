@@ -10,6 +10,7 @@ from .monitoring import (
     CommunicationMonitoring
 )
 from .metrics import ContactMetrics
+from .contact_note import ContactNote
 
 __all__ = [
     'Contact',
@@ -25,4 +26,5 @@ __all__ = [
     'ContactGroupMonitoring',
     'CommunicationMonitoring',
     'ContactMetrics',
+    'ContactNote',
 ]

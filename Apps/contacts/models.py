@@ -23,6 +23,7 @@ from .models.monitoring import (
     ContactGroupMonitoring,
     CommunicationMonitoring
 )
+from .models.contact_note import ContactNote, ContactNoteMonitoring, ContactNoteNotification
 
 User = get_user_model()
 
@@ -39,6 +40,9 @@ __all__ = [
     'ContactMonitoring',
     'ContactGroupMonitoring',
     'CommunicationMonitoring',
+    'ContactNote',
+    'ContactNoteMonitoring',
+    'ContactNoteNotification',
 ]
 
 class Contact(TaskAwareModel):
