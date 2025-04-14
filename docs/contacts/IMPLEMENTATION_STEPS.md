@@ -73,7 +73,7 @@
 - [x] Add note monitoring
 
 ## 7. Caching Layer
-- [ ] Set up Redis connection
+- [x] Set up Redis connection
 - [ ] Implement contact caching
 - [ ] Add group caching
 - [ ] Create cache invalidation
