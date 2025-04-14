@@ -4,7 +4,7 @@ from factory import (
     post_generation
 )
 from factory.declarations import Iterator
-from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList, ContactSegment
+from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList, ContactSegment, ContactNote, ContactNoteMonitoring, ContactNoteNotification
 from Apps.core.tests.factories import UserFactory, BaseModelFactory
 from Apps.entity.tests.factories import OrganizationFactory, DepartmentFactory, TeamFactory
 from django.utils import timezone
@@ -316,4 +316,77 @@ class ContactMetricsFactory(factory.django.DjangoModelFactory):
     def _build(cls, model_class, *args, **kwargs):
         if 'organization' not in kwargs and 'contact' in kwargs:
             kwargs['organization'] = kwargs['contact'].organization
+        return super()._build(model_class, *args, **kwargs)
+
+class ContactNoteFactory(BaseModelFactory):
+    class Meta:
+        model = ContactNote
+        skip_postgeneration_save = True
+
+    contact = SubFactory(ContactFactory)
+    organization = LazyAttribute(lambda o: o.contact.organization)
+    content = Faker('paragraph')
+    created_by = SubFactory(UserFactory)
+    updated_by = SubFactory(UserFactory)
+    is_private = False
+    is_active = True
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        instance = super()._create(model_class, *args, **kwargs)
+        instance.clean()
+        return instance
+    
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        return super()._build(model_class, *args, **kwargs)
+
+class ContactNoteMonitoringFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ContactNoteMonitoring
+
+    note = factory.SubFactory(ContactNoteFactory)
+    user = factory.SubFactory('Apps.core.tests.factories.UserFactory')
+    activity_type = 'view'
+    description = factory.LazyAttribute(lambda o: f"{o.activity_type.title()} of note for {o.note.contact.name}")
+    ip_address = '192.168.1.1'
+    user_agent = 'Test Browser'
+    metadata = factory.LazyFunction(lambda: {})
+    organization = factory.LazyAttribute(lambda o: o.note.organization)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'note' in kwargs:
+            kwargs['organization'] = kwargs['note'].organization
+        return super()._create(model_class, *args, **kwargs)
+
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'note' in kwargs:
+            kwargs['organization'] = kwargs['note'].organization
+        return super()._build(model_class, *args, **kwargs)
+
+class ContactNoteNotificationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ContactNoteNotification
+
+    note = factory.SubFactory(ContactNoteFactory)
+    user = factory.SubFactory('Apps.core.tests.factories.UserFactory')
+    organization = factory.LazyAttribute(lambda o: o.note.organization)
+    is_read = False
+    
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'note' in kwargs:
+            kwargs['organization'] = kwargs['note'].organization
+        return super()._create(model_class, *args, **kwargs)
+
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'note' in kwargs:
+            kwargs['organization'] = kwargs['note'].organization
         return super()._build(model_class, *args, **kwargs)

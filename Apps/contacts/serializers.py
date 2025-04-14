@@ -268,3 +268,83 @@ class ContactListSerializer(serializers.ModelSerializer):
                 )
         
         return data 
+
+class ContactNoteSerializer(serializers.ModelSerializer):
+    """Serializer for ContactNote model with related fields"""
+    
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    contact_name = serializers.CharField(source='contact.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    file_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        from .models import ContactNote
+        model = ContactNote
+        fields = (
+            'id', 'contact', 'contact_name', 'organization', 'organization_name',
+            'content', 'created_by', 'created_by_name', 'file_attachment', 'file_url',
+            'file_type', 'is_private', 'is_active', 'created_at', 'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at', 'file_url', 'file_type')
+    
+    def get_file_url(self, obj):
+        """Return the URL for the file attachment if it exists"""
+        if obj.file_attachment:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file_attachment.url)
+            return obj.file_attachment.url
+        return None
+    
+    def validate(self, data):
+        """Validate that contact belongs to the organization"""
+        if 'contact' in data and 'organization' in data:
+            if data['contact'].organization_id != data['organization'].id:
+                raise serializers.ValidationError(
+                    {'contact': 'Contact must belong to the specified organization.'}
+                )
+                
+        return data
+
+class ContactNoteNotificationSerializer(serializers.ModelSerializer):
+    """Serializer for ContactNoteNotification model"""
+    
+    note_id = serializers.IntegerField(source='note.id', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        from .models import ContactNoteNotification
+        model = ContactNoteNotification
+        fields = (
+            'id', 'note', 'note_id', 'user', 'user_name', 'notification_type',
+            'message', 'is_read', 'created_at', 'metadata'
+        )
+        read_only_fields = ('id', 'created_at')
+    
+    def validate(self, data):
+        """Validate notification data"""
+        if 'notification_type' in data:
+            from .models import ContactNoteNotification
+            valid_types = dict(ContactNoteNotification.NOTIFICATION_TYPES).keys()
+            if data['notification_type'] not in valid_types:
+                raise serializers.ValidationError(
+                    {'notification_type': f'Invalid notification type. Must be one of {valid_types}'}
+                )
+        return data
+
+class ContactNoteMonitoringSerializer(serializers.ModelSerializer):
+    """Serializer for ContactNoteMonitoring model"""
+    
+    note_content = serializers.CharField(source='note.content', read_only=True, allow_null=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True, allow_null=True)
+    
+    class Meta:
+        from .models import ContactNoteMonitoring
+        model = ContactNoteMonitoring
+        fields = (
+            'id', 'note', 'note_content', 'user', 'user_name',
+            'activity_type', 'description', 'organization', 'organization_name',
+            'created_at', 'ip_address', 'user_agent', 'metadata'
+        )
+        read_only_fields = ('id', 'created_at') 

@@ -62,6 +62,11 @@ class ContactNote(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         self.clean()
+        
+        # Handle the case where file_attachment was deleted but file_type wasn't updated
+        if not self.file_attachment and self.file_type:
+            self.file_type = None
+        
         super().save(*args, **kwargs)
 
     def hard_delete(self, user=None, request_meta=None):

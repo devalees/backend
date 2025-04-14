@@ -814,6 +814,7 @@ class ContactNoteCache:
     
     NOTE_KEY_PREFIX = 'contact_note'
     NOTE_LIST_KEY_PREFIX = 'contact_note_list'
+    DEFAULT_TTL = getattr(settings, 'CONTACT_CACHE_TTL', 3600)  # 1 hour default
     
     @classmethod
     def get_note_key(cls, note_id):
@@ -829,12 +830,16 @@ class ContactNoteCache:
     def set_note(cls, note, include_related=True):
         """Cache a note and optionally its related data"""
         from django.core.cache import cache
-        from django.forms.models import model_to_dict
+        from rest_framework import serializers
+        
+        # Get serializer and serialize note
+        from .serializers import ContactNoteSerializer
+        serializer = ContactNoteSerializer(note)
+        note_data = serializer.data
         
         # Cache individual note
         note_key = cls.get_note_key(note.id)
-        note_data = model_to_dict(note)
-        cache.set(note_key, note_data, timeout=3600)  # 1 hour timeout
+        cache.set(note_key, note_data, timeout=cls.DEFAULT_TTL)
         
         # Update note list cache
         list_key = cls.get_note_list_key(note.contact_id)
@@ -843,13 +848,19 @@ class ContactNoteCache:
         if include_related:
             # Cache related monitoring records
             monitoring_records = note.monitoring_records.all()[:10]  # Cache last 10 records
-            monitoring_data = [model_to_dict(record) for record in monitoring_records]
-            cache.set(f"{note_key}:monitoring", monitoring_data, timeout=3600)
+            from .serializers import ContactNoteMonitoringSerializer
+            monitoring_serializer = ContactNoteMonitoringSerializer(monitoring_records, many=True)
+            monitoring_data = monitoring_serializer.data
+            cache.set(f"{note_key}:monitoring", monitoring_data, timeout=cls.DEFAULT_TTL)
             
             # Cache related notifications
             notifications = note.notifications.all()[:10]  # Cache last 10 notifications
-            notification_data = [model_to_dict(notif) for notif in notifications]
-            cache.set(f"{note_key}:notifications", notification_data, timeout=3600)
+            from .serializers import ContactNoteNotificationSerializer
+            notification_serializer = ContactNoteNotificationSerializer(notifications, many=True)
+            notification_data = notification_serializer.data
+            cache.set(f"{note_key}:notifications", notification_data, timeout=cls.DEFAULT_TTL)
+        
+        return note_data
     
     @classmethod
     def get_note(cls, note_id):
@@ -863,11 +874,16 @@ class ContactNoteCache:
         if note_data is None:
             try:
                 note = ContactNote.objects.get(id=note_id)
-                cls.set_note(note)
+                note_data = cls.set_note(note)
                 return note
             except ContactNote.DoesNotExist:
                 return None
         
+        # Return cached data directly if it's a dict
+        if isinstance(note_data, dict):
+            return note_data
+            
+        # Otherwise, convert to ContactNote instance
         return ContactNote(**note_data)
     
     @classmethod
@@ -877,9 +893,10 @@ class ContactNoteCache:
         from .models import ContactNote
         
         list_key = cls.get_note_list_key(contact_id)
-        note_list = cache.get(list_key)
+        notes_data = cache.get(list_key)
         
-        if note_list is None:
+        if notes_data is None:
+            # Get notes from database
             notes = ContactNote.objects.filter(
                 contact_id=contact_id,
                 is_active=True
@@ -888,10 +905,24 @@ class ContactNoteCache:
             if limit:
                 notes = notes[:limit]
             
-            note_list = [model_to_dict(note) for note in notes]
-            cache.set(list_key, note_list, timeout=3600)
+            # Serialize notes
+            from .serializers import ContactNoteSerializer
+            serializer = ContactNoteSerializer(notes, many=True)
+            notes_data = serializer.data
+            
+            # Cache notes
+            cache.set(list_key, notes_data, timeout=cls.DEFAULT_TTL)
+            
+            # Return database notes
+            return notes
         
-        return [ContactNote(**note_data) for note_data in note_list]
+        # Return notes from cache
+        # If it's a list of dicts, return directly
+        if isinstance(notes_data, list) and all(isinstance(item, dict) for item in notes_data):
+            return [ContactNote(**note_data) for note_data in notes_data]
+        
+        # Otherwise, return the data as is
+        return notes_data
     
     @classmethod
     def delete_note_cache(cls, note_id, contact_id=None):
@@ -907,4 +938,44 @@ class ContactNoteCache:
         # Delete list cache if contact_id is provided
         if contact_id:
             list_key = cls.get_note_list_key(contact_id)
-            cache.delete(list_key) 
+            cache.delete(list_key)
+    
+    @classmethod
+    def refresh_note_cache(cls, note_id):
+        """Refresh a single note in cache"""
+        from .models import ContactNote
+        
+        try:
+            note = ContactNote.objects.get(id=note_id, is_active=True)
+            cls.set_note(note, include_related=True)
+            return True
+        except ContactNote.DoesNotExist:
+            return False
+    
+    @classmethod
+    def refresh_contact_notes_cache(cls, contact_id):
+        """Refresh cache for all notes of a contact"""
+        from .models import ContactNote
+        
+        # Delete existing cache
+        list_key = cls.get_note_list_key(contact_id)
+        from django.core.cache import cache
+        cache.delete(list_key)
+        
+        # Reload and cache
+        notes = ContactNote.objects.filter(
+            contact_id=contact_id,
+            is_active=True
+        ).order_by('-created_at')
+        
+        # Cache individual notes
+        for note in notes:
+            cls.set_note(note, include_related=False)
+        
+        # Cache the list
+        from .serializers import ContactNoteSerializer
+        serializer = ContactNoteSerializer(notes, many=True)
+        notes_data = serializer.data
+        
+        cache.set(list_key, notes_data, timeout=cls.DEFAULT_TTL)
+        return notes_data 
