@@ -11,6 +11,7 @@ import logging
 from django.http import Http404, FileResponse
 import os
 from django.conf import settings
+from django.utils import timezone
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -763,76 +764,119 @@ class ContactNoteViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Filter notes by contact, organization, is_active"""
-        queryset = ContactNote.objects.filter(is_active=True)
+        """Filter notes by organization and contact"""
+        queryset = ContactNote.objects.filter(is_active=True).select_related(
+            'contact', 'organization', 'created_by'
+        )
         
-        # Filter by contact
+        organization_id = self.request.query_params.get('organization', None)
         contact_id = self.request.query_params.get('contact', None)
+        
+        if organization_id:
+            queryset = queryset.filter(organization_id=organization_id)
+        
         if contact_id:
             queryset = queryset.filter(contact_id=contact_id)
             
-            # Try to get from cache if contact filter is applied
+            # Try to get from cache if filtering by contact
+            try:
+                cached_notes = ContactNoteCache.get_contact_notes(int(contact_id))
+                if cached_notes is not None:
+                    logger.debug(f"Retrieved notes from cache for contact {contact_id}")
+                    return queryset  # Return DB queryset since we'll use cached data in list()
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid contact ID format: {contact_id}")
+                
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        """List notes with cache support"""
+        contact_id = request.query_params.get('contact', None)
+        organization_id = request.query_params.get('organization', None)
+        
+        if contact_id and organization_id:
             try:
                 contact_id = int(contact_id)
-                
-                # Use the cache for list view
-                if self.action == 'list':
-                    cached_notes = ContactNoteCache.get_contact_notes(contact_id)
-                    if cached_notes is not None:
-                        logger.debug(f"Retrieved {len(cached_notes)} notes from cache for contact {contact_id}")
-                        return queryset
+                # Try to get from cache first
+                cached_notes = ContactNoteCache.get_contact_notes(contact_id)
+                if cached_notes is not None:
+                    logger.debug(f"Retrieved notes from cache for contact {contact_id}")
+                    return Response(cached_notes)
             except (ValueError, TypeError):
-                # Invalid contact ID format
                 logger.warning(f"Invalid contact ID format: {contact_id}")
-                return ContactNote.objects.none()
+                return Response(
+                    {"error": "Contact ID must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
-        # Filter by organization
-        organization_id = self.request.query_params.get('organization', None)
-        if organization_id:
-            queryset = queryset.filter(organization_id=organization_id)
+        # If not cached or no contact filter, continue with normal flow
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
             
-        # Filter by is_private
-        include_private = self.request.query_params.get('include_private', 'false').lower() == 'true'
-        if not include_private:
-            queryset = queryset.filter(is_private=False)
-            
-        return queryset
-    
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def retrieve(self, request, *args, **kwargs):
-        """Get single note and log view activity"""
+        """Get single note with cache support"""
         instance = self.get_object()
+        
+        # Try to get from cache
+        cached_note = ContactNoteCache.get_note(instance.id)
+        if cached_note is not None and isinstance(cached_note, dict):
+            logger.debug(f"Retrieved note {instance.id} from cache")
+            return Response(cached_note)
         
         # Log the view activity
         ContactNoteMonitoring.log_activity(
             note=instance,
             user=request.user,
             activity_type='view',
-            description='API view request',
+            description='Note viewed via API',
             ip_address=request.META.get('REMOTE_ADDR'),
             user_agent=request.META.get('HTTP_USER_AGENT'),
             organization=instance.organization
         )
-        
-        # Try to get from cache
-        cached_note = ContactNoteCache.get_note(instance.id)
-        if isinstance(cached_note, dict):
-            # If already serialized in cache, return directly
-            logger.debug(f"Retrieved note {instance.id} from cache")
-            return Response(cached_note)
         
         # Otherwise, serialize and return
         serializer = self.get_serializer(instance)
         # Store in cache for future requests
         ContactNoteCache.set_note(instance)
         return Response(serializer.data)
-    
+
     def perform_create(self, serializer):
-        """Set created_by on create and log activity"""
+        """Create note and handle file attachments"""
+        # Get file attachment if present
+        file_attachment = self.request.FILES.get('file_attachment', None)
+        
+        # Create the note
         note = serializer.save(
-            created_by=self.request.user
+            created_by=self.request.user,
+            updated_by=self.request.user,
+            file_attachment=file_attachment
         )
         
-        # Log the activity
+        # Set file type if file was attached
+        if file_attachment:
+            extension = os.path.splitext(file_attachment.name)[1].lower().replace('.', '')
+            note.file_type = extension
+            note.save()
+            
+            # Log file attachment
+            ContactNoteMonitoring.log_activity(
+                note=note,
+                user=self.request.user,
+                activity_type='attachment_upload',
+                description=f'File uploaded: {file_attachment.name}',
+                ip_address=self.request.META.get('REMOTE_ADDR'),
+                user_agent=self.request.META.get('HTTP_USER_AGENT'),
+                organization=note.organization
+            )
+        
+        # Create monitoring record
         ContactNoteMonitoring.log_activity(
             note=note,
             user=self.request.user,
@@ -843,84 +887,42 @@ class ContactNoteViewSet(viewsets.ModelViewSet):
             organization=note.organization
         )
         
-        # Cache the note
+        # Process mentions and create notifications
+        self._process_mentions(note)
+        
+        # Cache the new note
         ContactNoteCache.set_note(note)
-        
         # Invalidate contact notes cache
-        list_key = ContactNoteCache.get_note_list_key(note.contact_id)
-        ContactNoteCache.delete_note_cache(note.id, note.contact_id)
+        ContactNoteCache.invalidate_contact_notes(note.contact_id)
         
-        # Log creation
-        logger.info(
-            f"Note {note.id} created by {self.request.user.username} "
-            f"for contact {note.contact_id} in organization {note.organization_id}"
-        )
-    
-    def perform_update(self, serializer):
-        """Update the note and log activity"""
-        note = serializer.save()
+        logger.info(f"Note {note.id} created for contact {note.contact_id}")
+
+    def _process_mentions(self, note):
+        """Process @mentions in note content and create notifications"""
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         
-        # Log the activity
-        ContactNoteMonitoring.log_activity(
-            note=note,
-            user=self.request.user,
-            activity_type='update',
-            description='Note updated via API',
-            ip_address=self.request.META.get('REMOTE_ADDR'),
-            user_agent=self.request.META.get('HTTP_USER_AGENT'),
-            organization=note.organization
-        )
+        # Simple @username mention detection
+        mentioned_usernames = [
+            word[1:] for word in note.content.split() 
+            if word.startswith('@') and len(word) > 1
+        ]
         
-        # Update cache
-        ContactNoteCache.set_note(note)
-        
-        # Invalidate contact notes cache
-        ContactNoteCache.delete_note_cache(note.id, note.contact_id)
-        
-        # Log update
-        logger.info(
-            f"Note {note.id} updated by {self.request.user.username} "
-            f"for contact {note.contact_id} in organization {note.organization_id}"
-        )
-    
-    def perform_destroy(self, instance):
-        """Soft delete note and log activity"""
-        instance.delete(
-            user=self.request.user,
-            request_meta=self.request.META
-        )
-        
-        # Invalidate cache
-        ContactNoteCache.delete_note_cache(instance.id, instance.contact_id)
-        
-        # Log deletion
-        logger.info(
-            f"Note {instance.id} soft-deleted by {self.request.user.username} "
-            f"for contact {instance.contact_id} in organization {instance.organization_id}"
-        )
-    
-    @action(detail=True, methods=['delete'])
-    def hard_delete(self, request, pk=None):
-        """Hard delete endpoint"""
-        instance = self.get_object()
-        contact_id = instance.contact_id
-        
-        instance.hard_delete(
-            user=request.user,
-            request_meta=request.META
-        )
-        
-        # Invalidate cache
-        ContactNoteCache.delete_note_cache(int(pk), contact_id)
-        
-        # Log the hard deletion
-        logger.info(
-            f"Note {pk} hard-deleted by {request.user.username} "
-            f"for contact {contact_id}"
-        )
-        
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
+        # Create notifications for mentioned users
+        for username in mentioned_usernames:
+            try:
+                user = User.objects.get(username=username)
+                ContactNoteNotification.objects.create(
+                    note=note,
+                    user=user,
+                    notification_type='mention',
+                    message=f"You were mentioned in a note by {note.created_by.username}"
+                )
+                logger.info(f"Created mention notification for user {username} in note {note.id}")
+            except User.DoesNotExist:
+                logger.warning(f"Mentioned user {username} not found")
+                continue
+
     @action(detail=True, methods=['get'])
     def download_file(self, request, pk=None):
         """Download the file attachment"""
@@ -936,8 +938,8 @@ class ContactNoteViewSet(viewsets.ModelViewSet):
         ContactNoteMonitoring.log_activity(
             note=note,
             user=request.user,
-            activity_type='attachment_view',
-            description='File download',
+            activity_type='attachment_download',
+            description='File downloaded',
             ip_address=request.META.get('REMOTE_ADDR'),
             user_agent=request.META.get('HTTP_USER_AGENT'),
             organization=note.organization
@@ -957,130 +959,251 @@ class ContactNoteViewSet(viewsets.ModelViewSet):
         file_handle = open(file_path, 'rb')
         response = FileResponse(file_handle, content_type='application/octet-stream')
         response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+        
+        logger.info(f"File downloaded from note {note.id} by user {request.user.username}")
         return response
+
+    def perform_update(self, serializer):
+        """Update the note and log activity"""
+        note = serializer.save(updated_by=self.request.user)
+        
+        # Log the activity
+        ContactNoteMonitoring.log_activity(
+            note=note,
+            user=self.request.user,
+            activity_type='update',
+            description='Note updated via API',
+            ip_address=self.request.META.get('REMOTE_ADDR'),
+            user_agent=self.request.META.get('HTTP_USER_AGENT'),
+            organization=note.organization
+        )
+        
+        # Process mentions for any new @mentions
+        self._process_mentions(note)
+        
+        # Update cache
+        ContactNoteCache.set_note(note)
+        # Invalidate contact notes cache
+        ContactNoteCache.delete_note_cache(note.id, note.contact_id)
+        
+        logger.info(f"Note {note.id} updated by {self.request.user.username}")
     
-    def list(self, request, *args, **kwargs):
-        """List notes with cache support"""
-        contact_id = request.query_params.get('contact', None)
+    def perform_destroy(self, serializer):
+        """Soft delete note and log activity"""
+        instance = self.get_object()
         
-        if contact_id:
+        # Log the activity before deletion
+        ContactNoteMonitoring.log_activity(
+            note=instance,
+            user=self.request.user,
+            activity_type='soft_delete',
+            description='Note soft-deleted via API',
+            ip_address=self.request.META.get('REMOTE_ADDR'),
+            user_agent=self.request.META.get('HTTP_USER_AGENT'),
+            organization=instance.organization
+        )
+        
+        # Soft delete
+        instance.is_active = False
+        instance.deleted_at = timezone.now()
+        instance.deleted_by = self.request.user
+        instance.save()
+        
+        # Invalidate caches
+        ContactNoteCache.delete_note_cache(instance.id, instance.contact_id)
+        
+        logger.info(f"Note {instance.id} soft-deleted by {self.request.user.username}")
+    
+    @action(detail=True, methods=['delete'])
+    def hard_delete(self, request, pk=None):
+        """Permanently delete a note"""
+        instance = self.get_object()
+        
+        # Log the activity before deletion
+        ContactNoteMonitoring.log_activity(
+            note=instance,
+            user=request.user,
+            activity_type='hard_delete',
+            description='Note permanently deleted via API',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            user_agent=request.META.get('HTTP_USER_AGENT'),
+            organization=instance.organization
+        )
+        
+        # Store IDs before deletion
+        note_id = instance.id
+        contact_id = instance.contact_id
+        
+        # Delete file if exists
+        if instance.file_attachment:
             try:
-                # Convert to integer for cache key consistency
-                contact_id = int(contact_id)
-                
-                # Try to get from cache
-                cached_notes = ContactNoteCache.get_contact_notes(contact_id)
-                if cached_notes is not None:
-                    # Serialize the notes
-                    serializer = self.get_serializer(cached_notes, many=True)
-                    return Response(serializer.data)
-            except (ValueError, TypeError):
-                # Invalid contact ID format
-                logger.warning(f"Invalid contact ID format: {contact_id}")
-                return Response(
-                    {"error": "Contact ID must be an integer"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                instance.file_attachment.delete(save=False)
+            except Exception as e:
+                logger.error(f"Error deleting file for note {note_id}: {str(e)}")
         
-        # If not cached or no contact filter, continue with normal flow
-        return super().list(request, *args, **kwargs)
+        # Hard delete the instance using the model's hard_delete method
+        instance.hard_delete(user=request.user, request_meta=request.META)
+        
+        # Invalidate caches
+        ContactNoteCache.delete_note_cache(note_id, contact_id)
+        
+        logger.info(f"Note {note_id} permanently deleted by {request.user.username}")
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class ContactNoteNotificationViewSet(viewsets.ModelViewSet):
     """ViewSet for ContactNoteNotification model"""
     queryset = ContactNoteNotification.objects.all()
     serializer_class = ContactNoteNotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_queryset(self):
-        """Filter notifications by user, note, is_read"""
-        queryset = ContactNoteNotification.objects.all()
+        """Filter notifications by user"""
+        return ContactNoteNotification.objects.filter(
+            user=self.request.user
+        ).select_related('note', 'user').order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        """List notifications with pagination and filters"""
+        queryset = self.get_queryset()
         
-        # Only show notifications for current user by default
-        user_id = self.request.query_params.get('user', self.request.user.id)
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        
-        # Filter by note
-        note_id = self.request.query_params.get('note', None)
-        if note_id:
-            queryset = queryset.filter(note_id=note_id)
-        
-        # Filter by is_read
-        is_read = self.request.query_params.get('is_read', None)
+        # Filter by read status
+        is_read = request.query_params.get('is_read', None)
         if is_read is not None:
             is_read = is_read.lower() == 'true'
             queryset = queryset.filter(is_read=is_read)
-        
-        return queryset
-    
+            
+        # Filter by notification type
+        notification_type = request.query_params.get('type', None)
+        if notification_type:
+            queryset = queryset.filter(notification_type=notification_type)
+            
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+            
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
-        """Create a notification and track metadata"""
+        """Create notification"""
         notification = serializer.save()
-        
-        # Log creation
-        logger.info(
-            f"Notification {notification.id} created for user {notification.user_id} "
-            f"for note {notification.note_id}"
-        )
-    
+        logger.info(f"Notification created for user {notification.user.username}")
+
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
-        """Mark a notification as read"""
+        """Mark a single notification as read"""
         notification = self.get_object()
         notification.mark_as_read()
-        
-        return Response({"status": "success"}, status=status.HTTP_200_OK)
-    
+        return Response(status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'])
     def mark_all_read(self, request):
-        """Mark all notifications for current user as read"""
-        user_id = request.user.id
-        
-        # Get all unread notifications for the user
-        unread = ContactNoteNotification.objects.filter(user_id=user_id, is_read=False)
-        count = unread.count()
-        
-        # Mark all as read
-        unread.update(is_read=True)
-        
-        return Response({"status": "success", "count": count}, status=status.HTTP_200_OK)
-    
+        """Mark all notifications as read for the current user"""
+        self.get_queryset().update(is_read=True)
+        return Response(status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
-        """Get count of unread notifications for current user"""
-        user_id = request.user.id
-        count = ContactNoteNotification.objects.filter(user_id=user_id, is_read=False).count()
-        
-        return Response({"count": count}, status=status.HTTP_200_OK)
+        """Get count of unread notifications"""
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({'unread_count': count})
 
 class ContactNoteMonitoringViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for ContactNoteMonitoring model (read-only)"""
     queryset = ContactNoteMonitoring.objects.all()
     serializer_class = ContactNoteMonitoringSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_queryset(self):
-        """Filter monitoring records by note, user, activity_type"""
-        queryset = ContactNoteMonitoring.objects.all()
-        
-        # Filter by note
-        note_id = self.request.query_params.get('note', None)
-        if note_id:
-            queryset = queryset.filter(note_id=note_id)
-        
-        # Filter by user
-        user_id = self.request.query_params.get('user', None)
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        
-        # Filter by activity_type
-        activity_type = self.request.query_params.get('activity_type', None)
-        if activity_type:
-            queryset = queryset.filter(activity_type=activity_type)
+        """Filter monitoring records by organization and note"""
+        queryset = ContactNoteMonitoring.objects.all().select_related(
+            'note', 'user', 'note__contact', 'note__organization'
+        ).order_by('-created_at')
         
         # Filter by organization
         organization_id = self.request.query_params.get('organization', None)
         if organization_id:
-            queryset = queryset.filter(organization_id=organization_id)
+            queryset = queryset.filter(note__organization_id=organization_id)
+            
+        # Filter by note
+        note_id = self.request.query_params.get('note', None)
+        if note_id:
+            queryset = queryset.filter(note_id=note_id)
+            
+        # Filter by activity type
+        activity_type = self.request.query_params.get('activity_type', None)
+        if activity_type:
+            queryset = queryset.filter(activity_type=activity_type)
+            
+        # Filter by user
+        user_id = self.request.query_params.get('user', None)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+            
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        """List monitoring records with pagination"""
+        queryset = self.get_queryset()
         
-        return queryset.order_by('-created_at')
+        # Apply pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+            
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def activity_summary(self, request):
+        """Get summary of activities by type"""
+        organization_id = request.query_params.get('organization', None)
+        if not organization_id:
+            return Response(
+                {"error": "Organization ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        queryset = self.get_queryset().filter(note__organization_id=organization_id)
+        
+        # Get counts by activity type
+        from django.db.models import Count
+        summary = queryset.values('activity_type').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        return Response(summary)
+
+    @action(detail=False, methods=['get'])
+    def user_activity(self, request):
+        """Get activity summary by user"""
+        organization_id = request.query_params.get('organization', None)
+        if not organization_id:
+            return Response(
+                {"error": "Organization ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        queryset = self.get_queryset().filter(note__organization_id=organization_id)
+        
+        # Get counts by user
+        from django.db.models import Count
+        summary = queryset.values(
+            'user__id', 'user__username'
+        ).annotate(
+            activity_count=Count('id')
+        ).order_by('-activity_count')
+        
+        return Response(summary)

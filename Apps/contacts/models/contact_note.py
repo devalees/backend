@@ -7,8 +7,11 @@ from Apps.entity.models import Organization
 from ..cache_manager import ContactNoteCache
 from django.conf import settings
 from .contact import Contact
+from django.utils import timezone
+import logging
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 class ContactNote(TimeStampedModel):
     """
@@ -71,7 +74,30 @@ class ContactNote(TimeStampedModel):
 
     def hard_delete(self, user=None, request_meta=None):
         """Hard delete the note"""
-        self.delete(hard_delete=True, user=user, request_meta=request_meta)
+        # Delete file if exists
+        if self.file_attachment:
+            try:
+                self.file_attachment.delete(save=False)
+            except Exception as e:
+                logger.error(f"Error deleting file for note {self.id}: {str(e)}")
+        
+        # Log before deleting
+        ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
+        user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
+        
+        ContactNoteMonitoring.log_activity(
+            note=None,  # Don't set note since it will be deleted
+            user=user,
+            activity_type='delete',
+            description='Hard delete',
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata={'method': 'hard_delete', 'note_id': self.id},
+            organization=self.organization
+        )
+        
+        # Call parent's delete method directly to bypass soft delete
+        super(ContactNote, self).delete()
 
     def delete(self, *args, **kwargs):
         """Delete the note"""
@@ -80,46 +106,13 @@ class ContactNote(TimeStampedModel):
         request_meta = kwargs.pop('request_meta', {})
         
         if hard_delete:
-            # Log before deleting
-            ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
-            user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
+            return self.hard_delete(user=user, request_meta=request_meta)
             
-            ContactNoteMonitoring.log_activity(
-                note=None,  # Don't set note since it will be deleted
-                user=user,
-                activity_type='delete',
-                description='Hard delete',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata={'method': 'hard_delete', 'note_id': self.id},
-                organization=self.organization
-            )
-            
-            # Delete the file if it exists
-            if self.file_attachment:
-                self.file_attachment.delete(save=False)
-            
-            # Call the parent class's delete method
-            super().delete(*args, **kwargs)
-        else:
-            # Soft delete - set is_active to False
-            self.is_active = False
-            self.save()
-            
-            # Log the soft delete activity
-            ip_address = request_meta.get('REMOTE_ADDR') if request_meta else None
-            user_agent = request_meta.get('HTTP_USER_AGENT') if request_meta else None
-            
-            ContactNoteMonitoring.log_activity(
-                note=self,
-                user=user,
-                activity_type='delete',
-                description='Soft delete',
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata={'method': 'soft_delete', 'note_id': self.id},
-                organization=self.organization
-            )
+        # Soft delete
+        self.is_active = False
+        self.deleted_at = timezone.now()
+        self.deleted_by = user
+        self.save()
 
 
 class ContactNoteMonitoring(models.Model):
