@@ -42,7 +42,7 @@
 - [x] Add list validation
 - [x] Create contact segments
 - [x] Implement list templates
-- [ ] Add list caching
+- [x] Add list caching
 - [ ] Create list API endpoints
 - [ ] Add list documentation
 - [ ] Implement list tests

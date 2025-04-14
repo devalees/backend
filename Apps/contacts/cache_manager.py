@@ -626,4 +626,185 @@ class CommunicationCache:
             cls.invalidate_organization_communications(org_id)
             
         for contact_id in contact_communications:
-            cls.invalidate_contact_communications(contact_id) 
+            cls.invalidate_contact_communications(contact_id)
+
+class ContactListCache:
+    """
+    Handles caching operations for ContactList model
+    """
+    
+    LIST_KEY_PREFIX = "list"
+    ORG_LISTS_KEY_PREFIX = "org"
+    DEFAULT_TTL = getattr(settings, 'CONTACT_CACHE_TTL', 3600)  # 1 hour default
+    
+    @classmethod
+    def _get_list_key(cls, list_id):
+        """Generate cache key for a single contact list"""
+        return f"{cls.LIST_KEY_PREFIX}:{list_id}"
+    
+    @classmethod
+    def _get_org_lists_key(cls, org_id):
+        """Generate cache key for organization lists"""
+        return f"{cls.ORG_LISTS_KEY_PREFIX}:{org_id}:lists"
+    
+    @classmethod
+    def get_list(cls, list_id):
+        """Retrieve a contact list from cache"""
+        key = cls._get_list_key(list_id)
+        cached_data = cache.get(key)
+        
+        if cached_data is None:
+            return None
+            
+        # If the data is already a ContactList instance, return it
+        if hasattr(cached_data, '_meta') and cached_data._meta.model_name == 'contactlist':
+            return cached_data
+            
+        # If the data is a dict (serialized), convert it to a model-like object
+        if isinstance(cached_data, dict):
+            # Create a simple object to hold the serialized data
+            from types import SimpleNamespace
+            
+            # Process any nested serialized data (like contacts)
+            if 'contacts' in cached_data and isinstance(cached_data['contacts'], list):
+                # Convert contact dictionaries to objects
+                contact_objects = []
+                for contact_data in cached_data['contacts']:
+                    contact_objects.append(SimpleNamespace(**contact_data))
+                cached_data['contacts'] = contact_objects
+                
+            # Convert dict to object with attributes
+            return SimpleNamespace(**cached_data)
+            
+        return None
+    
+    @classmethod
+    def set_list(cls, contact_list, ttl=None, include_related=False):
+        """Cache a contact list instance"""
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_list_key(contact_list.id)
+        
+        # For serialized data with related fields
+        if include_related:
+            from .serializers import ContactListSerializer
+            
+            # Use the serializer's context to pass extra data if needed
+            context = {'include_only_related_contacts': True}
+            serializer = ContactListSerializer(contact_list, context=context)
+            cache_data = serializer.data
+            
+            # Cache the serialized data
+            cache.set(key, cache_data, timeout=ttl)
+            
+            # Also update organization lists cache if org_id exists
+            if contact_list.organization_id:
+                cls.invalidate_organization_lists(contact_list.organization_id)
+                
+            # Return the original model instance
+            return contact_list
+            
+        # For non-serialized data, store the model instance directly
+        cache.set(key, contact_list, timeout=ttl)
+        return contact_list
+    
+    @classmethod
+    def delete_list(cls, list_id, org_id=None, force_delete=False):
+        """Delete a contact list from cache"""
+        key = cls._get_list_key(list_id)
+        
+        # Always delete from cache first
+        cache.delete(key)
+        
+        # Always invalidate organization lists if org_id provided
+        if org_id:
+            cls.invalidate_organization_lists(org_id)
+    
+    @classmethod
+    def get_organization_lists(cls, org_id):
+        """
+        Retrieve all contact lists for an organization from cache
+        Returns None if not found
+        """
+        key = cls._get_org_lists_key(org_id)
+        return cache.get(key)
+    
+    @classmethod
+    def set_organization_lists(cls, org_id, ttl=None, queryset=None):
+        """
+        Cache all contact lists for an organization
+        
+        Args:
+            org_id: ID of the organization
+            ttl: Time to live in seconds (optional)
+            queryset: Optional queryset to use instead of fetching from database
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        key = cls._get_org_lists_key(org_id)
+        
+        # If no queryset provided, fetch from database
+        if queryset is None:
+            from .models import ContactList
+            queryset = ContactList.objects.filter(
+                organization_id=org_id,
+                is_active=True
+            ).select_related('organization').prefetch_related('contacts')
+        
+        # Convert queryset to list to ensure we can iterate multiple times
+        lists = list(queryset)
+        
+        # Cache individual lists first
+        for contact_list in lists:
+            cls.set_list(contact_list, ttl=ttl, include_related=True)
+        
+        # Now cache the organization's list of lists
+        cache.set(key, lists, timeout=ttl)
+        
+        return lists
+    
+    @classmethod
+    def invalidate_organization_lists(cls, org_id):
+        """
+        Invalidate the cache for all contact lists in an organization
+        
+        Args:
+            org_id: ID of the organization
+        """
+        key = cls._get_org_lists_key(org_id)
+        cache.delete(key)
+    
+    @classmethod
+    def bulk_set_lists(cls, lists, ttl=None):
+        """
+        Bulk cache multiple contact lists
+        
+        Args:
+            lists: List of ContactList instances
+            ttl: Time to live in seconds (optional)
+        """
+        if ttl is None:
+            ttl = cls.DEFAULT_TTL
+            
+        # Group lists by organization
+        org_lists = {}
+        for contact_list in lists:
+            if not hasattr(contact_list, 'id'):
+                continue
+                
+            org_id = getattr(contact_list, 'organization_id', None)
+            if org_id:
+                if org_id not in org_lists:
+                    org_lists[org_id] = []
+                org_lists[org_id].append(contact_list)
+            
+            # Cache individual list
+            cls.set_list(contact_list, ttl=ttl)
+        
+        # Update organization caches
+        for org_id, org_contact_lists in org_lists.items():
+            # Cache the organization's lists
+            key = cls._get_org_lists_key(org_id)
+            cache.set(key, org_contact_lists, timeout=ttl) 

@@ -9,8 +9,9 @@ from Apps.core.models import TaskAwareModel
 from Apps.entity.models import Organization, Department, Team
 from .cache_manager import ContactCache
 import re
-from django.db.models.signals import pre_save, post_save, post_delete
+from django.db.models.signals import pre_save, post_save, post_delete, pre_delete
 from django.dispatch import receiver
+from .cache_manager import ContactListCache
 
 User = get_user_model()
 
@@ -1301,11 +1302,21 @@ class ContactList(models.Model):
     def delete(self, *args, **kwargs):
         """Delete the contact list"""
         hard_delete = kwargs.pop('hard_delete', False)
+        org_id = self.organization_id  # Store org_id before deletion
+        
         if hard_delete:
+            # Clear cache before hard delete
+            from .cache_manager import ContactListCache
+            ContactListCache.delete_list(self.id, org_id, force_delete=True)
+            # Call parent's delete method
             super().delete(*args, **kwargs)
         else:
+            # For soft delete, set is_active to False
             self.is_active = False
             self.save()
+            # Update cache with inactive state
+            from .cache_manager import ContactListCache
+            ContactListCache.delete_list(self.id, org_id, force_delete=False)
 
     def clean(self):
         """Validate the contact list."""
@@ -1338,6 +1349,18 @@ class ContactList(models.Model):
                 raise ValidationError({
                     'contacts': _('All contacts must belong to the same organization as the contact list')
                 })
+
+@receiver(post_save, sender=ContactList)
+def contact_list_post_save(sender, instance, created, **kwargs):
+    """Update cache when a contact list is saved"""
+    from .cache_manager import ContactListCache
+    ContactListCache.set_list(instance)
+    ContactListCache.invalidate_organization_lists(instance.organization_id)
+
+@receiver(post_delete, sender=ContactList)
+def clear_contact_list_cache(sender, instance, **kwargs):
+    """Clear cache when a contact list is deleted"""
+    ContactListCache.delete_list(instance.id, instance.organization_id, force_delete=True)
 
 class ContactListTemplate(models.Model):
     """ContactListTemplate model for defining contact list templates"""
@@ -1591,49 +1614,52 @@ class ContactSegment(models.Model):
             operator = criteria['operator']
             value = criteria['value']
             
+            filter_kwargs = {}
             if operator == 'equals':
-                return contacts.filter(**{field: value})
+                filter_kwargs[field] = value
             elif operator == 'contains':
-                # Use icontains for case-insensitive contains
-                return contacts.filter(**{f"{field}__icontains": value})
+                filter_kwargs[f"{field}__icontains"] = value
             elif operator == 'startswith':
-                return contacts.filter(**{f"{field}__istartswith": value})
+                filter_kwargs[f"{field}__istartswith"] = value
             elif operator == 'endswith':
-                return contacts.filter(**{f"{field}__iendswith": value})
+                filter_kwargs[f"{field}__iendswith"] = value
             elif operator == 'gt':
-                return contacts.filter(**{f"{field}__gt": value})
+                filter_kwargs[f"{field}__gt"] = value
             elif operator == 'gte':
-                return contacts.filter(**{f"{field}__gte": value})
+                filter_kwargs[f"{field}__gte"] = value
             elif operator == 'lt':
-                return contacts.filter(**{f"{field}__lt": value})
+                filter_kwargs[f"{field}__lt"] = value
             elif operator == 'lte':
-                return contacts.filter(**{f"{field}__lte": value})
+                filter_kwargs[f"{field}__lte"] = value
             elif operator == 'in':
-                return contacts.filter(**{f"{field}__in": value})
+                filter_kwargs[f"{field}__in"] = value
             else:
                 return contacts.none()
+                
+            return contacts.filter(**filter_kwargs)
         
         # Handle complex criteria with AND/OR operators
-        if 'operator' in criteria and criteria['operator'] in ['and', 'or']:
+        if 'operator' in criteria and criteria['operator'] in ['and', 'or'] and 'criteria' in criteria:
             sub_criteria = criteria['criteria']
             
             if not sub_criteria:
                 return contacts
             
-            # Start with the first sub-criteria
-            result = self._apply_filter_criteria(contacts, sub_criteria[0])
+            # Start with all contacts for OR, none for AND
+            if criteria['operator'] == 'or':
+                result = contacts.none()
+            else:  # 'and'
+                result = contacts.all()
             
-            # Apply the rest of the sub-criteria
-            for sub_criteria_item in sub_criteria[1:]:
+            # Apply each sub-criteria
+            for sub_criteria_item in sub_criteria:
                 sub_result = self._apply_filter_criteria(contacts, sub_criteria_item)
                 
                 if criteria['operator'] == 'and':
-                    # Use filter() instead of intersection() to avoid subquery issues
                     result = result.filter(id__in=sub_result.values_list('id', flat=True))
                 else:  # 'or'
-                    # Use union() with distinct() to avoid duplicates
-                    result = result.union(sub_result).distinct()
+                    result = result.union(sub_result)
             
-            return result
+            return result.distinct()
         
         return contacts.none()

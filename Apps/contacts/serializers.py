@@ -192,7 +192,8 @@ class CommunicationMonitoringSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'created_at') 
 
 class ContactListSerializer(serializers.ModelSerializer):
-    """Serializer for ContactList model"""
+    """Serializer for ContactList model with related fields"""
+    
     organization_name = serializers.CharField(source='organization.name', read_only=True)
     contacts = ContactSerializer(many=True, read_only=True)
     contact_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
@@ -209,7 +210,28 @@ class ContactListSerializer(serializers.ModelSerializer):
             'updated_by', 'updated_by_name'
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def to_representation(self, instance):
+        """Custom representation for ContactList"""
+        # Get the default representation
+        representation = super().to_representation(instance)
         
+        # If include_only_related_contacts is in context, filter contacts
+        # For caching purposes, we need to ensure only explicitly related contacts are included
+        if self.context.get('include_only_related_contacts'):
+            # Return only explicitly related contacts
+            from .models import Contact
+            contact_ids = instance.contacts.values_list('id', flat=True)
+            
+            if 'contacts' in representation and representation['contacts']:
+                # Filter the contacts to only include those explicitly related
+                representation['contacts'] = [
+                    contact for contact in representation['contacts'] 
+                    if contact['id'] in contact_ids
+                ]
+                
+        return representation
+
     def create(self, validated_data):
         """Create a contact list and add contacts if provided"""
         contact_ids = validated_data.pop('contact_ids', [])
