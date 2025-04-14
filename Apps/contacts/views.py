@@ -2,11 +2,14 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 from .models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, Communication, CommunicationTemplate, CommunicationMonitoring, ContactList
 from .models import ContactNote, ContactNoteNotification, ContactNoteMonitoring
 from .serializers import ContactSerializer, ContactGroupSerializer, ContactTemplateSerializer, CommunicationSerializer, CommunicationTemplateSerializer, CommunicationMonitoringSerializer, ContactListSerializer
 from .serializers import ContactNoteSerializer, ContactNoteNotificationSerializer, ContactNoteMonitoringSerializer
 from .cache_manager import ContactCache, CommunicationCache, ContactNoteCache
+from .throttling import ContactRateThrottle, ContactCreateRateThrottle, ContactNoteRateThrottle, get_rate_limit_headers
 import logging
 from django.http import Http404, FileResponse
 import os
@@ -16,13 +19,124 @@ from django.utils import timezone
 # Set up logger
 logger = logging.getLogger(__name__)
 
-# Create your views here.
-
+@extend_schema_view(
+    list=extend_schema(
+        summary="List contacts",
+        description="Get a list of all contacts for the authenticated user's organization",
+        parameters=[
+            OpenApiParameter(
+                name="organization",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description="Filter contacts by organization ID"
+            ),
+            OpenApiParameter(
+                name="search",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Search contacts by name or email"
+            ),
+            OpenApiParameter(
+                name="ordering",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Order contacts by field (prefix with - for descending)"
+            )
+        ],
+        responses={
+            200: ContactSerializer(many=True),
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                "Success Response",
+                value=[{
+                    "id": 1,
+                    "name": "John Doe",
+                    "email": "john@example.com",
+                    "phone": "+1234567890",
+                    "organization": 1,
+                    "organization_name": "Example Org",
+                    "is_active": True
+                }]
+            )
+        ]
+    ),
+    create=extend_schema(
+        summary="Create contact",
+        description="Create a new contact",
+        request=ContactSerializer,
+        responses={
+            201: ContactSerializer,
+            400: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        }
+    ),
+    retrieve=extend_schema(
+        summary="Get contact",
+        description="Get a specific contact by ID",
+        responses={
+            200: ContactSerializer,
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        }
+    ),
+    update=extend_schema(
+        summary="Update contact",
+        description="Update a specific contact",
+        request=ContactSerializer,
+        responses={
+            200: ContactSerializer,
+            400: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        }
+    ),
+    partial_update=extend_schema(
+        summary="Partially update contact",
+        description="Partially update a specific contact",
+        request=ContactSerializer,
+        responses={
+            200: ContactSerializer,
+            400: OpenApiTypes.OBJECT,
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        }
+    ),
+    destroy=extend_schema(
+        summary="Delete contact",
+        description="Delete a specific contact",
+        responses={
+            204: None,
+            401: OpenApiTypes.OBJECT,
+            403: OpenApiTypes.OBJECT,
+            404: OpenApiTypes.OBJECT,
+            429: OpenApiTypes.OBJECT
+        }
+    )
+)
 class ContactViewSet(viewsets.ModelViewSet):
     """ViewSet for Contact model"""
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ContactRateThrottle]
+    
+    def get_throttles(self):
+        """Get appropriate throttle class based on action"""
+        if self.action == 'create':
+            return [ContactCreateRateThrottle()]
+        return super().get_throttles()
 
     def get_queryset(self):
         """Filter contacts by organization and use cache if available"""
@@ -53,6 +167,15 @@ class ContactViewSet(viewsets.ModelViewSet):
             
         return Contact.objects.filter(is_active=True)
 
+    def list(self, request, *args, **kwargs):
+        """List contacts with rate limit headers"""
+        response = super().list(request, *args, **kwargs)
+        # Replace response.headers.update with individual header setting
+        rate_limit_headers = get_rate_limit_headers(request, self)
+        for key, value in rate_limit_headers.items():
+            response.headers[key] = value
+        return response
+
     def retrieve(self, request, *args, **kwargs):
         """Get single contact and log view activity"""
         instance = self.get_object()
@@ -72,13 +195,23 @@ class ContactViewSet(viewsets.ModelViewSet):
         if cached_contact is not None and isinstance(cached_contact, dict):
             # If already serialized in cache, return directly
             logger.debug(f"Retrieved contact {instance.id} from cache")
-            return Response(cached_contact)
+            response = Response(cached_contact)
+            # Replace response.headers.update with individual header setting
+            rate_limit_headers = get_rate_limit_headers(request, self)
+            for key, value in rate_limit_headers.items():
+                response.headers[key] = value
+            return response
         
         # Otherwise, serialize and return
         serializer = self.get_serializer(instance)
         # Store in cache for future requests
         ContactCache.set_contact(instance, include_related=True)
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        # Replace response.headers.update with individual header setting
+        rate_limit_headers = get_rate_limit_headers(request, self)
+        for key, value in rate_limit_headers.items():
+            response.headers[key] = value
+        return response
 
     def perform_create(self, serializer):
         """Set created_by and updated_by on create, and log activity"""
@@ -180,31 +313,6 @@ class ContactViewSet(viewsets.ModelViewSet):
             {"message": f"Cache refreshed for organization {organization_id}"},
             status=status.HTTP_200_OK
         )
-
-    def list(self, request, *args, **kwargs):
-        """List contacts with cache support"""
-        organization_id = request.query_params.get('organization', None)
-        
-        if organization_id:
-            try:
-                # Convert to integer for cache key consistency
-                org_id = int(organization_id)
-                
-                # Try to get from cache first
-                cached_contacts = ContactCache.get_organization_contacts(org_id)
-                if cached_contacts is not None:
-                    logger.debug(f"Retrieved {len(cached_contacts)} contacts from cache for org {org_id}")
-                    return Response(cached_contacts)
-            except (ValueError, TypeError):
-                # Invalid organization ID format
-                logger.warning(f"Invalid organization ID format: {organization_id}")
-                return Response(
-                    {"error": "Organization ID must be an integer"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        # If not cached or no organization filter, continue with normal flow
-        return super().list(request, *args, **kwargs)
 
 class ContactGroupViewSet(viewsets.ModelViewSet):
     """ViewSet for ContactGroup model"""

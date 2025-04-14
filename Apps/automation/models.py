@@ -808,6 +808,7 @@ class ReportTemplate(models.Model):
         ('csv', 'CSV'),
         ('json', 'JSON')
     ])
+    is_active = models.BooleanField(_('Is Active'), default=True)
     created_by = models.ForeignKey(
         'users.User',
         on_delete=models.PROTECT,

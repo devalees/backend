@@ -101,8 +101,16 @@ class TestContactViewSet:
             response = view(request)
         
         assert response.status_code == status.HTTP_200_OK
+        
+        # Handle both list and dict with results key formats
+        data = response.data
+        if isinstance(data, dict) and 'results' in data:
+            contacts = data['results']
+        else:
+            contacts = data
+            
         # Should contain the contact id from our mock
-        contact_ids = [item['id'] for item in response.data]
+        contact_ids = [item['id'] for item in contacts]
         assert self.contact.id in contact_ids
         
     def test_retrieve_contact(self):
