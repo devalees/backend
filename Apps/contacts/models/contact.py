@@ -41,6 +41,7 @@ class Contact(ContactsBaseModel):
         verbose_name = 'Contact'
         verbose_name_plural = 'Contacts'
         ordering = ['name']
+        app_label = 'contacts'  # Explicitly set the app label
 
     def __str__(self):
         return self.name

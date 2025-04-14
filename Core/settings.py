@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'Apps.core',  # Core app
     'Apps.users',
     'Apps.entity',
-    'Apps.contacts',
+    'Apps.contacts.apps.ContactsConfig',  # Updated to use the config class
     'Apps.data_transfer',
     'Apps.project',
     'Apps.time_management',  # Time Management and Timesheet
@@ -177,6 +177,17 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day',
+        'contact': '100/minute',
+        'contact_create': '50/minute',
+        'contact_note': '200/minute'
+    }
 }
 
 # Celery Configuration
@@ -388,53 +399,56 @@ RATE_LIMIT_CACHE_PREFIX = 'rate_limit:'
 
 # Rate limit headers
 RATE_LIMIT_HEADERS = {
-    'X-RateLimit-Limit': 'X-RateLimit-Limit',
-    'X-RateLimit-Remaining': 'X-RateLimit-Remaining',
-    'X-RateLimit-Reset': 'X-RateLimit-Reset',
-    'Retry-After': 'Retry-After'
+    'X-RateLimit-Limit': 'Rate limit limit',
+    'X-RateLimit-Remaining': 'Rate limit remaining',
+    'X-RateLimit-Reset': 'Rate limit reset',
 }
 
 # drf-spectacular settings
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Project Management API',
-    'DESCRIPTION': 'API for project management system with RBAC and rate limiting',
+    'TITLE': 'Your API',
+    'DESCRIPTION': '''Your project description
+
+Rate Limits:
+- Anonymous users: 100 requests per day
+- Authenticated users: 1000 requests per day
+- Contact endpoints: 100 requests per minute
+- Contact creation: 50 requests per minute
+- Contact notes: 200 requests per minute''',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
-    'SCHEMA_PATH_PREFIX': '/api/v1',
-    'SCHEMA_PATH_PREFIX_TRIM': True,
-    'SERVERS': [
-        {'url': 'http://localhost:8000', 'description': 'Local Development Server'},
-    ],
     'TAGS': [
-        {'name': 'roles', 'description': 'Role management endpoints'},
-        {'name': 'permissions', 'description': 'Permission management endpoints'},
-        {'name': 'user-roles', 'description': 'User-role assignment endpoints'},
+        {'name': 'contacts', 'description': 'Contact management endpoints'},
+        {'name': 'users', 'description': 'User management endpoints'},
+        {'name': 'projects', 'description': 'Project management endpoints'},
     ],
-    'SECURITY': [
-        {
-            'Bearer': {
-                'type': 'apiKey',
-                'name': 'Authorization',
-                'in': 'header',
-                'description': 'Enter your bearer token in the format: Bearer <token>'
-            }
-        }
-    ],
-    'COMPONENTS': {
-        'headers': {
-            'x-rate-limit': {
-                'description': 'Rate limit quota',
-                'schema': {'type': 'integer'}
-            },
-            'x-rate-limit-remaining': {
-                'description': 'Remaining rate limit quota',
-                'schema': {'type': 'integer'}
-            },
-            'x-rate-limit-reset': {
-                'description': 'Rate limit reset time',
-                'schema': {'type': 'string', 'format': 'date-time'}
-            }
+    'SECURITY': [{'Bearer': []}],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+    },
+    'HEADERS': {
+        'X-RateLimit-Limit': {
+            'description': 'The number of allowed requests in the current period',
+            'schema': {'type': 'integer'},
+        },
+        'X-RateLimit-Remaining': {
+            'description': 'The number of remaining requests in the current period',
+            'schema': {'type': 'integer'},
+        },
+        'X-RateLimit-Reset': {
+            'description': 'The number of seconds left in the current period',
+            'schema': {'type': 'integer'},
+        },
+    },
+    'EXTENSIONS': {
+        'x-rate-limit': {
+            'anonymous': '100/day',
+            'authenticated': '1000/day',
+            'contact': '100/minute',
+            'contact_create': '50/minute',
+            'contact_note': '200/minute'
         }
     }
 }

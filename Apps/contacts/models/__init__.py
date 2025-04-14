@@ -1,16 +1,16 @@
-from .contact import Contact
-from .contact_group import ContactGroup
-from .communication import Communication, CommunicationTemplate
-from .contact_list import ContactList, ContactListTemplate
-from .contact_segment import ContactSegment
-from .templates import ContactTemplate, ContactGroupTemplate
-from .monitoring import (
+from Apps.contacts.models.contact import Contact
+from Apps.contacts.models.contact_group import ContactGroup
+from Apps.contacts.models.communication import Communication, CommunicationTemplate
+from Apps.contacts.models.contact_list import ContactList, ContactListTemplate
+from Apps.contacts.models.contact_segment import ContactSegment
+from Apps.contacts.models.templates import ContactTemplate, ContactGroupTemplate
+from Apps.contacts.models.monitoring import (
     ContactMonitoring,
     ContactGroupMonitoring,
     CommunicationMonitoring
 )
-from .metrics import ContactMetrics
-from .contact_note import ContactNote, ContactNoteNotification, ContactNoteMonitoring
+from Apps.contacts.models.metrics import ContactMetrics
+from Apps.contacts.models.contact_note import ContactNote, ContactNoteNotification, ContactNoteMonitoring
 
 __all__ = [
     'Contact',
