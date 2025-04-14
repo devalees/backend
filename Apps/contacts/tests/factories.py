@@ -7,6 +7,8 @@ from factory.declarations import Iterator
 from Apps.contacts.models import Contact, ContactGroup, ContactTemplate, ContactMonitoring, ContactGroupTemplate, ContactGroupMonitoring, ContactList, ContactSegment
 from Apps.core.tests.factories import UserFactory, BaseModelFactory
 from Apps.entity.tests.factories import OrganizationFactory, DepartmentFactory, TeamFactory
+from django.utils import timezone
+from datetime import timedelta
 
 class ContactFactory(BaseModelFactory):
     class Meta:
@@ -288,3 +290,30 @@ class ContactSegmentFactory(BaseModelFactory):
     def _create(cls, model_class, *args, **kwargs):
         manager = cls._get_manager(model_class)
         return manager.create(*args, **kwargs)
+
+class ContactMetricsFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = 'contacts.ContactMetrics'
+
+    contact = factory.SubFactory(ContactFactory)
+    organization = factory.LazyAttribute(lambda o: o.contact.organization)
+    engagement_score = factory.Faker('pyfloat', min_value=0, max_value=100)
+    last_interaction = factory.LazyFunction(timezone.now)
+    total_interactions = factory.Faker('random_int', min=0, max=1000)
+    email_opens = factory.Faker('random_int', min=0, max=500)
+    email_clicks = factory.Faker('random_int', min=0, max=200)
+    response_rate = factory.Faker('pyfloat', min_value=0, max_value=100)
+    average_response_time = factory.LazyFunction(lambda: timedelta(hours=factory.Faker('random_int', min=1, max=48)))
+    communication_frequency = factory.Faker('pyfloat', min_value=0, max_value=30)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        return super()._create(model_class, *args, **kwargs)
+
+    @classmethod
+    def _build(cls, model_class, *args, **kwargs):
+        if 'organization' not in kwargs and 'contact' in kwargs:
+            kwargs['organization'] = kwargs['contact'].organization
+        return super()._build(model_class, *args, **kwargs)
