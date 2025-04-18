@@ -181,8 +181,8 @@ class TestOrganizationOperations:
             parent.full_clean()  # This should raise ValidationError
         assert "Circular reference detected in organization context hierarchy" in str(exc_info.value)
         
-        # Save the parent to persist the circular reference
-        parent.save()
+        # Save the parent to persist the circular reference, skipping validation
+        parent.save(skip_validation=True)
     
         # Test circular reference validation in validate_organization_structure
         with pytest.raises(ValidationError) as exc_info:

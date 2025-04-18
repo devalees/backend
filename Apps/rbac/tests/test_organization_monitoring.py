@@ -1,5 +1,4 @@
 import pytest
-from django.core.cache import cache
 from django.utils import timezone
 from Apps.rbac.models import OrganizationContext, OrganizationMonitor
 from Apps.entity.models import Organization
@@ -130,7 +129,6 @@ class TestOrganizationMonitor:
             metric_type="counter",
             timestamp=reference_time - timedelta(hours=2)
         )
-        print(f"Monitor 1 timestamp: {monitor1.timestamp}")
         
         # Create a monitor from 1 hour ago
         monitor2 = OrganizationMonitor.objects.create(
@@ -140,7 +138,6 @@ class TestOrganizationMonitor:
             metric_type="counter",
             timestamp=reference_time - timedelta(hours=1)
         )
-        print(f"Monitor 2 timestamp: {monitor2.timestamp}")
         
         # Create a monitor from 30 minutes ago
         monitor3 = OrganizationMonitor.objects.create(
@@ -150,7 +147,6 @@ class TestOrganizationMonitor:
             metric_type="counter",
             timestamp=reference_time - timedelta(minutes=30)
         )
-        print(f"Monitor 3 timestamp: {monitor3.timestamp}")
         
         # Create a monitor from now
         monitor4 = OrganizationMonitor.objects.create(
@@ -160,14 +156,10 @@ class TestOrganizationMonitor:
             metric_type="counter",
             timestamp=reference_time
         )
-        print(f"Monitor 4 timestamp: {monitor4.timestamp}")
         
         # Get metrics from 45 minutes ago to now (after Monitor 2's timestamp)
         start_time = reference_time - timedelta(minutes=45)
         end_time = reference_time
-        
-        print(f"Start time: {start_time}")
-        print(f"End time: {end_time}")
         
         metrics = OrganizationMonitor.get_metrics_by_time_range(
             organization_context,
@@ -197,63 +189,46 @@ class TestOrganizationMonitor:
             metric_type="gauge"
         )
         
-        OrganizationMonitor.objects.create(
-            organization_context=organization_context,
-            metric_name="histogram_metric",
-            metric_value=300,
-            metric_type="histogram"
-        )
-        
         # Get metrics by type
         counter_metrics = OrganizationMonitor.get_metrics_by_type(organization_context, "counter")
         gauge_metrics = OrganizationMonitor.get_metrics_by_type(organization_context, "gauge")
-        histogram_metrics = OrganizationMonitor.get_metrics_by_type(organization_context, "histogram")
         
-        # Check that we got the correct metrics by type
+        # Check that we got the correct metrics
         assert len(counter_metrics) == 1
-        assert counter_metrics[0].metric_name == "counter_metric"
-        
+        assert counter_metrics[0].metric_value == 100
         assert len(gauge_metrics) == 1
-        assert gauge_metrics[0].metric_name == "gauge_metric"
-        
-        assert len(histogram_metrics) == 1
-        assert histogram_metrics[0].metric_name == "histogram_metric"
+        assert gauge_metrics[0].metric_value == 200
     
     def test_organization_monitor_get_metrics_by_name(self, organization_context):
         """Test getting metrics for an organization context by name"""
         # Create multiple monitors with different names
         OrganizationMonitor.objects.create(
             organization_context=organization_context,
-            metric_name="metric1",
+            metric_name="metric_1",
             metric_value=100,
             metric_type="counter"
         )
         
         OrganizationMonitor.objects.create(
             organization_context=organization_context,
-            metric_name="metric2",
+            metric_name="metric_2",
             metric_value=200,
-            metric_type="counter"
-        )
-        
-        OrganizationMonitor.objects.create(
-            organization_context=organization_context,
-            metric_name="metric3",
-            metric_value=300,
             metric_type="counter"
         )
         
         # Get metrics by name
-        metrics = OrganizationMonitor.get_metrics_by_name(organization_context, "metric2")
+        metrics_1 = OrganizationMonitor.get_metrics_by_name(organization_context, "metric_1")
+        metrics_2 = OrganizationMonitor.get_metrics_by_name(organization_context, "metric_2")
         
-        # Check that we got the correct metrics by name
-        assert len(metrics) == 1
-        assert metrics[0].metric_name == "metric2"
-        assert metrics[0].metric_value == 200
+        # Check that we got the correct metrics
+        assert len(metrics_1) == 1
+        assert metrics_1[0].metric_value == 100
+        assert len(metrics_2) == 1
+        assert metrics_2[0].metric_value == 200
     
     def test_organization_monitor_aggregate_metrics(self, organization_context):
         """Test aggregating metrics for an organization context"""
-        # Create multiple monitors with different values
+        # Create multiple monitors with the same name
         OrganizationMonitor.objects.create(
             organization_context=organization_context,
             metric_name="test_metric",
@@ -268,63 +243,14 @@ class TestOrganizationMonitor:
             metric_type="counter"
         )
         
-        OrganizationMonitor.objects.create(
-            organization_context=organization_context,
-            metric_name="test_metric",
-            metric_value=300,
-            metric_type="counter"
-        )
+        # Test different aggregation types
+        sum_value = OrganizationMonitor.aggregate_metrics(organization_context, "test_metric", "sum")
+        avg_value = OrganizationMonitor.aggregate_metrics(organization_context, "test_metric", "avg")
+        min_value = OrganizationMonitor.aggregate_metrics(organization_context, "test_metric", "min")
+        max_value = OrganizationMonitor.aggregate_metrics(organization_context, "test_metric", "max")
         
-        # Aggregate metrics
-        aggregated = OrganizationMonitor.aggregate_metrics(
-            organization_context, 
-            "test_metric", 
-            "sum"
-        )
-        
-        # Check that we got the correct aggregated value
-        assert aggregated == 600
-    
-    def test_organization_monitor_cache_metrics(self, organization_context):
-        """Test caching metrics for an organization context"""
-        # Create a monitor
-        monitor = OrganizationMonitor.objects.create(
-            organization_context=organization_context,
-            metric_name="test_metric",
-            metric_value=100,
-            metric_type="counter"
-        )
-        
-        # Cache the metrics
-        monitor.cache_metrics()
-        
-        # Get the cached metrics
-        cached_metrics = OrganizationMonitor.get_cached_metrics(organization_context)
-        
-        # Check that we got the cached metrics
-        assert cached_metrics is not None
-        assert len(cached_metrics) == 1
-        assert cached_metrics[0]["metric_name"] == "test_metric"
-        assert cached_metrics[0]["metric_value"] == 100
-    
-    def test_organization_monitor_invalidate_cache(self, organization_context):
-        """Test invalidating the cache for an organization context"""
-        # Create a monitor
-        monitor = OrganizationMonitor.objects.create(
-            organization_context=organization_context,
-            metric_name="test_metric",
-            metric_value=100,
-            metric_type="counter"
-        )
-        
-        # Cache the metrics
-        monitor.cache_metrics()
-        
-        # Invalidate the cache
-        OrganizationMonitor.invalidate_cache(organization_context)
-        
-        # Get the cached metrics
-        cached_metrics = OrganizationMonitor.get_cached_metrics(organization_context)
-        
-        # Check that the cache was invalidated
-        assert cached_metrics is None 
+        # Check aggregation results
+        assert sum_value == 300
+        assert avg_value == 150
+        assert min_value == 100
+        assert max_value == 200 

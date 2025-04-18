@@ -1,5 +1,4 @@
 import pytest
-from django.core.cache import cache
 from django.test import TestCase, TransactionTestCase
 from django.contrib.auth import get_user_model
 from django.db import models, connection
@@ -38,9 +37,6 @@ class TestRBACBaseModel(TransactionTestCase):
         """Set up test data"""
         super().setUp()
         
-        # Clear cache
-        cache.clear()
-        
         # Create test user
         self.user = User.objects.create_user(
             username=f'testuser_{self._testMethodName}',  # Make username unique per test
@@ -68,7 +64,6 @@ class TestRBACBaseModel(TransactionTestCase):
             self.organization.delete()
         if hasattr(self, 'user'):
             self.user.delete()
-        cache.clear()
         super().tearDown()
 
     @classmethod
@@ -82,41 +77,6 @@ class TestRBACBaseModel(TransactionTestCase):
             connection.enable_constraint_checking()
                 
         super().tearDownClass()
-
-    def test_permission_cache_key_generation(self):
-        """Test that permission cache keys are generated correctly"""
-        permission = 'view'
-        expected_key = f"rbac_permission_TestModel_{self.test_instance.id}_{self.user.id}_{permission}"
-        actual_key = self.test_instance.get_permission_cache_key(self.user, permission)
-        self.assertEqual(actual_key, expected_key)
-
-    def test_permission_caching(self):
-        """Test that permission checks are properly cached"""
-        permission = 'view'
-        
-        # First call should not be cached
-        self.assertFalse(self.test_instance.has_permission(self.user, permission))
-        
-        # Second call should use cache
-        cache_key = self.test_instance.get_permission_cache_key(self.user, permission)
-        self.assertIsNotNone(cache.get(cache_key))
-
-    def test_permission_cache_invalidation(self):
-        """Test that permission cache can be invalidated"""
-        permission = 'view'
-        
-        # Set up initial permission check
-        self.test_instance.has_permission(self.user, permission)
-        cache_key = self.test_instance.get_permission_cache_key(self.user, permission)
-        
-        # Verify cache exists
-        self.assertIsNotNone(cache.get(cache_key))
-        
-        # Invalidate cache
-        cache.delete(cache_key)  # Use delete instead of delete_pattern
-        
-        # Verify cache is cleared
-        self.assertIsNone(cache.get(cache_key))
 
     def test_field_permission_default(self):
         """Test that field permissions default to True"""

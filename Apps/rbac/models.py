@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from Apps.entity.models import Organization
@@ -38,28 +37,13 @@ class RBACBaseModel(models.Model):
             if self.organization_id != original.organization_id:
                 raise ValidationError("Cannot change organization of an existing instance")
 
-    def get_permission_cache_key(self, user, permission):
-        """Generate cache key for permission checks"""
-        return f"rbac_permission_{self.__class__.__name__}_{self.id}_{user.id}_{permission}"
-
     def has_permission(self, user, permission):
         """
         Check if user has specific permission on this object
-        Uses caching to improve performance
         """
-        cache_key = self.get_permission_cache_key(user, permission)
-        cached_result = cache.get(cache_key)
-        
-        if cached_result is not None:
-            return cached_result
-
         # Implement permission check logic here
         # This is a placeholder - actual implementation will be added in subsequent steps
-        result = False
-        
-        # Cache the result
-        cache.set(cache_key, result, timeout=300)  # Cache for 5 minutes
-        return result
+        return False
 
     def get_field_permission(self, user, field_name):
         """
@@ -68,17 +52,6 @@ class RBACBaseModel(models.Model):
         # Implement field-level permission check logic here
         # This is a placeholder - actual implementation will be added in subsequent steps
         return True
-
-    def invalidate_permission_cache(self, user=None):
-        """
-        Invalidate permission cache for this object
-        """
-        if user:
-            # Invalidate specific user's permissions
-            cache.delete(f"rbac_permission_{self.__class__.__name__}_{self.id}_{user.id}_*")
-        else:
-            # Invalidate all users' permissions
-            cache.delete(f"rbac_permission_{self.__class__.__name__}_{self.id}_*_*")
 
 class Permission(RBACBaseModel):
     """
@@ -89,9 +62,6 @@ class Permission(RBACBaseModel):
     description = models.TextField(blank=True)
     code = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
-
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
 
     class Meta:
         verbose_name = 'Permission'
@@ -155,7 +125,6 @@ class Role(RBACBaseModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Store original permissions for change detection
         self._original_permissions = set()
         if self.pk:
             self._original_permissions = set(self.permissions.values_list('id', flat=True))
@@ -163,12 +132,8 @@ class Role(RBACBaseModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-        # Update original permissions after save
         if self.pk:
             current_permissions = set(self.permissions.values_list('id', flat=True))
-            if current_permissions != self._original_permissions:
-                # Permissions have changed, invalidate cache
-                self.invalidate_permission_cache()
             self._original_permissions = current_permissions
 
     def clean(self):
@@ -181,20 +146,10 @@ class Role(RBACBaseModel):
         if self.parent and self.parent.organization != self.organization:
             raise ValidationError("Parent role must belong to the same organization")
 
-    def get_permission_cache_key(self, permission_code):
-        """Generate cache key for permission checks"""
-        return f"role_permission_{self.id}_{permission_code}"
-
     def has_permission(self, permission_code):
         """Check if the role has a specific permission"""
         if not self.is_active:
             return False
-            
-        # Check cache first
-        cache_key = self.get_permission_cache_key(permission_code)
-        cached_value = cache.get(cache_key)
-        if cached_value is not None:
-            return cached_value
             
         # Check direct permissions
         has_perm = self.permissions.filter(
@@ -202,50 +157,24 @@ class Role(RBACBaseModel):
             is_active=True
         ).exists()
         
-        # If no direct permission, check parent role
-        if not has_perm and self.parent and self.parent.is_active:
+        # Check parent role if no direct permission
+        if not has_perm and self.parent:
             has_perm = self.parent.has_permission(permission_code)
             
-        # Cache the result
-        cache.set(cache_key, has_perm, 300)  # Cache for 5 minutes
         return has_perm
-
-    def invalidate_permission_cache(self, permission_code=None):
-        """Invalidate the permission cache for this role"""
-        if permission_code:
-            # Invalidate specific permission cache
-            cache_key = self.get_permission_cache_key(permission_code)
-            cache.delete(cache_key)
-        else:
-            # If no specific permission code, invalidate all permission caches
-            # This includes both direct permissions and inherited permissions
-            for perm in Permission.objects.filter(organization=self.organization):
-                cache_key = self.get_permission_cache_key(perm.code)
-                cache.delete(cache_key)
-        
-        # Invalidate cache for child roles since they inherit permissions
-        for child in self.children.all():
-            child.invalidate_permission_cache(permission_code)
 
     def __str__(self):
         return self.name
 
     def deactivate(self):
-        """Deactivate the role"""
+        """Deactivate this role"""
         self.is_active = False
         self.save()
-        self.invalidate_permission_cache()
 
     def activate(self):
-        """Activate the role"""
+        """Activate this role"""
         self.is_active = True
         self.save()
-        self.invalidate_permission_cache()
-
-    def m2m_changed(self, sender, instance, action, reverse, model, pk_set, **kwargs):
-        """Handle M2M relationship changes"""
-        if action in ["post_add", "post_remove", "post_clear"]:
-            self.invalidate_permission_cache()
 
 class UserRole(RBACBaseModel):
     """Model representing a role assignment to a user"""
@@ -257,9 +186,6 @@ class UserRole(RBACBaseModel):
     deactivated_at = models.DateTimeField(null=True, blank=True)
     is_delegated = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
-
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
 
     class Meta:
         app_label = 'rbac'
@@ -318,31 +244,21 @@ class UserRole(RBACBaseModel):
         self.is_active = False
         self.deactivated_at = timezone.now()
         self.save()
-        self.invalidate_permission_cache()
 
     def activate(self):
         """Activate the user role assignment"""
         self.is_active = True
         self.deactivated_at = None
         self.save()
-        self.invalidate_permission_cache()
 
     def has_permission(self, permission):
         """
         Check if the user has a specific permission through this role
-        Uses caching to improve performance
         """
         if not self.is_active:
             return False
 
-        cache_key = self.get_permission_cache_key(self.user, permission)
-        cached_result = cache.get(cache_key)
-        
-        if cached_result is not None:
-            return cached_result
-
         has_perm = self.role.has_permission(permission)
-        cache.set(cache_key, has_perm, timeout=300)  # Cache for 5 minutes
         return has_perm
 
     def has_higher_priority_than(self, other_user_role):
@@ -394,9 +310,6 @@ class Resource(RBACBaseModel):
     )
     is_active = models.BooleanField(default=True)
     metadata = models.JSONField(default=dict, blank=True)
-
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
 
     class Meta:
         app_label = 'rbac'
@@ -562,9 +475,6 @@ class ResourceAccess(RBACBaseModel):
     deactivated_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
-
     class Meta:
         app_label = 'rbac'
         unique_together = ('resource', 'user', 'access_type', 'organization')
@@ -632,9 +542,6 @@ class OrganizationContext(RBACBaseModel):
     deactivated_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
-
     class Meta:
         app_label = 'rbac'
         unique_together = ('name', 'organization')
@@ -644,193 +551,75 @@ class OrganizationContext(RBACBaseModel):
         return f"{self.name} ({self.organization.name})"
 
     def clean(self):
-        """Validate the model data"""
+        """Validate organization context data"""
         super().clean()
         
-        # Validate name
-        if not self.name:
-            raise ValidationError("Name is required")
-        
-        # Check for duplicate names in the same organization
-        query = OrganizationContext.objects.filter(
-            name=self.name,
-            organization=self.organization
-        )
-        if self.pk:
-            query = query.exclude(pk=self.pk)
-        
-        if query.exists():
-            raise ValidationError({
-                'name': f"An organization context with the name '{self.name}' already exists in this organization"
-            })
-        
-        # Validate parent
+        # Check for circular reference
         if self.parent:
+            # Check if parent belongs to the same organization
             if self.parent.organization != self.organization:
                 raise ValidationError("Parent context must belong to the same organization")
             
-            # Check for circular references
-            if self.pk:  # Only check if this is an existing instance
-                parent = self.parent
-                while parent:
-                    if parent.pk == self.pk:
-                        raise ValidationError("Circular reference detected in organization context hierarchy")
-                    parent = parent.parent
+            # Check for circular reference
+            current = self.parent
+            while current:
+                if current.pk == self.pk:
+                    raise ValidationError("Circular reference detected in organization context hierarchy")
+                current = current.parent
 
     def save(self, *args, **kwargs):
-        """Override save to handle organization context changes"""
+        """Save the organization context with validation"""
+        skip_validation = kwargs.pop('skip_validation', False)
+        if not skip_validation:
+            self.full_clean()
         super().save(*args, **kwargs)
-        # Update the cache with the latest data
-        self.cache_organization_data()
 
     def delete(self, *args, **kwargs):
-        """Override delete to implement soft delete"""
+        """Soft delete the organization context"""
         self.is_active = False
         self.deactivated_at = timezone.now()
         self.save()
-        # Invalidate organization cache after soft delete
-        self.invalidate_organization_cache()
 
     def hard_delete(self):
-        """Permanently delete the organization context"""
+        """Hard delete the organization context"""
         super().delete()
 
     def deactivate(self):
-        """Deactivate the organization context"""
+        """Deactivate this organization context"""
         self.is_active = False
         self.deactivated_at = timezone.now()
         self.save()
 
     def activate(self):
-        """Activate the organization context"""
+        """Activate this organization context"""
         self.is_active = True
         self.deactivated_at = None
         self.save()
 
     def get_ancestors(self):
-        """Get all ancestors of this organization context"""
+        """Get all ancestor contexts"""
         ancestors = []
-        parent = self.parent
-        
-        while parent:
-            ancestors.append(parent)
-            parent = parent.parent
-        
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
         return ancestors
 
     def get_descendants(self):
-        """Get all descendants of this organization context"""
+        """Get all descendant contexts"""
         descendants = []
-        children = self.children.all()
-        
-        for child in children:
+        for child in self.children.all():
             descendants.append(child)
             descendants.extend(child.get_descendants())
-        
         return descendants
 
     def get_all_children(self):
-        """Get all direct children of this organization context"""
+        """Get all immediate children contexts"""
         return self.children.all()
 
     def get_all_parents(self):
-        """Get all parents (ancestors) of this organization context"""
-        parents = []
-        current = self.parent
-        while current:
-            parents.append(current)
-            current = current.parent
-        return parents
-    
-    def get_organization_cache_key(self):
-        """
-        Generate a cache key for the organization data.
-        The key is specific to this context to avoid conflicts.
-        
-        Returns:
-            str: The cache key for the organization data
-        """
-        return f"rbac_organization_context_{self.id}_{self.organization.id}"
-    
-    def cache_organization_data(self, expiration=None):
-        """
-        Cache the organization data for this context.
-        Only caches data relevant to this specific context.
-        
-        Args:
-            expiration (int, optional): Cache expiration time in seconds. Defaults to None.
-        """
-        cache_key = self.get_organization_cache_key()
-        
-        # Prepare organization data for caching, focusing on context-specific data
-        org_data = {
-            'id': self.organization.id,
-            'name': self.organization.name,
-            'context_id': self.id,
-            'context_name': self.name,
-            'context_description': self.description,
-            'context_is_active': self.is_active,
-            'context_created_at': self.created_at.isoformat() if self.created_at else None,
-            'context_updated_at': self.updated_at.isoformat() if self.updated_at else None,
-        }
-        
-        # Add hierarchy information if available
-        if self.parent:
-            org_data['parent'] = {
-                'id': self.parent.id,
-                'name': self.parent.name,
-                'context_id': self.parent.id
-            }
-        
-        children = self.children.all()
-        if children:
-            org_data['children'] = [
-                {
-                    'id': child.id,
-                    'name': child.name,
-                    'context_id': child.id
-                } for child in children
-            ]
-        
-        # Cache the data
-        cache.set(cache_key, org_data, expiration)
-    
-    def get_cached_organization(self):
-        """
-        Get the cached organization data for this context.
-        
-        Returns:
-            dict: The cached organization data or None if not cached
-        """
-        cache_key = self.get_organization_cache_key()
-        return cache.get(cache_key)
-    
-    def invalidate_organization_cache(self):
-        """
-        Invalidate the organization cache for this context.
-        Only affects this specific context's cache.
-        """
-        cache_key = self.get_organization_cache_key()
-        cache.delete(cache_key)
-    
-    def update_organization_cache(self):
-        """
-        Update the organization cache with the latest data.
-        Only updates this specific context's cache.
-        """
-        self.cache_organization_data()
-    
-    @classmethod
-    def cache_organization_data_bulk(cls, organization):
-        """
-        Cache organization data for all contexts in an organization.
-        
-        Args:
-            organization: The organization to cache data for
-        """
-        contexts = cls.objects.filter(organization=organization)
-        for context in contexts:
-            context.cache_organization_data()
+        """Get all parent contexts in order"""
+        return self.get_ancestors()
 
 class OrganizationMonitor(RBACBaseModel):
     """
@@ -857,9 +646,6 @@ class OrganizationMonitor(RBACBaseModel):
     is_active = models.BooleanField(default=True)
     deactivated_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
-
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
 
     class Meta:
         app_label = 'rbac'
@@ -891,16 +677,12 @@ class OrganizationMonitor(RBACBaseModel):
         if self.organization_context and not self.organization_id:
             self.organization_id = self.organization_context.organization_id
         super().save(*args, **kwargs)
-        # Cache the metrics after saving
-        self.cache_metrics()
 
     def delete(self, *args, **kwargs):
         """Override delete to implement soft delete"""
         self.is_active = False
         self.deactivated_at = timezone.now()
         self.save()
-        # Invalidate metrics cache after soft delete
-        self.invalidate_cache()
 
     def deactivate(self):
         """Deactivate the monitor"""
@@ -1073,9 +855,6 @@ class Audit(RBACBaseModel):
     user_agent = models.TextField(blank=True)
     session_id = models.CharField(max_length=100, blank=True)
     retention_period = models.IntegerField(default=DEFAULT_RETENTION_PERIOD, help_text="Number of days to retain this audit log")
-
-    # Add the organization isolation manager
-    objects = OrganizationIsolationManager()
 
     class Meta:
         app_label = 'rbac'
