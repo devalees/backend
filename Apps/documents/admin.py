@@ -9,15 +9,20 @@ class DocumentAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('title', 'description', 'status')
+            'fields': ('title', 'description', 'status', 'file')
         }),
         ('Classification', {
             'fields': ('classification', 'tags')
         }),
         ('Metadata', {
-            'fields': ('user', 'updated_by', 'created_at', 'updated_at', 'is_deleted')
+            'fields': ('user', 'created_at', 'updated_at', 'is_deleted')
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        if not change:  # If this is a new document
+            obj.user = request.user
+        super().save_model(request, obj, form, change)
 
 @admin.register(DocumentVersion)
 class DocumentVersionAdmin(admin.ModelAdmin):
