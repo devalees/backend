@@ -67,10 +67,17 @@ CACHES = {
         "LOCATION": "redis://127.0.0.1:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "PARSER_CLASS": "redis.connection.HiredisParser",
+            "PARSER_CLASS": "redis.connection.DefaultParser",
         }
     }
 }
+
+# Elasticsearch Configuration
+ELASTICSEARCH_DSN = 'http://localhost:9200'
+ELASTICSEARCH_USERNAME = 'elastic'  # Default username
+ELASTICSEARCH_PASSWORD = 'changeme'  # Default password
+ELASTICSEARCH_VERIFY_CERTS = False  # For development only
+ELASTICSEARCH_INDEX_PREFIX = 'pm_'  # Prefix for all indices
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -260,16 +267,6 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 CORS_ALLOW_CREDENTIALS = True
 
-# Elasticsearch Configuration
-ELASTICSEARCH_DSN = 'http://localhost:9200'
-ELASTICSEARCH_USERNAME = 'elastic'
-ELASTICSEARCH_PASSWORD = 'changeme'
-ELASTICSEARCH_VERIFY_CERTS = True  # Always verify certificates in production
-ELASTICSEARCH_USE_SSL = False  # Set to True if using HTTPS
-ELASTICSEARCH_AUTH = {
-    'basic_auth': (ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD)
-}
-
 # Email settings for Mailtrap
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
@@ -353,9 +350,6 @@ STORAGES = {
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 FILE_UPLOAD_PERMISSIONS = 0o644
-
-# Elasticsearch Configuration
-ELASTICSEARCH_INDEX_PREFIX = 'documents_'
 
 # Document Settings
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50MB

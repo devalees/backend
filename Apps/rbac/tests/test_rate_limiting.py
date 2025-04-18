@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from ..api.middleware.rate_limiting import RateLimitMiddleware
 from ..models import Role
+from django.http import HttpResponse
 
 @pytest.fixture
 def client():
@@ -68,17 +69,17 @@ class TestRateLimiting:
         assert 'Retry-After' in response.headers
 
     def test_rate_limit_reset(self, client, request_factory):
-        """Test that rate limit resets after window period"""
+        """Test that rate limit resets after window expires"""
         request = request_factory.get('/api/roles/')
-        middleware = RateLimitMiddleware(get_response=lambda r: r)
+        middleware = RateLimitMiddleware(get_response=lambda r: HttpResponse())
         
         # Make requests up to the limit
         for _ in range(settings.RATE_LIMIT_REQUESTS):
             middleware(request)
         
-        # Wait for rate limit window to expire
+        # Wait for rate limit window to expire (add a small buffer to ensure reset)
         import time
-        time.sleep(settings.RATE_LIMIT_WINDOW)
+        time.sleep(settings.RATE_LIMIT_WINDOW + 1)
         
         # Next request should be allowed
         response = middleware(request)

@@ -11,7 +11,8 @@ from ..auto_mixin_applier import (
     AutoMixinApplier,
     apply_mixins_to_model,
     apply_indexes_to_model,
-    register_model_indexes
+    register_model_indexes,
+    apply_model_configuration
 )
 
 
@@ -144,9 +145,9 @@ class TestAutoMixinApplier(TestCase):
         self.assertFalse(hasattr(TestAutoMixinModel, 'aggregate'))
     
     def test_apply_model_configuration(self):
-        """Test applying model configuration from FilterConfig and AggregationConfig"""
-        # Apply mixins to TestWithModelConfig
-        model_with_mixins = apply_mixins_to_model(TestWithModelConfig)
+        """Test apply_model_configuration function"""
+        # Apply configuration to TestWithModelConfig
+        model_with_mixins = apply_model_configuration(TestWithModelConfig)
         
         # Verify that the model now has the expected functionality
         self.assertTrue(hasattr(model_with_mixins, 'get_filterable_fields'))

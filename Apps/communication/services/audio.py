@@ -134,33 +134,60 @@ class AudioProcessingService:
         if not 0 <= quality <= 1:
             raise ValueError("Quality must be between 0.0 and 1.0")
         
-        # Get the file path if it's a Django FileField
-        if hasattr(audio_file, 'path'):
-            file_path = audio_file.path
-        else:
-            # If it's a file object, save it temporarily
-            temp_path = os.path.join(settings.MEDIA_ROOT, 'temp', audio_file.name)
-            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-            
-            with open(temp_path, 'wb+') as destination:
-                for chunk in audio_file.chunks():
-                    destination.write(chunk)
-            file_path = temp_path
-        
         try:
+            # Handle different types of input
+            if isinstance(audio_file, str):
+                file_path = audio_file
+            elif hasattr(audio_file, 'path'):
+                file_path = audio_file.path
+            else:
+                # If it's a file object, save it temporarily
+                temp_path = os.path.join(settings.MEDIA_ROOT, 'temp', audio_file.name)
+                os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+                
+                with open(temp_path, 'wb+') as destination:
+                    for chunk in audio_file.chunks():
+                        destination.write(chunk)
+                file_path = temp_path
+            
             # Load the audio file using librosa
             audio_data, sample_rate = librosa.load(file_path, sr=None)
             
             # Calculate target quality based on input parameter
-            # For OGG format, subtype 'vorbis' with different quality levels
-            compressed_path = os.path.splitext(file_path)[0] + '_compressed.ogg'
+            # For MP3 format which is more widely supported
+            compressed_path = os.path.splitext(file_path)[0] + '_compressed.mp3'
+            os.makedirs(os.path.dirname(compressed_path), exist_ok=True)
             
             # Export with compression using soundfile
-            # Quality in soundfile for OGG/Vorbis ranges from 0 to 10
-            # Convert our 0-1 quality to 0-10 range
-            sf_quality = int(quality * 10)
-            sf.write(compressed_path, audio_data, sample_rate, format='OGG', subtype='VORBIS',
-                    encoding_args={'quality': sf_quality})
+            # For MP3, we'll use a simpler approach with librosa
+            # Normalize the audio data
+            audio_data = self.normalize_audio(audio_data)
+            
+            # Apply compression by reducing quality
+            if quality < 1.0:
+                # Reduce sample rate based on quality
+                target_sr = int(sample_rate * quality)
+                audio_data = self.resample_audio(audio_data, sample_rate, target_sr)
+                sample_rate = target_sr
+            
+            # Save as WAV first (librosa doesn't support direct MP3 writing)
+            temp_wav = os.path.splitext(file_path)[0] + '_temp.wav'
+            os.makedirs(os.path.dirname(temp_wav), exist_ok=True)
+            
+            sf.write(temp_wav, audio_data, sample_rate)
+            
+            # Convert to MP3 using ffmpeg if available
+            try:
+                import subprocess
+                subprocess.run([
+                    'ffmpeg', '-i', temp_wav,
+                    '-codec:a', 'libmp3lame',
+                    '-q:a', str(int((1 - quality) * 9)),  # Convert quality to ffmpeg's scale (0-9)
+                    '-y', compressed_path
+                ], check=True, capture_output=True)
+            except (subprocess.SubprocessError, FileNotFoundError):
+                # Fallback to WAV if ffmpeg is not available
+                compressed_path = temp_wav
             
             # Read the compressed file
             with open(compressed_path, 'rb') as f:
@@ -168,9 +195,15 @@ class AudioProcessingService:
             
             return compressed_content
             
+        except Exception as e:
+            logger.error(f"Error compressing audio: {str(e)}")
+            raise
+            
         finally:
             # Clean up temporary files
-            if not hasattr(audio_file, 'path'):
+            if not isinstance(audio_file, str) and not hasattr(audio_file, 'path'):
                 os.remove(file_path)
             if os.path.exists(compressed_path):
-                os.remove(compressed_path) 
+                os.remove(compressed_path)
+            if os.path.exists(temp_wav):
+                os.remove(temp_wav) 

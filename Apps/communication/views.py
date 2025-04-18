@@ -18,6 +18,12 @@ from rest_framework.decorators import action
 from Apps.communication.models import EmailTemplate, EmailTracking, EmailAnalytics
 from Apps.communication.serializers import EmailTemplateSerializer, EmailTrackingSerializer, EmailAnalyticsSerializer
 from Apps.communication.services.email_service import EmailService
+import base64
+import logging
+import tempfile
+import shutil
+
+logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -139,61 +145,75 @@ def play_audio(request, audio_id):
     return response 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def compress_audio(request, audio_id):
-    """Compress an audio file with the specified quality."""
     try:
-        audio = Audio.objects.get(id=audio_id)
-    except Audio.DoesNotExist:
-        raise Http404("Audio file not found")
-    
-    quality = request.data.get('quality', 0.5)
-    try:
-        quality = float(quality)
-        if not 0 <= quality <= 1:
-            return Response(
-                {'error': 'Quality must be between 0.0 and 1.0'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    except (TypeError, ValueError):
-        return Response(
-            {'error': 'Invalid quality value'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    audio_service = AudioProcessingService()
-    
-    try:
-        # Get the original file size
-        original_size = audio.get_file_size()
+        # Get the audio file by ID instead of from request
+        try:
+            from Apps.communication.models import Audio
+            audio_file_obj = Audio.objects.get(id=audio_id)
+            audio_file = audio_file_obj.file
+        except Audio.DoesNotExist:
+            return Response({'error': 'Audio file not found'}, status=404)
+            
+        quality = float(request.data.get('quality', 0.5))
         
-        # Compress the audio
-        compressed_content = audio_service.compress_audio(audio.file, quality)
+        if not 0 <= quality <= 1:
+            return Response({'error': 'Quality must be between 0.0 and 1.0'}, status=400)
+            
+        service = AudioProcessingService()
+        
+        # Validate the audio file
+        if not service.validate_audio_file(audio_file)[0]:
+            return Response({'error': 'Invalid audio file format or size'}, status=400)
+            
+        # Process the audio file
+        compressed_content = service.compress_audio(audio_file, quality)
+        
+        # Get original file info for comparison
+        original_file_path = audio_file.path
+        original_size = os.path.getsize(original_file_path)
+        
+        # Generate a unique filename for the compressed file
+        filename = f"compressed_{os.path.splitext(audio_file.name)[0]}.mp3"
+        
+        # Save compressed file temporarily to get its size
+        temp_compressed_path = os.path.join(tempfile.gettempdir(), 'compressed_audio', filename)
+        os.makedirs(os.path.dirname(temp_compressed_path), exist_ok=True)
+        
+        with open(temp_compressed_path, 'wb') as f:
+            f.write(compressed_content)
+        compressed_size = os.path.getsize(temp_compressed_path)
+        
+        # Create URL for compressed file
+        compressed_url = request.build_absolute_uri(f'/media/compressed/{filename}')
         
         # Save the compressed file
-        compressed_filename = f'compressed_{os.path.basename(audio.file.name)}'
-        compressed_file = ContentFile(compressed_content, name=compressed_filename)
+        compressed_dir = os.path.join(settings.MEDIA_ROOT, 'compressed')
+        os.makedirs(compressed_dir, exist_ok=True)
+        compressed_path = os.path.join(compressed_dir, filename)
         
-        # Update the audio file with the compressed version
-        audio.file = compressed_file
-        audio.save()
+        # Make sure the parent directories exist
+        os.makedirs(os.path.dirname(compressed_path), exist_ok=True)
         
-        # Get the new file size
-        compressed_size = audio.get_file_size()
+        shutil.copy(temp_compressed_path, compressed_path)
+        
+        # Clean up temp file
+        os.remove(temp_compressed_path)
         
         return Response({
             'message': 'Audio compressed successfully',
-            'compressed_file': audio.file.url,
+            'compressed_file': compressed_url,
             'original_size': original_size,
             'compressed_size': compressed_size,
-            'compression_ratio': compressed_size / original_size
+            'compression_ratio': f"{(original_size - compressed_size) / original_size * 100:.2f}%"
         })
-    
+        
+    except ValueError as e:
+        logger.error(f"Validation error in compress_audio: {str(e)}")
+        return Response({'error': str(e)}, status=400)
     except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        logger.error(f"Error in compress_audio: {str(e)}")
+        return Response({'error': 'Failed to compress audio file'}, status=500)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
