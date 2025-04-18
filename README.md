@@ -1,3 +1,5 @@
+# Project Management System
+
 ## Migration Management
 
 ### Automated Migration Tools
@@ -65,4 +67,45 @@ python3 manage.py makemigrations --empty app_name
 
 # Fake a migration (mark as applied without running)
 python3 manage.py migrate --fake
-``` 
+```
+
+## Setup Instructions
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/devalees/backend.git
+   cd backend
+   ```
+
+2. Run the setup script:
+   ```bash
+   chmod +x scripts/setup.sh
+   ./scripts/setup.sh
+   ```
+
+   This script will:
+   - Create and activate a Python virtual environment
+   - Install all Python dependencies from requirements.txt
+   - Install necessary system dependencies for audio processing
+   - Set up the development environment
+
+3. Start the development server:
+   ```bash
+   python manage.py runserver
+   ```
+
+## Dependency Management
+
+All Python dependencies are managed in `requirements.txt`. If you add new dependencies, please:
+
+1. Install them in your virtual environment:
+   ```bash
+   pip install new_package
+   ```
+
+2. Update requirements.txt:
+   ```bash
+   pip freeze > requirements.txt
+   ```
+
+3. Test the setup script to ensure it works for new installations. 
