@@ -10,11 +10,13 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 # Use the original RBACBaseModel directly
 from Apps.rbac.models import RBACBaseModel
 from Apps.rbac.managers import OrganizationIsolationManager
+# Import the FilterableAggregatableModel
+from Apps.filtering.base_model import FilterableAggregatableModel
 from .storage import document_storage
 
 User = get_user_model()
 
-class Document(RBACBaseModel):
+class Document(FilterableAggregatableModel, RBACBaseModel):
     """
     Model representing a document in the system.
     """
@@ -33,6 +35,26 @@ class Document(RBACBaseModel):
     classification = models.ForeignKey('DocumentClassification', on_delete=models.SET_NULL, null=True, blank=True)
     tags = models.ManyToManyField('DocumentTag', blank=True)
     is_deleted = models.BooleanField(default=False)
+
+    # FilterConfig defines which fields can be filtered and how
+    class FilterConfig:
+        text = ['title', 'description']
+        choice = ['status']
+        boolean = ['is_deleted']
+        related = ['user', 'classification', 'tags']
+        # Define indexes for optimized filtering
+        indexes = [
+            ['title'],
+            ['status'],
+            ['is_deleted', 'status'],
+        ]
+
+    # AggregationConfig defines which fields can be aggregated and how
+    class AggregationConfig:
+        # Fields for grouping
+        group_by = ['status', 'user', 'classification', 'is_deleted']
+        # Fields for counting
+        count = ['id']
 
     class Meta:
         ordering = ['-created_at']
@@ -136,7 +158,7 @@ class DocumentVersionManager(models.Manager):
         instance.save(force_insert=True)
         return instance
 
-class DocumentVersion(RBACBaseModel):
+class DocumentVersion(FilterableAggregatableModel, RBACBaseModel):
     """
     Model representing a version of a document.
     """
@@ -149,6 +171,29 @@ class DocumentVersion(RBACBaseModel):
     branch_name = models.CharField(max_length=100, default='main')
     parent_version = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='branches')
     merged_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='merged_from')
+
+    # FilterConfig defines which fields can be filtered and how
+    class FilterConfig:
+        text = ['comment', 'branch_name']
+        numeric = ['version_number']
+        boolean = ['is_current']
+        related = ['document', 'user', 'parent_version', 'merged_to']
+        # Define indexes for optimized filtering
+        indexes = [
+            ['document', 'version_number'],
+            ['is_current'],
+            ['branch_name'],
+        ]
+
+    # AggregationConfig defines which fields can be aggregated and how
+    class AggregationConfig:
+        # Fields for grouping
+        group_by = ['document', 'branch_name', 'user', 'is_current']
+        # Fields for counting
+        count = ['id']
+        # Fields for finding max/min
+        max = ['version_number']
+        min = ['version_number']
 
     # Use both manager types
     objects = models.Manager()
@@ -341,13 +386,29 @@ class DocumentVersion(RBACBaseModel):
             organization=self.organization
         ).order_by('version_number')
 
-class DocumentClassification(RBACBaseModel):
+class DocumentClassification(FilterableAggregatableModel, RBACBaseModel):
     """
     Model for classifying documents into categories.
     """
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+
+    # FilterConfig defines which fields can be filtered and how
+    class FilterConfig:
+        text = ['name', 'description']
+        related = ['parent']
+        # Define indexes for optimized filtering
+        indexes = [
+            ['name'],
+        ]
+
+    # AggregationConfig defines which fields can be aggregated and how
+    class AggregationConfig:
+        # Fields for grouping
+        group_by = ['parent']
+        # Fields for counting
+        count = ['id']
 
     class Meta:
         ordering = ['name']
@@ -369,13 +430,26 @@ class DocumentClassification(RBACBaseModel):
         if not self.name:
             raise ValidationError('Name is required')
 
-class DocumentTag(RBACBaseModel):
+class DocumentTag(FilterableAggregatableModel, RBACBaseModel):
     """
     Model for tagging documents with keywords.
     """
     name = models.CharField(max_length=50)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default='#000000')  # Hex color code
+
+    # FilterConfig defines which fields can be filtered and how
+    class FilterConfig:
+        text = ['name', 'description', 'color']
+        # Define indexes for optimized filtering
+        indexes = [
+            ['name'],
+        ]
+
+    # AggregationConfig defines which fields can be aggregated and how
+    class AggregationConfig:
+        # Fields for counting
+        count = ['id']
 
     class Meta:
         ordering = ['name']
