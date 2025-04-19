@@ -6,7 +6,7 @@ from Apps.project.models import Project
 class TimeCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeCategory
-        fields = ['id', 'name', 'description', 'is_billable', 'created_by', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'is_billable', 'color', 'created_by', 'created_at', 'updated_at']
         read_only_fields = ['created_by', 'created_at', 'updated_at']
 
 class TimeEntrySerializer(serializers.ModelSerializer):
@@ -15,7 +15,7 @@ class TimeEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeEntry
         fields = ['id', 'user', 'project', 'category', 'description', 'start_time', 'end_time', 
-                 'hours', 'is_billable', 'created_at', 'updated_at']
+                 'hours', 'is_billable', 'created_at', 'updated_at', 'task', 'project_phase', 'milestone']
         read_only_fields = ['created_at', 'updated_at']
 
     def validate(self, data):

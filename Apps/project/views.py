@@ -3,7 +3,8 @@ from rest_framework import viewsets, status, filters, decorators, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Q
+from django.db.models import Q, Sum, Count, F, ExpressionWrapper, fields
+from django.db.models.functions import TruncDate
 from django.utils.translation import gettext_lazy as _
 from .models import Project, Task, ProjectTemplate, TaskTemplate, ProjectSchedule, ProjectPhase, Milestone, ProjectDiscussion, DiscussionAttachment, DiscussionNotification
 from .serializers import (
@@ -17,6 +18,9 @@ import logging
 from django.utils import timezone
 from django.core.cache import cache
 import json
+from django.utils.timezone import timedelta
+from Apps.time_management.models import TimeEntry
+from Apps.time_management.serializers import TimeEntrySerializer
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +124,360 @@ class ProjectViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['get'])
+    def time_entries(self, request, pk=None):
+        """
+        Retrieve all time entries for a specific project, with optional filtering.
+        """
+        project = self.get_object()
+        queryset = TimeEntry.objects.filter(project=project)
+        
+        # Apply filters
+        task_id = request.query_params.get('task_id')
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+            
+        phase_id = request.query_params.get('phase_id')
+        if phase_id:
+            queryset = queryset.filter(project_phase_id=phase_id)
+            
+        milestone_id = request.query_params.get('milestone_id')
+        if milestone_id:
+            queryset = queryset.filter(milestone_id=milestone_id)
+            
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        billable = request.query_params.get('is_billable')
+        if billable is not None:
+            is_billable = billable.lower() == 'true'
+            queryset = queryset.filter(is_billable=is_billable)
+            
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(end_time__date__lte=end_date)
+        
+        serializer = TimeEntrySerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def time_report(self, request, pk=None):
+        """
+        Generate a time report for the project with aggregated statistics.
+        """
+        project = self.get_object()
+        
+        # Apply date filters if provided
+        time_entries = TimeEntry.objects.filter(project=project)
+        
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            time_entries = time_entries.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            time_entries = time_entries.filter(end_time__date__lte=end_date)
+        
+        # Calculate basic statistics
+        total_entries = time_entries.count()
+        
+        total_hours_agg = time_entries.aggregate(total=Sum('hours'))
+        total_hours = total_hours_agg['total'] or 0
+        
+        billable_hours_agg = time_entries.filter(is_billable=True).aggregate(total=Sum('hours'))
+        billable_hours = billable_hours_agg['total'] or 0
+        
+        non_billable_hours_agg = time_entries.filter(is_billable=False).aggregate(total=Sum('hours'))
+        non_billable_hours = non_billable_hours_agg['total'] or 0
+        
+        # Group by user
+        user_data = time_entries.values('user__username', 'user__id').annotate(
+            total_hours=Sum('hours'),
+            billable_hours=Sum('hours', filter=Q(is_billable=True)),
+            non_billable_hours=Sum('hours', filter=Q(is_billable=False)),
+            entry_count=Count('id')
+        ).order_by('-total_hours')
+        
+        # Group by task
+        task_data = time_entries.filter(task__isnull=False).values('task__title', 'task__id').annotate(
+            total_hours=Sum('hours'),
+            entry_count=Count('id')
+        ).order_by('-total_hours')
+        
+        # Group by phase
+        phase_data = time_entries.filter(project_phase__isnull=False).values('project_phase__name', 'project_phase__id').annotate(
+            total_hours=Sum('hours'),
+            entry_count=Count('id')
+        ).order_by('-total_hours')
+        
+        # Group by milestone
+        milestone_data = time_entries.filter(milestone__isnull=False).values('milestone__name', 'milestone__id').annotate(
+            total_hours=Sum('hours'),
+            entry_count=Count('id')
+        ).order_by('-total_hours')
+        
+        # Timeline - group by day
+        timeline_data = time_entries.annotate(
+            date=TruncDate('start_time')
+        ).values('date').annotate(
+            total_hours=Sum('hours'),
+            entry_count=Count('id')
+        ).order_by('date')
+        
+        # Prepare the response
+        report_data = {
+            'total_entries': total_entries,
+            'total_hours': total_hours,
+            'billable_hours': billable_hours,
+            'non_billable_hours': non_billable_hours,
+            'by_user': user_data,
+            'by_task': task_data,
+            'by_phase': phase_data,
+            'by_milestone': milestone_data,
+            'timeline_daily': timeline_data
+        }
+        
+        return Response(report_data)
+    
+    @action(detail=True, methods=['get'])
+    def burndown(self, request, pk=None):
+        """
+        Generate burndown chart data for the project schedule.
+        """
+        project = self.get_object()
+        
+        try:
+            schedule = project.schedule
+        except:
+            return Response(
+                {"detail": "Project does not have a schedule."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get estimated hours for the project
+        estimated_hours = schedule.estimated_hours or 0
+        
+        # Get project start and end dates
+        start_date = schedule.estimated_start_date or project.start_date
+        end_date = schedule.estimated_end_date or project.end_date
+        
+        if not start_date or not end_date:
+            return Response(
+                {"detail": "Project does not have valid start/end dates."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get all time entries for the project, sorted by date
+        time_entries = TimeEntry.objects.filter(project=project).order_by('start_time')
+        
+        # If no time entries, just return the basic burndown (ideal line)
+        if not time_entries.exists():
+            # Create ideal burndown line
+            today = timezone.now().date()
+            total_days = (end_date.date() - start_date.date()).days + 1
+            
+            if total_days <= 1:
+                # Handle case with only one day
+                return Response([
+                    {'date': start_date.date().isoformat(), 'remaining': float(estimated_hours)},
+                    {'date': end_date.date().isoformat(), 'remaining': 0}
+                ])
+            
+            # Calculate daily burn rate for ideal burndown
+            daily_burn_rate = estimated_hours / total_days
+            
+            # Generate ideal burndown data points
+            burndown_data = []
+            current_date = start_date.date()
+            remaining = float(estimated_hours)
+            
+            while current_date <= end_date.date():
+                burndown_data.append({
+                    'date': current_date.isoformat(),
+                    'remaining': remaining,
+                    'ideal': remaining  # Include ideal line
+                })
+                
+                current_date += timedelta(days=1)
+                remaining = max(0, remaining - float(daily_burn_rate))
+            
+            return Response(burndown_data)
+        
+        # Create actual burndown data based on time entries
+        first_time_entry_date = time_entries.first().start_time.date()
+        last_time_entry_date = time_entries.last().start_time.date()
+        
+        # Ensure start_date is not later than the first time entry
+        if start_date.date() > first_time_entry_date:
+            chart_start_date = first_time_entry_date
+        else:
+            chart_start_date = start_date.date()
+        
+        # Ensure end_date is not earlier than the last time entry
+        if end_date.date() < last_time_entry_date:
+            chart_end_date = last_time_entry_date
+        else:
+            chart_end_date = end_date.date()
+        
+        # Calculate total days for the chart
+        total_days = (chart_end_date - chart_start_date).days + 1
+        
+        # Calculate daily burn rate for ideal burndown
+        daily_burn_rate = estimated_hours / total_days if total_days > 0 else 0
+        
+        # Group time entries by date and calculate hours per day
+        daily_hours = time_entries.annotate(
+            date=TruncDate('start_time')
+        ).values('date').annotate(
+            hours=Sum('hours')
+        ).order_by('date')
+        
+        # Convert to dictionary for easy lookup
+        hours_by_date = {entry['date'].isoformat(): float(entry['hours']) for entry in daily_hours}
+        
+        # Generate burndown data points
+        burndown_data = []
+        current_date = chart_start_date
+        remaining = float(estimated_hours)
+        ideal_remaining = float(estimated_hours)
+        
+        while current_date <= chart_end_date:
+            date_str = current_date.isoformat()
+            
+            # Subtract hours logged on this day from remaining work
+            if date_str in hours_by_date:
+                remaining -= hours_by_date[date_str]
+            
+            # Ensure remaining doesn't go negative
+            remaining = max(0, remaining)
+            
+            # Calculate ideal burndown
+            ideal_remaining = max(0, float(estimated_hours) - (float(daily_burn_rate) * (current_date - chart_start_date).days))
+            
+            burndown_data.append({
+                'date': date_str,
+                'remaining': remaining,
+                'ideal': ideal_remaining
+            })
+            
+            current_date += timedelta(days=1)
+        
+        return Response(burndown_data)
+    
+    @action(detail=True, methods=['get'])
+    def time_dashboard(self, request, pk=None):
+        """
+        Provide a dashboard overview of time tracking for the project.
+        """
+        project = self.get_object()
+        
+        # Get all time entries for the project
+        time_entries = TimeEntry.objects.filter(project=project)
+        
+        # Apply date filters if provided
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            time_entries = time_entries.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            time_entries = time_entries.filter(end_time__date__lte=end_date)
+        
+        # Get total logged hours
+        logged_hours_agg = time_entries.aggregate(total=Sum('hours'))
+        logged_hours = logged_hours_agg['total'] or 0
+        
+        # Get estimated hours from project schedule
+        try:
+            estimated_hours = project.schedule.estimated_hours or 0
+        except:
+            estimated_hours = 0
+        
+        # Calculate variance
+        variance_hours = float(estimated_hours) - float(logged_hours)
+        
+        # Calculate variance percentage
+        if float(estimated_hours) > 0:
+            variance_percentage = (variance_hours / float(estimated_hours)) * 100
+        else:
+            variance_percentage = 0
+        
+        # Time by task
+        by_task = time_entries.filter(task__isnull=False).values('task__id', 'task__title').annotate(
+            logged_hours=Sum('hours')
+        ).order_by('-logged_hours')
+        
+        for task_data in by_task:
+            task_id = task_data['task__id']
+            task = project.tasks.filter(id=task_id).first()
+            if task and task.estimated_hours:
+                task_data['estimated_hours'] = float(task.estimated_hours)
+                task_data['variance'] = float(task.estimated_hours) - float(task_data['logged_hours'])
+            else:
+                task_data['estimated_hours'] = 0
+                task_data['variance'] = -float(task_data['logged_hours'])
+        
+        # Time by phase
+        by_phase = time_entries.filter(project_phase__isnull=False).values('project_phase__id', 'project_phase__name').annotate(
+            logged_hours=Sum('hours')
+        ).order_by('-logged_hours')
+        
+        for phase_data in by_phase:
+            phase_id = phase_data['project_phase__id']
+            phase = ProjectPhase.objects.filter(id=phase_id).first()
+            if phase and phase.estimated_hours:
+                phase_data['estimated_hours'] = float(phase.estimated_hours)
+                phase_data['variance'] = float(phase.estimated_hours) - float(phase_data['logged_hours'])
+            else:
+                phase_data['estimated_hours'] = 0
+                phase_data['variance'] = -float(phase_data['logged_hours'])
+        
+        # Time by milestone
+        by_milestone = time_entries.filter(milestone__isnull=False).values('milestone__id', 'milestone__name').annotate(
+            logged_hours=Sum('hours')
+        ).order_by('-logged_hours')
+        
+        for milestone_data in by_milestone:
+            milestone_id = milestone_data['milestone__id']
+            milestone = Milestone.objects.filter(id=milestone_id).first()
+            if milestone and milestone.estimated_hours:
+                milestone_data['estimated_hours'] = float(milestone.estimated_hours)
+                milestone_data['variance'] = float(milestone.estimated_hours) - float(milestone_data['logged_hours'])
+            else:
+                milestone_data['estimated_hours'] = 0
+                milestone_data['variance'] = -float(milestone_data['logged_hours'])
+        
+        # Time by user
+        by_user = time_entries.values('user__id', 'user__username').annotate(
+            logged_hours=Sum('hours')
+        ).order_by('-logged_hours')
+        
+        # Time by date
+        by_date = time_entries.annotate(
+            date=TruncDate('start_time')
+        ).values('date').annotate(
+            logged_hours=Sum('hours')
+        ).order_by('date')
+        
+        dashboard_data = {
+            'total_hours': float(logged_hours),
+            'estimated_hours': float(estimated_hours),
+            'variance_hours': variance_hours,
+            'variance_percentage': variance_percentage,
+            'by_task': by_task,
+            'by_phase': by_phase,
+            'by_milestone': by_milestone,
+            'by_user': by_user,
+            'by_date': by_date
+        }
+        
+        return Response(dashboard_data)
+
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
@@ -204,6 +562,35 @@ class TaskViewSet(viewsets.ModelViewSet):
             TaskSerializer(task).data,
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def time_entries(self, request, pk=None):
+        """
+        Retrieve all time entries for a specific task.
+        """
+        task = self.get_object()
+        queryset = TimeEntry.objects.filter(task=task)
+        
+        # Apply filters
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        billable = request.query_params.get('is_billable')
+        if billable is not None:
+            is_billable = billable.lower() == 'true'
+            queryset = queryset.filter(is_billable=is_billable)
+            
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(end_time__date__lte=end_date)
+        
+        serializer = TimeEntrySerializer(queryset, many=True)
+        return Response(serializer.data)
 
 class ProjectTemplateViewSet(viewsets.ModelViewSet):
     queryset = ProjectTemplate.objects.all()
@@ -510,6 +897,35 @@ class ProjectPhaseViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def time_entries(self, request, pk=None):
+        """
+        Retrieve all time entries for a specific phase.
+        """
+        phase = self.get_object()
+        queryset = TimeEntry.objects.filter(project_phase=phase)
+        
+        # Apply filters
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        billable = request.query_params.get('is_billable')
+        if billable is not None:
+            is_billable = billable.lower() == 'true'
+            queryset = queryset.filter(is_billable=is_billable)
+            
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(end_time__date__lte=end_date)
+        
+        serializer = TimeEntrySerializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class MilestoneViewSet(viewsets.ModelViewSet):
     queryset = Milestone.objects.all()
@@ -605,6 +1021,35 @@ class MilestoneViewSet(viewsets.ModelViewSet):
             MilestoneSerializer(milestone).data,
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def time_entries(self, request, pk=None):
+        """
+        Retrieve all time entries for a specific milestone.
+        """
+        milestone = self.get_object()
+        queryset = TimeEntry.objects.filter(milestone=milestone)
+        
+        # Apply filters
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        billable = request.query_params.get('is_billable')
+        if billable is not None:
+            is_billable = billable.lower() == 'true'
+            queryset = queryset.filter(is_billable=is_billable)
+            
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(end_time__date__lte=end_date)
+        
+        serializer = TimeEntrySerializer(queryset, many=True)
+        return Response(serializer.data)
 
 class IsProjectMember(permissions.BasePermission):
     """
@@ -859,6 +1304,35 @@ class ProjectTaskViewSet(viewsets.ModelViewSet):
             TaskSerializer(task).data,
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['get'])
+    def time_entries(self, request, pk=None):
+        """
+        Retrieve all time entries for a specific task.
+        """
+        task = self.get_object()
+        queryset = TimeEntry.objects.filter(task=task)
+        
+        # Apply filters
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
+        billable = request.query_params.get('is_billable')
+        if billable is not None:
+            is_billable = billable.lower() == 'true'
+            queryset = queryset.filter(is_billable=is_billable)
+            
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(end_time__date__lte=end_date)
+        
+        serializer = TimeEntrySerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class ProjectTeamViewSet(viewsets.ViewSet):

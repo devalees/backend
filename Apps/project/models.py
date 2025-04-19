@@ -227,6 +227,31 @@ class Project(BaseModel):
             'billable_percentage': (billable_hours / total_hours * 100) if total_hours > 0 else 0
         }
 
+    def delete(self, *args, **kwargs):
+        """
+        Override delete method to handle related objects properly.
+        """
+        # Delete related documents
+        from Apps.document.models import Document
+        Document.objects.filter(project=self).delete()
+        
+        # Delete related time entries
+        from Apps.time_management.models import TimeEntry
+        TimeEntry.objects.filter(project=self).delete()
+        
+        # Delete related discussions and attachments
+        discussions = ProjectDiscussion.objects.filter(project=self)
+        DiscussionAttachment.objects.filter(discussion__in=discussions).delete()
+        DiscussionNotification.objects.filter(discussion__in=discussions).delete()
+        discussions.delete()
+        
+        # Delete related events
+        from Apps.event.models import Event
+        Event.objects.filter(project=self).delete()
+        
+        # Delete the project
+        super().delete(*args, **kwargs)
+
 class Task(BaseModel):
     class Status(models.TextChoices):
         TODO = 'todo', _('Todo')
@@ -322,6 +347,17 @@ class Task(BaseModel):
         elif self.progress_percentage > 0 and self.status == self.Status.TODO:
             self.status = self.Status.IN_PROGRESS
             self.save(update_fields=['status'])
+
+    def delete(self, *args, **kwargs):
+        """
+        Override delete method to handle related objects properly.
+        """
+        # Delete related time entries
+        from Apps.time_management.models import TimeEntry
+        TimeEntry.objects.filter(task=self).delete()
+        
+        # Delete the task
+        super().delete(*args, **kwargs)
 
 class ProjectTemplate(BaseModel):
     """
