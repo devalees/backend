@@ -173,7 +173,8 @@ class TestProjectPhaseModel:
     
     def test_phase_str(self, project_phase):
         """Test string representation of project phase"""
-        assert str(project_phase) == project_phase.name
+        expected_str = f"{project_phase.name} - {project_phase.schedule.project.title}"
+        assert str(project_phase) == expected_str
     
     def test_date_validation(self, project_schedule):
         """Test start date must be before end date"""
@@ -235,7 +236,8 @@ class TestMilestoneModel:
     
     def test_milestone_str(self, milestone):
         """Test string representation of milestone"""
-        assert str(milestone) == milestone.name
+        expected_str = f"{milestone.name} - {milestone.schedule.project.title}"
+        assert str(milestone) == expected_str
     
     def test_due_date_validation(self, project_schedule, project_phase):
         """Test milestone due date validation"""
@@ -253,7 +255,7 @@ class TestMilestoneModel:
             milestone.full_clean()
         
         errors = excinfo.value.error_dict
-        assert 'Due date cannot be after schedule end date' in str(errors['__all__'])
+        assert 'Milestone due date cannot be after schedule end date' in str(errors['__all__'])
     
     def test_status_validation(self, project_schedule, project_phase):
         """Test milestone status validation"""
