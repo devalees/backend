@@ -238,22 +238,22 @@ class TestMilestoneModel:
         assert str(milestone) == milestone.name
     
     def test_due_date_validation(self, project_schedule, project_phase):
-        """Test due date must be within schedule boundaries"""
+        """Test milestone due date validation"""
+        # Create a milestone with due date after schedule end date
         milestone = Milestone(
-            name="Invalid Milestone",
+            name="Test Milestone",
             description="Milestone with invalid due date",
             schedule=project_schedule,
             phase=project_phase,
-            due_date=project_schedule.estimated_end_date + timedelta(days=10),
-            status='pending'
+            due_date=project_schedule.estimated_end_date + timedelta(days=10)
         )
         
+        # This should raise a validation error
         with pytest.raises(ValidationError) as excinfo:
             milestone.full_clean()
         
         errors = excinfo.value.error_dict
-        assert '__all__' in errors
-        assert 'Milestone due date cannot be after schedule end date' in str(errors['__all__'])
+        assert 'Due date cannot be after schedule end date' in str(errors['__all__'])
     
     def test_status_validation(self, project_schedule, project_phase):
         """Test milestone status validation"""
@@ -277,7 +277,7 @@ class TestProjectScheduleAPI:
     
     def test_create_schedule(self, api_client, project):
         """Test creating a schedule via API"""
-        url = reverse('project:projectschedule-list')
+        url = reverse('project:schedule-list')
         data = {
             'project': project.id,
             'estimated_start_date': project.start_date.isoformat(),
@@ -293,7 +293,7 @@ class TestProjectScheduleAPI:
     
     def test_get_schedule_list(self, api_client, project_schedule):
         """Test getting list of schedules"""
-        url = reverse('project:projectschedule-list')
+        url = reverse('project:schedule-list')
         
         response = api_client.get(url)
         
@@ -302,7 +302,7 @@ class TestProjectScheduleAPI:
     
     def test_get_schedule_detail(self, api_client, project_schedule):
         """Test getting schedule detail"""
-        url = reverse('project:projectschedule-detail', args=[project_schedule.id])
+        url = reverse('project:schedule-detail', args=[project_schedule.id])
         
         response = api_client.get(url)
         
@@ -312,7 +312,7 @@ class TestProjectScheduleAPI:
     
     def test_update_schedule(self, api_client, project_schedule):
         """Test updating a schedule"""
-        url = reverse('project:projectschedule-detail', args=[project_schedule.id])
+        url = reverse('project:schedule-detail', args=[project_schedule.id])
         data = {
             'project': project_schedule.project.id,
             'estimated_start_date': project_schedule.estimated_start_date.isoformat(),
@@ -327,7 +327,7 @@ class TestProjectScheduleAPI:
     
     def test_delete_schedule(self, api_client, project_schedule):
         """Test deleting a schedule"""
-        url = reverse('project:projectschedule-detail', args=[project_schedule.id])
+        url = reverse('project:schedule-detail', args=[project_schedule.id])
         
         response = api_client.delete(url)
         

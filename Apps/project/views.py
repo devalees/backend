@@ -1,19 +1,22 @@
-from django.shortcuts import render
-from rest_framework import viewsets, status, filters
+from django.shortcuts import render, get_object_or_404
+from rest_framework import viewsets, status, filters, decorators, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from .models import Project, Task, ProjectTemplate, TaskTemplate, ProjectSchedule, ProjectPhase, Milestone
+from .models import Project, Task, ProjectTemplate, TaskTemplate, ProjectSchedule, ProjectPhase, Milestone, ProjectDiscussion, DiscussionAttachment, DiscussionNotification
 from .serializers import (
     ProjectSerializer, TaskSerializer,
     ProjectTemplateSerializer, TaskTemplateSerializer,
-    ProjectScheduleSerializer, ProjectPhaseSerializer, MilestoneSerializer
+    ProjectScheduleSerializer, ProjectPhaseSerializer, MilestoneSerializer,
+    ProjectDiscussionSerializer, DiscussionAttachmentSerializer, DiscussionNotificationSerializer
 )
 from Apps.core.permissions import IsOwnerOrReadOnly, IsOrganizationMember
 import logging
 from django.utils import timezone
+from django.core.cache import cache
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -601,4 +604,349 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         return Response(
             MilestoneSerializer(milestone).data,
             status=status.HTTP_200_OK
+        )
+
+class IsProjectMember(permissions.BasePermission):
+    """
+    Custom permission to only allow project members or owner to access discussions.
+    """
+    def has_permission(self, request, view):
+        # Check if the user is authenticated
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        # Get the project ID from URL
+        project_id = view.kwargs.get('project_pk')
+        if not project_id:
+            return False
+            
+        # Get the project
+        try:
+            project = Project.objects.get(pk=project_id)
+            
+            # Check if user is the owner or a team member
+            return (request.user == project.owner or 
+                   request.user in project.team_members.all())
+        except Project.DoesNotExist:
+            return False
+
+    def has_object_permission(self, request, view, obj):
+        # Get the project (either directly or through a relation)
+        if hasattr(obj, 'project'):
+            project = obj.project
+        elif hasattr(obj, 'discussion') and hasattr(obj.discussion, 'project'):
+            project = obj.discussion.project
+        else:
+            return False
+            
+        # Check if user is the owner or a team member
+        return (request.user == project.owner or 
+               request.user in project.team_members.all())
+
+
+class ProjectDiscussionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for project discussions.
+    """
+    serializer_class = ProjectDiscussionSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+    pagination_class = None  # Disable pagination for this viewset
+    
+    def get_queryset(self):
+        """
+        Get the discussions for a specific project.
+        Cache the results for better performance.
+        """
+        project_id = self.kwargs.get('project_pk')
+        
+        # Check if we should bypass cache
+        refresh = self.request.query_params.get('refresh', 'false').lower() == 'true'
+        
+        # Generate cache key
+        cache_key = f'project_discussions_{project_id}'
+        
+        # Try to get from cache if not refreshing
+        if not refresh:
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                return ProjectDiscussion.objects.filter(pk__in=[d['id'] for d in json.loads(cached_data)])
+        
+        # Get from database
+        queryset = ProjectDiscussion.objects.filter(
+            project_id=project_id,
+            is_active=True
+        ).select_related('created_by', 'updated_by', 'project')
+        
+        # Update cache
+        serializer = ProjectDiscussionSerializer(queryset, many=True)
+        cache.set(cache_key, json.dumps(serializer.data), 3600)  # Cache for 1 hour
+        
+        return queryset
+    
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        context = super().get_serializer_context()
+        context['project_pk'] = self.kwargs.get('project_pk')
+        return context
+    
+    def perform_create(self, serializer):
+        """Create a new discussion for a project."""
+        project_id = self.kwargs.get('project_pk')
+        project = get_object_or_404(Project, pk=project_id)
+        
+        # Save the discussion with the project
+        discussion = serializer.save(project=project)
+        
+        # Invalidate cache
+        cache_key = f'project_discussions_{project_id}'
+        cache.delete(cache_key)
+        
+        return discussion
+    
+    def perform_update(self, serializer):
+        """Update an existing discussion."""
+        # Get project ID from URL
+        project_id = self.kwargs.get('project_pk')
+        project = get_object_or_404(Project, pk=project_id)
+        
+        # Save the updated discussion
+        discussion = serializer.save()
+        
+        # Invalidate cache
+        cache_key = f'project_discussions_{project_id}'
+        cache.delete(cache_key)
+        
+        return discussion
+    
+    def perform_destroy(self, instance):
+        """
+        Perform a soft delete by marking the discussion as inactive.
+        """
+        instance.is_active = False
+        instance.save()
+        
+        # Invalidate cache
+        project_id = self.kwargs.get('project_pk')
+        cache_key = f'project_discussions_{project_id}'
+        cache.delete(cache_key)
+
+
+class DiscussionAttachmentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for discussion attachments.
+    """
+    serializer_class = DiscussionAttachmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+    pagination_class = None  # Disable pagination for this viewset
+    
+    def get_queryset(self):
+        """Get attachments for a specific discussion."""
+        discussion_id = self.kwargs.get('discussion_pk')
+        return DiscussionAttachment.objects.filter(discussion_id=discussion_id)
+    
+    def perform_create(self, serializer):
+        """Create a new attachment for a discussion."""
+        discussion_id = self.kwargs.get('discussion_pk')
+        discussion = get_object_or_404(
+            ProjectDiscussion, 
+            pk=discussion_id,
+            project_id=self.kwargs.get('project_pk')
+        )
+        
+        # Save the attachment with the discussion
+        attachment = serializer.save(
+            discussion=discussion,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+        
+        return attachment
+
+
+class DiscussionNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for discussion notifications.
+    """
+    serializer_class = DiscussionNotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None  # Disable pagination for this viewset
+    
+    def get_queryset(self):
+        """Get notifications for a specific discussion."""
+        discussion_id = self.kwargs.get('discussion_pk')
+        return DiscussionNotification.objects.filter(
+            discussion_id=discussion_id,
+            user=self.request.user
+        )
+    
+    @decorators.action(detail=True, methods=['post'])
+    def mark_read(self, request, *args, **kwargs):
+        """Mark a notification as read."""
+        notification = self.get_object()
+        notification.mark_as_read()
+        return Response({'status': 'notification marked as read'})
+
+
+class UserDiscussionNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for user's discussion notifications across all projects.
+    """
+    serializer_class = DiscussionNotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None  # Disable pagination for this viewset
+    
+    def get_queryset(self):
+        """Get all notifications for the current user."""
+        return DiscussionNotification.objects.filter(
+            user=self.request.user
+        ).select_related('discussion', 'discussion__project')
+    
+    @decorators.action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        """Mark all notifications as read for the current user."""
+        DiscussionNotification.mark_all_as_read(request.user)
+        return Response({'status': 'all notifications marked as read'})
+
+
+class ProjectTaskViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for tasks within a specific project.
+    """
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated, IsOrganizationMember]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'description']
+    ordering_fields = ['created_at', 'due_date', 'status', 'priority']
+    ordering = ['due_date']
+    
+    def get_queryset(self):
+        """
+        Get all tasks for a specific project.
+        """
+        project_id = self.kwargs.get('project_pk')
+        return Task.objects.filter(project_id=project_id)
+    
+    def perform_create(self, serializer):
+        """
+        Create a task for the specified project.
+        """
+        project_id = self.kwargs.get('project_pk')
+        project = get_object_or_404(Project, pk=project_id)
+        
+        serializer.save(
+            project=project,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+    
+    @action(detail=True, methods=['post'])
+    def assign(self, request, project_pk=None, pk=None):
+        """Assign task to a user"""
+        task = self.get_object()
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response(
+                {"detail": _("No user ID provided")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task.assigned_to_id = user_id
+        task.save()
+        return Response(
+            TaskSerializer(task).data,
+            status=status.HTTP_200_OK
+        )
+
+
+class ProjectTeamViewSet(viewsets.ViewSet):
+    """
+    API endpoint for managing project team members.
+    """
+    permission_classes = [IsAuthenticated, IsOrganizationMember]
+    
+    def list(self, request, project_pk=None):
+        """
+        List all team members for a project.
+        """
+        project = get_object_or_404(Project, pk=project_pk)
+        
+        # Check if user has permission to view team members
+        if not (request.user == project.owner or request.user in project.team_members.all()):
+            return Response(
+                {"detail": _("You do not have permission to view team members")},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get team members including the owner
+        team_members = list(project.team_members.all())
+        team_members.append(project.owner)
+        
+        # Serialize the team members
+        from Apps.users.serializers import UserSerializer
+        serializer = UserSerializer(team_members, many=True)
+        
+        return Response(serializer.data)
+    
+    def create(self, request, project_pk=None):
+        """
+        Add team members to a project.
+        """
+        project = get_object_or_404(Project, pk=project_pk)
+        
+        # Check if user has permission to add team members
+        if not (request.user == project.owner or request.user.has_perm('project.manage_project_members')):
+            return Response(
+                {"detail": _("You do not have permission to add team members")},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get user IDs from request
+        user_ids = request.data.get('user_ids', [])
+        
+        if not user_ids:
+            return Response(
+                {"detail": _("No user IDs provided")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Add team members
+        project.team_members.add(*user_ids)
+        
+        return Response(
+            {"detail": _("Team members added successfully")},
+            status=status.HTTP_201_CREATED
+        )
+    
+    def destroy(self, request, project_pk=None, pk=None):
+        """
+        Remove a team member from a project.
+        """
+        project = get_object_or_404(Project, pk=project_pk)
+        
+        # Check if user has permission to remove team members
+        if not (request.user == project.owner or request.user.has_perm('project.manage_project_members')):
+            return Response(
+                {"detail": _("You do not have permission to remove team members")},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Remove team member
+        from Apps.users.models import User
+        team_member = get_object_or_404(User, pk=pk)
+        
+        # Check if trying to remove the owner
+        if team_member == project.owner:
+            return Response(
+                {"detail": _("Cannot remove project owner from team")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        project.team_members.remove(team_member)
+        
+        return Response(
+            {"detail": _("Team member removed successfully")},
+            status=status.HTTP_204_NO_CONTENT
         )

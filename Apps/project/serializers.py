@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Project, Task, ProjectTemplate, TaskTemplate, Milestone, ProjectPhase, ProjectSchedule
+from .models import Project, Task, ProjectTemplate, TaskTemplate, Milestone, ProjectPhase, ProjectSchedule, ProjectDiscussion, DiscussionAttachment, DiscussionNotification
 from Apps.users.serializers import UserSerializer
 from Apps.entity.serializers import OrganizationSerializer
 from Apps.users.models import User
@@ -260,30 +260,206 @@ class ProjectScheduleSerializer(serializers.ModelSerializer):
         if 'estimated_start_date' in data and 'estimated_end_date' in data:
             if data['estimated_start_date'] > data['estimated_end_date']:
                 raise serializers.ValidationError(
-                    {'estimated_start_date': 'Estimated start date must be before estimated end date'}
+                    {'estimated_start_date': 'Start date must be before end date'}
                 )
         
-        # Validate schedule dates are within project dates
-        if 'project' in data and ('estimated_start_date' in data or 'estimated_end_date' in data):
-            project = data['project']
-            start_date = data.get('estimated_start_date', getattr(self.instance, 'estimated_start_date', None))
-            end_date = data.get('estimated_end_date', getattr(self.instance, 'estimated_end_date', None))
-            
-            if start_date and start_date < project.start_date:
+        # Validate project
+        if 'project' in data and 'estimated_start_date' in data:
+            if data['estimated_start_date'] < data['project'].start_date:
                 raise serializers.ValidationError(
                     {'estimated_start_date': 'Schedule start date cannot be before project start date'}
                 )
-            if end_date and end_date > project.end_date:
+        
+        if 'project' in data and 'estimated_end_date' in data:
+            if data['estimated_end_date'] > data['project'].end_date:
                 raise serializers.ValidationError(
                     {'estimated_end_date': 'Schedule end date cannot be after project end date'}
                 )
         
-        # Validate only one baseline can exist
-        if data.get('is_baseline', False) and not getattr(self.instance, 'is_baseline', False):
-            project = data.get('project', getattr(self.instance, 'project', None))
-            if project and ProjectSchedule.objects.filter(project=project, is_baseline=True).exists():
-                raise serializers.ValidationError(
-                    {'is_baseline': 'A baseline schedule already exists for this project'}
-                )
-                
-        return data 
+        return data
+
+class ProjectDiscussionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the ProjectDiscussion model.
+    """
+    created_by_name = serializers.SerializerMethodField()
+    attachment_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ProjectDiscussion
+        fields = [
+            'id', 'project', 'title', 'content', 'is_active',
+            'created_at', 'created_by', 'created_by_name',
+            'updated_at', 'updated_by', 'attachment_count'
+        ]
+        read_only_fields = ['id', 'created_at', 'created_by', 'updated_at', 'updated_by', 'attachment_count']
+        extra_kwargs = {
+            'project': {'required': False}
+        }
+    
+    def get_created_by_name(self, obj):
+        """Get the name of the user who created the discussion"""
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}"
+        return ""
+    
+    def get_attachment_count(self, obj):
+        """Get the number of attachments for the discussion"""
+        return obj.attachments.count()
+    
+    def validate(self, data):
+        """
+        Custom validation for ProjectDiscussion.
+        """
+        # Ensure title is not empty when provided
+        if 'title' in data and not data['title'].strip():
+            raise serializers.ValidationError({'title': 'Title cannot be empty'})
+        
+        # Ensure content is not empty when provided
+        if 'content' in data and not data['content'].strip():
+            raise serializers.ValidationError({'content': 'Content cannot be empty'})
+        
+        return data
+    
+    def create(self, validated_data):
+        """
+        Create and return a new ProjectDiscussion instance, given the validated data.
+        """
+        # Set created_by and updated_by from the context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
+        
+        # Get project from context if not in validated_data
+        project_pk = self.context.get('project_pk')
+        if project_pk and 'project' not in validated_data:
+            project = Project.objects.get(pk=project_pk)
+            validated_data['project'] = project
+        
+        # Create the discussion using model's create method
+        instance = ProjectDiscussion.objects.create(**validated_data)
+        return instance
+    
+    def update(self, instance, validated_data):
+        """
+        Update and return an existing ProjectDiscussion instance, given the validated data.
+        """
+        # Set updated_by from the context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        
+        # Remove project from validated_data if present to prevent change
+        if 'project' in validated_data:
+            # Only raise error if trying to change to a different project
+            if validated_data['project'].pk != instance.project.pk:
+                raise serializers.ValidationError({'project': 'Cannot change the project for an existing discussion'})
+            # Remove it to avoid unnecessary update
+            validated_data.pop('project')
+        
+        # Update fields manually to avoid validation issues
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        # Save the instance
+        instance.save()
+        
+        # Create notifications for team members about the update
+        instance._create_notifications_for_team('updated')
+        
+        return instance
+
+class DiscussionAttachmentSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the DiscussionAttachment model.
+    """
+    file_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DiscussionAttachment
+        fields = [
+            'id', 'discussion', 'file', 'filename', 'description', 
+            'file_size', 'content_type', 'created_at', 'created_by',
+            'updated_at', 'updated_by', 'file_url'
+        ]
+        read_only_fields = ['id', 'created_at', 'created_by', 'updated_at', 'updated_by', 
+                           'file_size', 'content_type', 'filename', 'file_url']
+        extra_kwargs = {
+            'discussion': {'required': False}
+        }
+    
+    def get_file_url(self, obj):
+        """Get the URL for the attachment file"""
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+        return None
+    
+    def create(self, validated_data):
+        """
+        Create and return a new DiscussionAttachment instance, given the validated data.
+        """
+        # Set created_by and updated_by from the context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
+        
+        # Create attachment using model's create method to bypass validation issues
+        attachment = DiscussionAttachment.objects.create(**validated_data)
+        
+        # Create notification for team members about the new attachment
+        discussion = attachment.discussion
+        discussion._create_notifications_for_team('attachment')
+        
+        return attachment
+
+class DiscussionNotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the DiscussionNotification model.
+    """
+    discussion_title = serializers.SerializerMethodField()
+    project_id = serializers.SerializerMethodField()
+    notification_text = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DiscussionNotification
+        fields = [
+            'id', 'discussion', 'discussion_title', 'project_id',
+            'user', 'notification_type', 'notification_text',
+            'is_read', 'read_at', 'created_at', 
+            'updated_at'
+        ]
+        read_only_fields = ['created_at', 'created_by', 'updated_at', 'updated_by', 
+                           'discussion_title', 'project_id', 'notification_text']
+    
+    def get_discussion_title(self, obj):
+        """Get the title of the discussion"""
+        return obj.discussion.title if obj.discussion else ""
+    
+    def get_project_id(self, obj):
+        """Get the ID of the project"""
+        return obj.discussion.project.id if obj.discussion and obj.discussion.project else None
+    
+    def get_notification_text(self, obj):
+        """Get a descriptive text for the notification"""
+        if not obj.discussion:
+            return ""
+        
+        notification_type = obj.notification_type
+        actor_name = f"{obj.created_by.first_name} {obj.created_by.last_name}" if obj.created_by else "Someone"
+        
+        if notification_type == 'created':
+            return f"{actor_name} created a new discussion: {obj.discussion.title}"
+        elif notification_type == 'updated':
+            return f"{actor_name} updated discussion: {obj.discussion.title}"
+        elif notification_type == 'comment':
+            return f"{actor_name} commented on discussion: {obj.discussion.title}"
+        elif notification_type == 'mention':
+            return f"{actor_name} mentioned you in discussion: {obj.discussion.title}"
+        elif notification_type == 'attachment':
+            return f"{actor_name} added an attachment to discussion: {obj.discussion.title}"
+        else:
+            return f"New activity in discussion: {obj.discussion.title}" 

@@ -385,44 +385,225 @@ class Milestone(BaseModel):
     def clean(self):
         from django.core.exceptions import ValidationError
         
-        # Validate schedule relation
-        if self.schedule:
-            # Check if milestone due date is within schedule dates
-            if self.due_date < self.schedule.estimated_start_date:
-                raise ValidationError(_('Milestone due date cannot be before schedule start date'))
-            if self.due_date > self.schedule.estimated_end_date:
-                raise ValidationError(_('Milestone due date cannot be after schedule end date'))
+        super().clean()
         
-        # Validate phase relation if provided
-        if self.phase:
-            # Check if milestone due date is within phase dates
-            if self.due_date < self.phase.start_date:
-                raise ValidationError(_('Milestone due date cannot be before phase start date'))
-            if self.due_date > self.phase.end_date:
-                raise ValidationError(_('Milestone due date cannot be after phase end date'))
-            
-            # Check if phase belongs to the same schedule
-            if self.phase.schedule != self.schedule:
-                raise ValidationError(_('Phase must belong to the same schedule as the milestone'))
+        # Validate name is not empty
+        if not self.name.strip():
+            raise ValidationError(_('Milestone name cannot be empty'))
+        
+        # Validate phase belongs to the same schedule
+        if self.phase and self.phase.schedule != self.schedule:
+            raise ValidationError(_('Phase must belong to the same schedule'))
+        
+        # Validate due date is within schedule dates
+        if self.due_date and self.schedule:
+            if self.due_date < self.schedule.estimated_start_date:
+                raise ValidationError(_('Due date cannot be before schedule start date'))
+            if self.due_date > self.schedule.estimated_end_date:
+                raise ValidationError(_('Due date cannot be after schedule end date'))
+        
+        # Validate completion date is after due date
+        if self.completion_date and self.due_date and self.completion_date < self.due_date:
+            raise ValidationError(_('Completion date cannot be before due date'))
 
     def save(self, *args, **kwargs):
-        self.clean()
-        
-        # Set completion date if status is completed
+        # Automatically set completion date when status is set to completed
         if self.status == self.Status.COMPLETED and not self.completion_date:
             self.completion_date = timezone.now()
-        elif self.status != self.Status.COMPLETED:
+        # Clear completion date when status is changed from completed
+        elif self.status != self.Status.COMPLETED and self.completion_date:
             self.completion_date = None
-            
-        super().save(*args, **kwargs)
         
-        # Update progress of parent objects
-        if self.phase:
-            self.phase.update_progress()
-        self.schedule.update_progress()
-
+        self.clean()
+        super().save(*args, **kwargs)
+    
     def complete(self):
-        """Mark milestone as completed"""
+        """Mark the milestone as completed"""
         self.status = self.Status.COMPLETED
         self.completion_date = timezone.now()
         self.save()
+
+class ProjectDiscussion(BaseModel):
+    """
+    Represents a discussion thread within a project.
+    Allows team members to collaborate and communicate.
+    """
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name='discussions'
+    )
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        permissions = [
+            ('view_all_discussions', 'Can view all discussions'),
+            ('manage_discussions', 'Can manage discussions'),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.project.title}"
+    
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        
+        super().clean()
+        
+        # Validate title is not empty
+        if not self.title.strip():
+            raise ValidationError(_('Discussion title cannot be empty'))
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        is_new = self.pk is None
+        
+        # Save the model first to ensure it has a pk
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Create notifications for team members when a new discussion is created
+            self._create_notifications_for_team('created')
+    
+    def _create_notifications_for_team(self, notification_type):
+        """
+        Create notifications for all team members about this discussion.
+        
+        Args:
+            notification_type (str): Type of notification (created, updated, etc.)
+        """
+        # Get all team members including the owner
+        team_members = list(self.project.team_members.all())
+        team_members.append(self.project.owner)
+        
+        # Create notifications for each member
+        for member in team_members:
+            # Skip notification for the user who created the discussion
+            if notification_type == 'created' and member == self.created_by:
+                continue
+                
+            # Skip notification for the user who updated the discussion
+            if notification_type == 'updated' and member == self.updated_by:
+                continue
+            
+            # Skip notification for the user who added the attachment
+            if notification_type == 'attachment' and member == self.updated_by:
+                continue
+                
+            # Determine notification creator
+            notification_creator = None
+            if notification_type == 'created':
+                notification_creator = self.created_by
+            elif notification_type in ['updated', 'attachment', 'comment', 'mention']:
+                notification_creator = self.updated_by
+            
+            # Only create notification if we have a valid creator
+            if notification_creator:
+                DiscussionNotification.objects.create(
+                    discussion=self,
+                    user=member,
+                    notification_type=notification_type,
+                    created_by=notification_creator,
+                    updated_by=notification_creator
+                )
+
+class DiscussionAttachment(BaseModel):
+    """
+    Represents a file attachment to a discussion.
+    """
+    discussion = models.ForeignKey(
+        ProjectDiscussion,
+        on_delete=models.CASCADE,
+        related_name='attachments'
+    )
+    file = models.FileField(upload_to='discussions/attachments/%Y/%m/%d/')
+    filename = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    content_type = models.CharField(max_length=100, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Attachment: {self.filename or self.file.name}"
+    
+    def save(self, *args, **kwargs):
+        # Set filename if not provided
+        if not self.filename and self.file:
+            self.filename = self.file.name
+            
+        # Set file size
+        if self.file and hasattr(self.file, 'size'):
+            self.file_size = self.file.size
+            
+        # Set content type
+        if self.file and not self.content_type:
+            import mimetypes
+            content_type, encoding = mimetypes.guess_type(self.file.name)
+            if content_type:
+                self.content_type = content_type
+            else:
+                self.content_type = 'application/octet-stream'
+                
+        super().save(*args, **kwargs)
+
+class DiscussionNotification(BaseModel):
+    """
+    Represents a notification for a discussion action.
+    """
+    NOTIFICATION_TYPES = [
+        ('created', 'Discussion Created'),
+        ('updated', 'Discussion Updated'),
+        ('comment', 'New Comment'),
+        ('mention', 'User Mentioned'),
+        ('attachment', 'New Attachment')
+    ]
+    
+    discussion = models.ForeignKey(
+        ProjectDiscussion,
+        on_delete=models.CASCADE,
+        related_name='notifications'
+    )
+    user = models.ForeignKey(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='discussion_notifications'
+    )
+    notification_type = models.CharField(
+        max_length=20,
+        choices=NOTIFICATION_TYPES
+    )
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['discussion', 'notification_type']),
+        ]
+    
+    def __str__(self):
+        return f"Notification for {self.user.username} - {self.get_notification_type_display()}"
+    
+    def mark_as_read(self):
+        """Mark notification as read"""
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save()
+    
+    @classmethod
+    def mark_all_as_read(cls, user):
+        """Mark all notifications as read for a user"""
+        cls.objects.filter(
+            user=user,
+            is_read=False
+        ).update(
+            is_read=True,
+            read_at=timezone.now(),
+            updated_at=timezone.now()
+        )
