@@ -2,7 +2,8 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import (
     ProjectViewSet, TaskViewSet,
-    ProjectTemplateViewSet, TaskTemplateViewSet
+    ProjectTemplateViewSet, TaskTemplateViewSet,
+    ProjectScheduleViewSet, ProjectPhaseViewSet, MilestoneViewSet
 )
 import logging
 
@@ -19,6 +20,9 @@ router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'tasks', TaskViewSet, basename='task')
 router.register(r'project-templates', ProjectTemplateViewSet, basename='project-template')
 router.register(r'task-templates', TaskTemplateViewSet, basename='task-template')
+router.register(r'schedules', ProjectScheduleViewSet, basename='projectschedule')
+router.register(r'phases', ProjectPhaseViewSet, basename='projectphase')
+router.register(r'milestones', MilestoneViewSet, basename='milestone')
 
 # The API URLs are now determined automatically by the router
 urlpatterns = router.urls

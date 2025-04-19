@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Project, Task, ProjectTemplate, TaskTemplate
+from .models import Project, Task, ProjectTemplate, TaskTemplate, Milestone, ProjectPhase, ProjectSchedule
 from Apps.users.serializers import UserSerializer
 from Apps.entity.serializers import OrganizationSerializer
 from Apps.users.models import User
@@ -157,3 +157,133 @@ class ProjectTemplateSerializer(serializers.ModelSerializer):
             self._create_task_from_template(subtask_template, project, task_map)
 
         return task 
+
+class MilestoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Milestone
+        fields = [
+            'id', 'name', 'description', 'schedule', 'phase',
+            'due_date', 'status', 'completion_date', 'created_at',
+            'updated_at', 'created_by', 'updated_by'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'completion_date']
+
+    def validate(self, data):
+        # Validate due date is within schedule dates
+        if 'due_date' in data and 'schedule' in data:
+            schedule = data['schedule']
+            if data['due_date'] < schedule.estimated_start_date:
+                raise serializers.ValidationError(
+                    {'due_date': 'Milestone due date cannot be before schedule start date'}
+                )
+            if data['due_date'] > schedule.estimated_end_date:
+                raise serializers.ValidationError(
+                    {'due_date': 'Milestone due date cannot be after schedule end date'}
+                )
+
+        # Validate due date is within phase dates if phase provided
+        if 'due_date' in data and 'phase' in data and data['phase']:
+            phase = data['phase']
+            if data['due_date'] < phase.start_date:
+                raise serializers.ValidationError(
+                    {'due_date': 'Milestone due date cannot be before phase start date'}
+                )
+            if data['due_date'] > phase.end_date:
+                raise serializers.ValidationError(
+                    {'due_date': 'Milestone due date cannot be after phase end date'}
+                )
+            
+            # Validate phase belongs to the same schedule
+            if 'schedule' in data and phase.schedule != data['schedule']:
+                raise serializers.ValidationError(
+                    {'phase': 'Phase must belong to the same schedule as the milestone'}
+                )
+        
+        return data
+
+class ProjectPhaseSerializer(serializers.ModelSerializer):
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = ProjectPhase
+        fields = [
+            'id', 'name', 'description', 'schedule', 'start_date',
+            'end_date', 'order', 'is_active', 'progress', 'milestones',
+            'created_at', 'updated_at', 'created_by', 'updated_by'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'progress']
+
+    def validate(self, data):
+        # Validate date range
+        if 'start_date' in data and 'end_date' in data:
+            if data['start_date'] > data['end_date']:
+                raise serializers.ValidationError(
+                    {'start_date': 'Start date must be before end date'}
+                )
+        
+        # Validate phase dates are within schedule dates
+        if 'schedule' in data and ('start_date' in data or 'end_date' in data):
+            schedule = data['schedule']
+            start_date = data.get('start_date', getattr(self.instance, 'start_date', None))
+            end_date = data.get('end_date', getattr(self.instance, 'end_date', None))
+            
+            if start_date and start_date < schedule.estimated_start_date:
+                raise serializers.ValidationError(
+                    {'start_date': 'Phase start date cannot be before schedule start date'}
+                )
+            if end_date and end_date > schedule.estimated_end_date:
+                raise serializers.ValidationError(
+                    {'end_date': 'Phase end date cannot be after schedule end date'}
+                )
+                
+        return data
+
+class ProjectScheduleSerializer(serializers.ModelSerializer):
+    phases = ProjectPhaseSerializer(many=True, read_only=True)
+    milestones = MilestoneSerializer(many=True, read_only=True)
+    duration = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ProjectSchedule
+        fields = [
+            'id', 'project', 'estimated_start_date', 'estimated_end_date',
+            'description', 'is_baseline', 'progress', 'phases', 'milestones',
+            'duration', 'created_at', 'updated_at', 'created_by', 'updated_by'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'progress']
+
+    def get_duration(self, obj):
+        return obj.get_duration()
+
+    def validate(self, data):
+        # Validate date range
+        if 'estimated_start_date' in data and 'estimated_end_date' in data:
+            if data['estimated_start_date'] > data['estimated_end_date']:
+                raise serializers.ValidationError(
+                    {'estimated_start_date': 'Estimated start date must be before estimated end date'}
+                )
+        
+        # Validate schedule dates are within project dates
+        if 'project' in data and ('estimated_start_date' in data or 'estimated_end_date' in data):
+            project = data['project']
+            start_date = data.get('estimated_start_date', getattr(self.instance, 'estimated_start_date', None))
+            end_date = data.get('estimated_end_date', getattr(self.instance, 'estimated_end_date', None))
+            
+            if start_date and start_date < project.start_date:
+                raise serializers.ValidationError(
+                    {'estimated_start_date': 'Schedule start date cannot be before project start date'}
+                )
+            if end_date and end_date > project.end_date:
+                raise serializers.ValidationError(
+                    {'estimated_end_date': 'Schedule end date cannot be after project end date'}
+                )
+        
+        # Validate only one baseline can exist
+        if data.get('is_baseline', False) and not getattr(self.instance, 'is_baseline', False):
+            project = data.get('project', getattr(self.instance, 'project', None))
+            if project and ProjectSchedule.objects.filter(project=project, is_baseline=True).exists():
+                raise serializers.ValidationError(
+                    {'is_baseline': 'A baseline schedule already exists for this project'}
+                )
+                
+        return data 
