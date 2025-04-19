@@ -11,6 +11,8 @@ from Apps.core.tests.factories import UserFactory
 from unittest.mock import patch, MagicMock
 import json
 from django.test import override_settings
+from Apps.entity.models import Organization, Department, Team, TeamMember
+from Apps.rbac.models import Role, Permission, UserRole
 
 @pytest.mark.django_db
 class TestContactViewSet:
@@ -20,9 +22,82 @@ class TestContactViewSet:
         """Setup before each test"""
         self.user = UserFactory()
         self.factory = APIRequestFactory()
-        self.contact = ContactFactory(created_by=self.user, updated_by=self.user)
+        
+        # Create an organization first to ensure consistency
+        self.organization = Organization.objects.create(
+            name="Test Organization",
+            created_by=self.user,
+            updated_by=self.user
+        )
+        
+        # Create the contact with the same organization
+        self.contact = ContactFactory(
+            created_by=self.user, 
+            updated_by=self.user,
+            organization=self.organization
+        )
+        
         self.detail_url = reverse('contact-detail', kwargs={'pk': self.contact.id})
         self.list_url = reverse('contact-list')
+        
+        # Set up RBAC permissions for the user
+        # Create permissions for contacts
+        self.view_permission = Permission.objects.create(
+            name="View Contact",
+            description="Can view contact details",
+            code="contact.view",
+            organization=self.organization
+        )
+        
+        self.change_permission = Permission.objects.create(
+            name="Change Contact",
+            description="Can change contact details",
+            code="contact.change",
+            organization=self.organization
+        )
+        
+        self.delete_permission = Permission.objects.create(
+            name="Delete Contact",
+            description="Can delete contacts",
+            code="contact.delete",
+            organization=self.organization
+        )
+        
+        # Create a role with these permissions
+        self.role = Role.objects.create(
+            name="Contact Manager",
+            organization=self.organization
+        )
+        
+        # Add permissions to the role
+        self.role.permissions.add(self.view_permission, self.change_permission, self.delete_permission)
+        
+        # Create department and team for the organization
+        self.department = Department.objects.create(
+            name="Test Department",
+            organization=self.organization
+        )
+        
+        self.team = Team.objects.create(
+            name="Test Team",
+            department=self.department
+        )
+        
+        # Create team membership to associate user with organization
+        self.team_member = TeamMember.objects.create(
+            user=self.user,
+            team=self.team,
+            role=TeamMember.Role.MEMBER,
+            is_active=True
+        )
+        
+        # Assign the role to the user - do this AFTER creating team membership
+        self.user_role = UserRole.objects.create(
+            user=self.user,
+            role=self.role,
+            organization=self.organization,
+            assigned_by=self.user
+        )
         
         # Clear cache
         cache.clear()
@@ -318,3 +393,66 @@ class TestContactViewSet:
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "error" in response.data 
+
+    def test_cross_organization_access_denied(self):
+        """Test that users from one organization cannot access contacts from another organization."""
+        # Create another organization directly without validation
+        other_org = Organization.objects.create(
+            name="Test Organization 2",
+            description="Second test organization",
+            created_by=self.user,
+            updated_by=self.user
+        )
+        
+        # Create a department in the other organization
+        other_department = Department.objects.create(
+            name="Test Department 2",
+            description="Department in second organization",
+            organization=other_org,
+            created_by=self.user,
+            updated_by=self.user
+        )
+        
+        # Create a team in the other department
+        other_team = Team.objects.create(
+            name="Test Team 2",
+            description="Team in second organization",
+            department=other_department,
+            created_by=self.user,
+            updated_by=self.user
+        )
+        
+        # Create another user
+        other_user = UserFactory()
+        
+        # Make other_user a member of the other organization's team
+        TeamMember.objects.create(
+            user=other_user, 
+            team=other_team, 
+            is_active=True,
+            role=TeamMember.Role.MEMBER
+        )
+        
+        # Create a contact in the other organization directly
+        other_contact = Contact.objects.create(
+            name="Other Contact",
+            email="other.contact@example.com",
+            phone="+10987654321",
+            organization=other_org,
+            department=other_department,
+            team=other_team,
+            created_by=other_user,
+            updated_by=other_user,
+            is_active=True
+        )
+        
+        # Try to access the contact with our main test user (who belongs to a different organization)
+        url = reverse('contact-detail', kwargs={'pk': other_contact.id})
+        request = self.factory.get(url)
+        force_authenticate(request, user=self.user)
+        view = ContactViewSet.as_view({'get': 'retrieve'})
+        response = view(request, pk=other_contact.id)
+        
+        # The system returns 404 Not Found for contacts from other organizations
+        # rather than 403 Forbidden, as the queryset is filtered by the user's organization
+        assert response.status_code == status.HTTP_404_NOT_FOUND 

@@ -31,6 +31,24 @@ class ContactGroup(ContactsBaseModel):
         related_name='children'
     )
 
+    # Filtering configuration
+    class FilterConfig:
+        """Configuration for filtering capabilities"""
+        text = ['name', 'description']
+        date = ['created_at', 'updated_at']
+        boolean = ['is_active']
+        related = {
+            'organization': 'organization__name',
+            'parent': 'parent__name',
+            'contacts': 'contacts__name'
+        }
+        
+    # Aggregation configuration
+    class AggregationConfig:
+        """Configuration for aggregation capabilities"""
+        count = ['id', 'contacts']
+        group_by = ['organization', 'parent', 'is_active']
+
     class Meta:
         verbose_name = 'Contact Group'
         verbose_name_plural = 'Contact Groups'

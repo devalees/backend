@@ -10,6 +10,11 @@ from .serializers import ContactSerializer, ContactGroupSerializer, ContactTempl
 from .serializers import ContactNoteSerializer, ContactNoteNotificationSerializer, ContactNoteMonitoringSerializer
 from .cache_manager import ContactCache, CommunicationCache, ContactNoteCache
 from .throttling import ContactRateThrottle, ContactCreateRateThrottle, ContactNoteRateThrottle, get_rate_limit_headers
+# Import filtering utils
+from Apps.filtering.filters import apply_filters, get_available_filters
+from Apps.filtering.aggregations import apply_aggregations, get_available_aggregations
+# Import RBAC permissions
+from Apps.rbac.permissions import RBACPermission
 import logging
 from django.http import Http404, FileResponse
 import os
@@ -41,6 +46,20 @@ logger = logging.getLogger(__name__)
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 description="Order contacts by field (prefix with - for descending)"
+            ),
+            # Add documentation for filtering parameters
+            OpenApiParameter(
+                name="filters",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                description="JSON-formatted filter criteria"
+            ),
+            # Add documentation for aggregation parameters
+            OpenApiParameter(
+                name="aggregate",
+                type=OpenApiTypes.OBJECT,
+                location=OpenApiParameter.QUERY,
+                description="JSON-formatted aggregation criteria"
             )
         ],
         responses={
@@ -129,7 +148,7 @@ class ContactViewSet(viewsets.ModelViewSet):
     """ViewSet for Contact model"""
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
     throttle_classes = [ContactRateThrottle]
     
     def get_throttles(self):
@@ -139,42 +158,85 @@ class ContactViewSet(viewsets.ModelViewSet):
         return super().get_throttles()
 
     def get_queryset(self):
-        """Filter contacts by organization and use cache if available"""
-        organization_id = self.request.query_params.get('organization', None)
+        """
+        Filter contacts by organization and apply filtering capabilities.
+        Uses cache when appropriate.
+        """
+        queryset = Contact.objects.filter(is_active=True)
         
-        if organization_id:
+        # Apply RBAC filtering - automatically filter to user's organization(s)
+        # The RBACPermission will restrict access, but we also filter here for efficiency
+        
+        # Get organizations the user belongs to through team membership
+        from Apps.entity.models import TeamMember
+        user_orgs = TeamMember.objects.filter(
+            user=self.request.user,
+            is_active=True
+        ).values_list('team__department__organization', flat=True).distinct()
+        
+        # Filter contacts by user's organizations
+        queryset = queryset.filter(organization__in=user_orgs)
+        
+        # Apply filters from request
+        if 'filters' in self.request.query_params:
+            queryset = apply_filters(queryset, self.request.query_params.get('filters'))
+            
+        # Default organization filter if not already applied
+        if 'organization' in self.request.query_params:
             try:
-                # Convert to integer to ensure type consistency
-                org_id = int(organization_id)
-                
-                # Try to get from cache first
-                cached_contacts = ContactCache.get_organization_contacts(org_id)
-                if cached_contacts is not None:
-                    logger.debug(f"Retrieved {len(cached_contacts)} contacts from cache for org {org_id}")
-                    # Since this is already serialized data, we'll handle it in the list method
-                    # Just return the base query filtered by organization
-                    return Contact.objects.filter(organization_id=org_id, is_active=True)
-                
-                # If not cached, get from DB and cache
-                queryset = Contact.objects.filter(organization_id=org_id, is_active=True)
-                # Cache the results for future requests
-                ContactCache.set_organization_contacts(org_id, queryset=queryset)
-                return queryset
+                org_id = int(self.request.query_params.get('organization'))
+                # Verify user belongs to this organization
+                if org_id in user_orgs:
+                    queryset = queryset.filter(organization_id=org_id)
+                    
+                    # Try to get from cache if no other filters are applied
+                    if len(self.request.query_params) == 1:
+                        cached_contacts = ContactCache.get_organization_contacts(org_id)
+                        if cached_contacts is not None:
+                            logger.debug(f"Retrieved {len(cached_contacts)} contacts from cache for org {org_id}")
+                            # Return DB queryset - we'll handle the cache in list()
+                            return queryset
+                        
+                        # If not cached, cache the results for future requests
+                        ContactCache.set_organization_contacts(org_id, queryset=queryset)
+                else:
+                    # User doesn't belong to the requested organization
+                    logger.warning(f"User {self.request.user.id} attempted to access contacts from organization {org_id} to which they don't belong")
+                    return Contact.objects.none()
             except (ValueError, TypeError):
-                # Invalid organization ID format
-                logger.warning(f"Invalid organization ID format: {organization_id}")
+                logger.warning(f"Invalid organization ID format: {self.request.query_params.get('organization')}")
                 return Contact.objects.none()
             
-        return Contact.objects.filter(is_active=True)
+        return queryset
 
     def list(self, request, *args, **kwargs):
-        """List contacts with rate limit headers"""
+        """
+        List contacts with rate limit headers and support for aggregations
+        """
+        # Check if we're doing aggregation
+        if 'aggregate' in request.query_params:
+            queryset = self.get_queryset()
+            aggregation_results = apply_aggregations(queryset, request.query_params.get('aggregate'))
+            return Response(aggregation_results)
+            
+        # Standard list view with rate limit headers
         response = super().list(request, *args, **kwargs)
-        # Replace response.headers.update with individual header setting
         rate_limit_headers = get_rate_limit_headers(request, self)
         for key, value in rate_limit_headers.items():
             response.headers[key] = value
         return response
+            
+    @action(detail=False, methods=['get'])
+    def available_filters(self, request):
+        """Return the available filters for Contact model"""
+        filters = get_available_filters(Contact)
+        return Response(filters)
+        
+    @action(detail=False, methods=['get'])
+    def available_aggregations(self, request):
+        """Return the available aggregations for Contact model"""
+        aggregations = get_available_aggregations(Contact)
+        return Response(aggregations)
 
     def retrieve(self, request, *args, **kwargs):
         """Get single contact and log view activity"""
@@ -318,14 +380,51 @@ class ContactGroupViewSet(viewsets.ModelViewSet):
     """ViewSet for ContactGroup model"""
     queryset = ContactGroup.objects.all()
     serializer_class = ContactGroupSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_queryset(self):
-        """Filter contact groups by organization"""
-        organization_id = self.request.query_params.get('organization', None)
-        if organization_id:
-            return ContactGroup.objects.filter(organization_id=organization_id)
-        return ContactGroup.objects.all()
+        """
+        Filter contact groups with RBAC and filtering support
+        """
+        queryset = ContactGroup.objects.filter(is_active=True)
+        
+        # Apply filters from query parameters
+        if 'filters' in self.request.query_params:
+            queryset = apply_filters(queryset, self.request.query_params.get('filters'))
+            
+        # Default organization filter if not already applied
+        if 'organization' in self.request.query_params:
+            try:
+                org_id = int(self.request.query_params.get('organization'))
+                queryset = queryset.filter(organization_id=org_id)
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid organization ID format: {self.request.query_params.get('organization')}")
+                return ContactGroup.objects.none()
+                
+        return queryset
+        
+    def list(self, request, *args, **kwargs):
+        """List contact groups with aggregation support"""
+        # Check if we're doing aggregation
+        if 'aggregate' in request.query_params:
+            queryset = self.get_queryset()
+            aggregation_results = apply_aggregations(queryset, request.query_params.get('aggregate'))
+            return Response(aggregation_results)
+            
+        # Standard list response
+        return super().list(request, *args, **kwargs)
+        
+    @action(detail=False, methods=['get'])
+    def available_filters(self, request):
+        """Return the available filters for ContactGroup model"""
+        filters = get_available_filters(ContactGroup)
+        return Response(filters)
+        
+    @action(detail=False, methods=['get'])
+    def available_aggregations(self, request):
+        """Return the available aggregations for ContactGroup model"""
+        aggregations = get_available_aggregations(ContactGroup)
+        return Response(aggregations)
 
 class ContactTemplateViewSet(viewsets.ModelViewSet):
     """ViewSet for ContactTemplate model"""

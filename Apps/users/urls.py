@@ -13,11 +13,12 @@ router.register(r'', UserViewSet, basename='users')
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Authentication endpoints
     path('register/', UserViewSet.as_view({'post': 'register'}), name='register'),
     path('password-reset/', UserViewSet.as_view({'post': 'password_reset'}), name='password-reset'),
     path('password-reset-confirm/', UserViewSet.as_view({
         'post': 'password_reset_confirm'
-    }, permission_classes=[permissions.AllowAny]), name='password-reset-confirm'),
+    }), name='password-reset-confirm'),
     # 2FA endpoints
     path('verify-2fa/', UserViewSet.as_view({'post': 'verify_2fa'}), name='verify-2fa'),
     path('enable-2fa/', UserViewSet.as_view({'post': 'enable_2fa'}), name='enable-2fa'),
@@ -25,4 +26,7 @@ urlpatterns = [
     path('disable-2fa/', UserViewSet.as_view({'post': 'disable_2fa'}), name='disable-2fa'),
     path('generate-backup-codes/', UserViewSet.as_view({'post': 'generate_backup_codes'}), name='generate-backup-codes'),
     path('verify-backup-code/', UserViewSet.as_view({'post': 'verify_backup_code'}), name='verify-backup-code'),
+    # Filtering and aggregation endpoints - use kebab-case to match contacts app conventions
+    path('available-filters/', UserViewSet.as_view({'get': 'available_filters'}), name='available-filters'),
+    path('available-aggregations/', UserViewSet.as_view({'get': 'available_aggregations'}), name='available-aggregations'),
 ] 

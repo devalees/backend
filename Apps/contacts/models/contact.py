@@ -37,6 +37,25 @@ class Contact(ContactsBaseModel):
         blank=True
     )
 
+    # Filtering configuration
+    class FilterConfig:
+        """Configuration for filtering capabilities"""
+        text = ['name', 'first_name', 'email', 'phone']
+        date = ['created_at', 'updated_at']
+        number = []
+        boolean = ['is_active']
+        related = {
+            'organization': 'organization__name',
+            'department': 'department__name', 
+            'team': 'team__name'
+        }
+        
+    # Aggregation configuration
+    class AggregationConfig:
+        """Configuration for aggregation capabilities"""
+        count = ['id']
+        group_by = ['organization', 'department', 'team', 'is_active']
+
     class Meta:
         verbose_name = 'Contact'
         verbose_name_plural = 'Contacts'

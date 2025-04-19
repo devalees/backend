@@ -58,7 +58,7 @@ SESSION_CACHE_ALIAS = 'default'
 MIDDLEWARE = [m for m in MIDDLEWARE if 'csrf' not in m.lower()]
 
 # Elasticsearch settings for testing
-ELASTICSEARCH_DSN = 'http://localhost:9200'
+ELASTICSEARCH_DSN = 'http://localhost:9201'
 ELASTICSEARCH_USERNAME = 'elastic'
 ELASTICSEARCH_PASSWORD = 'Hgdshv@6281'
 ELASTICSEARCH_VERIFY_CERTS = False  # Disable certificate verification in tests

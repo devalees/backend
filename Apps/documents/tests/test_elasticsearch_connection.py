@@ -16,7 +16,7 @@ def es_client():
     """
     # Create a client using HTTP instead of HTTPS to avoid SSL issues during tests
     es = Elasticsearch(
-        ['http://localhost:9200'],
+        ['http://localhost:9201'],
         verify_certs=False,
         basic_auth=(settings.ELASTICSEARCH_USERNAME, settings.ELASTICSEARCH_PASSWORD) if hasattr(settings, 'ELASTICSEARCH_USERNAME') else None
     )
@@ -48,7 +48,7 @@ def test_elasticsearch_connection():
     try:
         # Create client using HTTP instead of HTTPS
         es = Elasticsearch(
-            ['http://localhost:9200'],
+            ['http://localhost:9201'],
             verify_certs=False,
             basic_auth=(settings.ELASTICSEARCH_USERNAME, settings.ELASTICSEARCH_PASSWORD) if hasattr(settings, 'ELASTICSEARCH_USERNAME') else None
         )

@@ -73,12 +73,12 @@ CACHES = {
 }
 
 # Elasticsearch Configuration
-ELASTICSEARCH_DSN = 'http://localhost:9200'
+ELASTICSEARCH_INDEX_PREFIX = 'django_'
+ELASTICSEARCH_DSN = 'http://localhost:9201'
 ELASTICSEARCH_USERNAME = 'elastic'  # Default username
 ELASTICSEARCH_PASSWORD = 'changeme'  # Default password
 ELASTICSEARCH_VERIFY_CERTS = False  # For development only
 ELASTICSEARCH_USE_SSL = False  # Add the missing configuration
-ELASTICSEARCH_INDEX_PREFIX = 'pm_'  # Prefix for all indices
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

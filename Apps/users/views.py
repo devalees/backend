@@ -13,44 +13,183 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 import pyotp
 import logging
+
+# Import filtering utilities
+from Apps.filtering.filters import apply_filters, get_available_filters
+from Apps.filtering.aggregations import apply_aggregations, get_available_aggregations
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+# Custom permission class for RBAC-like functionality
+class UserPermission(permissions.BasePermission):
+    """
+    Custom permission class that implements RBAC-like functionality
+    without using direct RBAC inheritance
+    """
+    def has_permission(self, request, view):
+        """
+        Global permission check
+        """
+        # Allow authentication endpoints
+        if view.action in ['login', 'refresh_token', 'password_reset', 'password_reset_confirm', 'register', 'verify_2fa']:
+            return True
+        
+        # Authenticated users can access basic functionality
+        if not request.user.is_authenticated:
+            return False
+        
+        # Superusers always have access
+        if request.user.is_superuser:
+            return True
+            
+        # List view should show only authorized users 
+        if view.action == 'list':
+            return True
+        
+        # For retrieve, update, destroy - check in has_object_permission
+        if view.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            return True
+            
+        # For custom actions
+        if view.action in ['available_filters', 'available_aggregations', 'enable_2fa', 
+                          'confirm_2fa', 'disable_2fa', 'generate_backup_codes', 'verify_backup_code']:
+            return request.user.is_authenticated
+            
+        # Default deny
+        return False
+        
+    def has_object_permission(self, request, view, obj):
+        """
+        Object-level permission check
+        """
+        # Superusers always have access
+        if request.user.is_superuser:
+            return True
+            
+        # Users can always access their own record
+        if obj.id == request.user.id:
+            return True
+            
+        # Check if users are in the same organization
+        try:
+            user_org = request.user.organization
+            obj_org = obj.organization
+            
+            if not user_org or not obj_org or user_org.id != obj_org.id:
+                return False
+                
+            # Check for admin permissions within the organization
+            try:
+                if hasattr(request.user, 'has_role'):
+                    has_admin = request.user.has_role('admin', user_org)
+                    if has_admin:
+                        return True
+            except Exception as e:
+                logger.error(f"Error checking role: {str(e)}")
+                pass
+        except Exception as e:
+            logger.error(f"Organization check error: {str(e)}")
+            return False
+            
+        return False
+
 class UserViewSet(viewsets.ModelViewSet):
-    """ViewSet for User model"""
-    queryset = User.objects.all().order_by('id')  # Add default ordering
+    """ViewSet for User model with filtering capabilities"""
+    queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
-    permission_classes = []  # Remove default permission class
-
-    def get_queryset(self):
-        """Filter queryset based on user permissions"""
-        logger.info(f"User requesting: {self.request.user}")
-        logger.info(f"Is authenticated: {self.request.user.is_authenticated}")
-        logger.info(f"Is superuser: {self.request.user.is_superuser}")
-        
-        if self.request.user.is_superuser:
-            queryset = User.objects.all().order_by('id')  # Add ordering
-            logger.info(f"Superuser access - returning all users. Count: {queryset.count()}")
-            return queryset
-        
-        logger.info(f"Regular user access - returning only user's own record")
-        return User.objects.filter(id=self.request.user.id)
-
-    def list(self, request, *args, **kwargs):
-        """Override list method to add debug info"""
-        logger.info("List method called")
-        logger.info(f"Request headers: {request.headers}")
-        return super().list(request, *args, **kwargs)
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
         """Get permissions based on action"""
         if self.action in ['login', 'refresh_token', 'password_reset', 'password_reset_confirm', 'register', 'verify_2fa']:
             return [AllowAny()]
-        return [permissions.IsAuthenticated()]
+            
+        if self.action in ['available_filters', 'available_aggregations']:
+            return [permissions.IsAuthenticated()]
+            
+        # For all other actions, use the custom permission class
+        return [UserPermission()]
+
+    def get_queryset(self):
+        """
+        Filter queryset based on user permissions and apply filter capabilities
+        """
+        logger.info(f"User requesting: {self.request.user}")
+        logger.info(f"Is authenticated: {self.request.user.is_authenticated}")
+        logger.info(f"Is superuser: {self.request.user.is_superuser}")
+        
+        if self.request.user.is_superuser:
+            queryset = User.objects.all().order_by('id')
+        else:
+            # Get user's organization
+            try:
+                user_org = self.request.user.organization
+                
+                if user_org:
+                    # Get all users in the same organization
+                    queryset = User.objects.filter(
+                        Q(organization=user_org) | 
+                        Q(team_memberships__team__department__organization=user_org,
+                          team_memberships__is_active=True)
+                    ).distinct().order_by('id')
+                else:
+                    # If user doesn't have an organization, show only their own record
+                    queryset = User.objects.filter(id=self.request.user.id)
+            except Exception as e:
+                logger.error(f"Error getting user organization: {str(e)}")
+                queryset = User.objects.filter(id=self.request.user.id)
+            
+        # Apply filters from request
+        if 'filters' in self.request.query_params:
+            try:
+                queryset = apply_filters(queryset, self.request.query_params.get('filters'))
+            except Exception as e:
+                logger.error(f"Error applying filters: {str(e)}")
+            
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        """
+        List users with support for aggregations
+        """
+        logger.info("List method called")
+        logger.info(f"Request headers: {request.headers}")
+        
+        # Check if we're doing aggregation
+        if 'aggregate' in request.query_params:
+            try:
+                queryset = self.get_queryset()
+                aggregation_results = apply_aggregations(queryset, request.query_params.get('aggregate'))
+                return Response(aggregation_results)
+            except Exception as e:
+                logger.error(f"Error applying aggregations: {str(e)}")
+        
+        return super().list(request, *args, **kwargs)
+    
+    @action(detail=False, methods=['get'])
+    def available_filters(self, request):
+        """Return the available filters for User model"""
+        try:
+            filters = get_available_filters(User)
+            return Response(filters)
+        except Exception as e:
+            logger.error(f"Error getting available filters: {str(e)}")
+            return Response({"error": "Error retrieving filters"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    @action(detail=False, methods=['get'])
+    def available_aggregations(self, request):
+        """Return the available aggregations for User model"""
+        try:
+            aggregations = get_available_aggregations(User)
+            return Response(aggregations)
+        except Exception as e:
+            logger.error(f"Error getting available aggregations: {str(e)}")
+            return Response({"error": "Error retrieving aggregations"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_destroy(self, instance):
         """Soft delete the user"""

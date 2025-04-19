@@ -298,4 +298,94 @@ class FilterFactory:
         if not filter_class:
             raise ValueError(f"Unsupported field type: {field_type}")
         
-        return filter_class(field_name, **kwargs) 
+        return filter_class(field_name, **kwargs)
+
+def apply_filters(queryset, filter_json_str):
+    """
+    Apply filters to a queryset based on JSON-formatted filter criteria.
+    
+    Args:
+        queryset: The Django queryset to filter
+        filter_json_str: JSON string containing filter criteria
+        
+    Returns:
+        Filtered queryset
+    """
+    import json
+    
+    # If empty, return unmodified queryset
+    if not filter_json_str:
+        return queryset
+    
+    try:
+        # Parse the JSON filter criteria
+        if isinstance(filter_json_str, str):
+            filter_criteria = json.loads(filter_json_str)
+        else:
+            # Already a dict
+            filter_criteria = filter_json_str
+    except json.JSONDecodeError:
+        # If invalid JSON, return unmodified queryset
+        return queryset
+    
+    # Build query
+    q_objects = Q()
+    
+    for field_name, value in filter_criteria.items():
+        if "__" in field_name:
+            # Handle lookups like field__contains, field__gt, etc.
+            q_objects &= Q(**{field_name: value})
+        else:
+            # Default to exact match
+            q_objects &= Q(**{field_name: value})
+    
+    return queryset.filter(q_objects)
+
+def get_available_filters(model_class):
+    """
+    Get the available filters for a model class based on its FilterConfig.
+    
+    Args:
+        model_class: The Django model class
+        
+    Returns:
+        Dictionary of available filters by category
+    """
+    result = {
+        'text': [],
+        'number': [],
+        'date': [],
+        'boolean': [],
+        'related': {},
+        'lookups': [
+            'exact', 'iexact', 'contains', 'icontains', 
+            'gt', 'gte', 'lt', 'lte', 'in', 'startswith', 
+            'istartswith', 'endswith', 'iendswith'
+        ]
+    }
+    
+    # Check if the model has a FilterConfig
+    if hasattr(model_class, 'FilterConfig'):
+        filter_config = model_class.FilterConfig
+        
+        # Add configured text fields
+        if hasattr(filter_config, 'text'):
+            result['text'] = filter_config.text
+        
+        # Add configured number fields
+        if hasattr(filter_config, 'number'):
+            result['number'] = filter_config.number
+        
+        # Add configured date fields
+        if hasattr(filter_config, 'date'):
+            result['date'] = filter_config.date
+        
+        # Add configured boolean fields
+        if hasattr(filter_config, 'boolean'):
+            result['boolean'] = filter_config.boolean
+        
+        # Add configured related fields
+        if hasattr(filter_config, 'related'):
+            result['related'] = filter_config.related
+    
+    return result 

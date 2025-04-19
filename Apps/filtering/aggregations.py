@@ -118,4 +118,126 @@ def get_aggregation(agg_type: str, field_name: str, **kwargs) -> Any:
             raise ValueError("Custom aggregation requires an 'expression' parameter")
         return agg_func(field_name, kwargs['expression'])
     
-    return agg_func(field_name) 
+    return agg_func(field_name)
+
+def apply_aggregations(queryset, aggregation_json_str):
+    """
+    Apply aggregations to a queryset based on JSON-formatted aggregation criteria.
+    
+    Args:
+        queryset: The Django queryset to aggregate
+        aggregation_json_str: JSON string containing aggregation criteria
+        
+    Returns:
+        Aggregation results
+    """
+    import json
+    
+    # If empty, return empty result
+    if not aggregation_json_str:
+        return {}
+    
+    try:
+        # Parse the JSON aggregation criteria
+        if isinstance(aggregation_json_str, str):
+            aggregation_criteria = json.loads(aggregation_json_str)
+        else:
+            # Already a dict
+            aggregation_criteria = aggregation_json_str
+    except json.JSONDecodeError:
+        # If invalid JSON, return empty result
+        return {}
+    
+    # Handle group_by
+    group_by = aggregation_criteria.pop('group_by', None)
+    if group_by:
+        if isinstance(group_by, str):
+            group_by = [group_by]
+        
+        # Create aggregations
+        aggregations = {}
+        for agg_type, field_names in aggregation_criteria.items():
+            if not isinstance(field_names, list):
+                field_names = [field_names]
+                
+            for field_name in field_names:
+                try:
+                    aggregation = get_aggregation(agg_type, field_name)
+                    aggregations[f"{agg_type}_{field_name}"] = aggregation
+                except ValueError:
+                    # Skip invalid aggregations
+                    continue
+        
+        # Apply group by and aggregations
+        result = list(queryset.values(*group_by).annotate(**aggregations))
+        return result
+    else:
+        # Create aggregations without group_by
+        aggregations = {}
+        for agg_type, field_names in aggregation_criteria.items():
+            if not isinstance(field_names, list):
+                field_names = [field_names]
+                
+            for field_name in field_names:
+                try:
+                    aggregation = get_aggregation(agg_type, field_name)
+                    aggregations[f"{agg_type}_{field_name}"] = aggregation
+                except ValueError:
+                    # Skip invalid aggregations
+                    continue
+        
+        # Apply aggregations
+        if aggregations:
+            result = queryset.aggregate(**aggregations)
+            return result
+    
+    return {}
+
+def get_available_aggregations(model_class):
+    """
+    Get the available aggregations for a model class based on its AggregationConfig.
+    
+    Args:
+        model_class: The Django model class
+        
+    Returns:
+        Dictionary of available aggregations by type
+    """
+    result = {
+        'count': [],
+        'sum': [],
+        'avg': [],
+        'min': [],
+        'max': [],
+        'group_by': []
+    }
+    
+    # Check if the model has an AggregationConfig
+    if hasattr(model_class, 'AggregationConfig'):
+        aggregation_config = model_class.AggregationConfig
+        
+        # Add configured count fields
+        if hasattr(aggregation_config, 'count'):
+            result['count'] = aggregation_config.count
+        
+        # Add configured sum fields
+        if hasattr(aggregation_config, 'sum'):
+            result['sum'] = aggregation_config.sum
+        
+        # Add configured avg fields
+        if hasattr(aggregation_config, 'avg'):
+            result['avg'] = aggregation_config.avg
+        
+        # Add configured min fields
+        if hasattr(aggregation_config, 'min'):
+            result['min'] = aggregation_config.min
+        
+        # Add configured max fields
+        if hasattr(aggregation_config, 'max'):
+            result['max'] = aggregation_config.max
+        
+        # Add configured group_by fields
+        if hasattr(aggregation_config, 'group_by'):
+            result['group_by'] = aggregation_config.group_by
+    
+    return result 
