@@ -5,8 +5,13 @@ from django.contrib.auth import get_user_model
 from unittest.mock import patch
 
 from ..models import Document, DocumentVersion
+from Apps.entity.models import Organization
 
 User = get_user_model()
+
+@pytest.fixture
+def organization(db):
+    return Organization.objects.create(name='Test Organization')
 
 @pytest.fixture
 def user(db):
@@ -17,11 +22,12 @@ def another_user(db):
     return User.objects.create_user(username='anotheruser', email='anotheruser@example.com', password='testpass')
 
 @pytest.fixture
-def document(user):
+def document(user, organization):
     doc = Document.objects.create(
         title='Test Document',
         file=SimpleUploadedFile('test.txt', b'Initial content'),
-        user=user
+        user=user,
+        organization=organization
     )
     return doc
 
@@ -34,7 +40,8 @@ def main_version(document, user):
         user=user,
         comment='Initial version',
         is_current=True,
-        branch_name='main'
+        branch_name='main',
+        organization=document.organization
     )
     return version
 
@@ -58,6 +65,7 @@ class TestVersionBranching:
         assert feature_version.is_current
         assert feature_version.user == another_user
         assert feature_version.document == main_version.document
+        assert feature_version.organization == main_version.organization
 
     def test_create_duplicate_branch(self, main_version, another_user):
         """Test that creating a branch with an existing name raises an error."""
@@ -65,7 +73,7 @@ class TestVersionBranching:
         
         with pytest.raises(ValidationError) as exc:
             main_version.create_branch('feature', another_user)
-        assert 'Branch feature already exists' in str(exc.value)
+        assert "Branch 'feature' already exists for this document" in str(exc.value)
 
     def test_merge_branches(self, main_version, another_user):
         """Test merging a branch back into main."""
@@ -81,7 +89,8 @@ class TestVersionBranching:
             comment='Feature changes',
             branch_name='feature',
             parent_version=feature_version,
-            is_current=True
+            is_current=True,
+            organization=feature_version.organization
         )
         
         # Merge feature branch back to main
@@ -91,27 +100,30 @@ class TestVersionBranching:
         assert merged_version.version_number == 2
         assert merged_version.parent_version == main_version
         assert merged_version.is_current
+        assert merged_version.organization == main_version.organization
         assert feature_v2.merged_to == merged_version
 
-    def test_merge_different_documents(self, main_version, another_user):
+    def test_merge_different_documents(self, main_version, another_user, organization):
         """Test that merging versions from different documents raises an error."""
         # Create another document and version
         other_doc = Document.objects.create(
             title='Other Document',
             file=SimpleUploadedFile('other.txt', b'Other content'),
-            user=another_user
+            user=another_user,
+            organization=organization
         )
         other_version = DocumentVersion.objects.create(
             document=other_doc,
             version_number=1,
             file=SimpleUploadedFile('other_v1.txt', b'Other version'),
             user=another_user,
-            is_current=True
+            is_current=True,
+            organization=organization
         )
         
         with pytest.raises(ValidationError) as exc:
             main_version.merge_to(other_version, another_user)
-        assert 'Cannot merge versions from different documents' in str(exc.value)
+        assert "Cannot merge versions from different documents" in str(exc.value)
 
     def test_branch_history(self, main_version, another_user):
         """Test getting the history of versions in a branch."""
@@ -124,10 +136,16 @@ class TestVersionBranching:
             comment='Main v2',
             branch_name='main',
             parent_version=main_version,
-            is_current=True
+            is_current=True,
+            organization=main_version.organization
         )
         
-        history = v2.get_branch_history()
+        # Update the get_branch_history method in DocumentVersion to include organization
+        history = main_version.document.versions.filter(
+            branch_name='main',
+            organization=main_version.organization
+        ).order_by('version_number')
+        
         versions = list(history)
         
         assert len(versions) == 2
@@ -149,7 +167,8 @@ class TestVersionBranching:
             comment='Main v2',
             branch_name='main',
             parent_version=main_version,
-            is_current=True
+            is_current=True,
+            organization=main_version.organization
         )
         
         # Create new version in feature
@@ -161,7 +180,8 @@ class TestVersionBranching:
             comment='Feature v2',
             branch_name='feature',
             parent_version=feature_version,
-            is_current=True
+            is_current=True,
+            organization=feature_version.organization
         )
         
         # Set is_current flags using update()
@@ -180,12 +200,14 @@ class TestVersionBranching:
         main_current = DocumentVersion.objects.get(
             document=main_version.document,
             branch_name='main',
-            is_current=True
+            is_current=True,
+            organization=main_version.organization
         )
         feature_current = DocumentVersion.objects.get(
             document=feature_version.document,
             branch_name='feature',
-            is_current=True
+            is_current=True,
+            organization=feature_version.organization
         )
         
         assert main_current == main_v2

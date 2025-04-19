@@ -35,10 +35,12 @@ class DocumentIndex(Document):
     title = Text(analyzer='standard')
     description = Text(analyzer='standard')
     user_id = Integer()
+    organization_id = Integer()
     status = Keyword()
     created_at = Date()
     updated_at = Date()
     is_deleted = Boolean()
+    is_active = Boolean()
 
     class Index:
         name = 'documents_documents'
@@ -72,10 +74,13 @@ class DocumentVersionIndex(Document):
     document_id = Integer()
     version_number = Integer()
     user_id = Integer()
+    organization_id = Integer()
     comment = Text(analyzer='standard')
     created_at = Date()
     updated_at = Date()
     is_current = Boolean()
+    is_active = Boolean()
+    branch_name = Keyword()
 
     class Index:
         name = 'documents_versions'

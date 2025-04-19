@@ -1,27 +1,20 @@
-from django.db import models
-from django.core.validators import MinValueValidator
+import uuid
+import os
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.conf import settings
-from django.db import transaction
+from django.core.files.uploadedfile import SimpleUploadedFile
 
+# Use the original RBACBaseModel directly
+from Apps.rbac.models import RBACBaseModel
+from Apps.rbac.managers import OrganizationIsolationManager
 from .storage import document_storage
 
 User = get_user_model()
 
-class TimeStampedModel(models.Model):
-    """
-    An abstract base class model that provides self-updating
-    `created_at` and `updated_at` fields.
-    """
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
-
-class Document(TimeStampedModel):
+class Document(RBACBaseModel):
     """
     Model representing a document in the system.
     """
@@ -48,11 +41,15 @@ class Document(TimeStampedModel):
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
         ]
+        app_label = 'documents'
 
     def __str__(self):
         return self.title
 
     def clean(self):
+        # Call parent's clean method to validate organization field
+        super().clean()
+        
         if not self.title:
             raise ValidationError('Title is required')
 
@@ -139,7 +136,7 @@ class DocumentVersionManager(models.Manager):
         instance.save(force_insert=True)
         return instance
 
-class DocumentVersion(TimeStampedModel):
+class DocumentVersion(RBACBaseModel):
     """
     Model representing a version of a document.
     """
@@ -153,122 +150,103 @@ class DocumentVersion(TimeStampedModel):
     parent_version = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='branches')
     merged_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='merged_from')
 
+    # Use both manager types
     objects = models.Manager()
+    rbac_objects = OrganizationIsolationManager()
 
     class Meta:
         ordering = ['-version_number']
         unique_together = [
-            ['document', 'branch_name', 'version_number']  # Version numbers are unique within a branch
+            ['document', 'branch_name', 'version_number', 'organization']  # Version numbers are unique within a branch and organization
         ]
         indexes = [
             models.Index(fields=['document', 'version_number']),
             models.Index(fields=['is_current']),
             models.Index(fields=['branch_name']),
         ]
+        app_label = 'documents'
 
     def __str__(self):
         return f'{self.document.title} - {self.branch_name} - Version {self.version_number}'
 
     def clean(self):
+        # Call parent's clean method to validate organization field
+        super().clean()
+        
         if self.version_number < 1:
             raise ValidationError('Version number must be greater than 0')
         if self.parent_version and self.parent_version.document != self.document:
             raise ValidationError('Parent version must belong to the same document')
-        if self.merged_to and self.merged_to.document != self.document:
-            raise ValidationError('Merged to version must belong to the same document')
 
     def save(self, *args, **kwargs):
-        """
-        Override save method to handle is_current flag and version numbers.
-        """
-        # Set version number for new instances
-        if not self.pk and not self.version_number:
-            latest_version = DocumentVersion.objects.filter(
-                document=self.document,
-                branch_name=self.branch_name
-            ).order_by('-version_number').first()
-            self.version_number = (latest_version.version_number + 1) if latest_version else 1
-
-        # Handle is_current flag within a transaction
-        with transaction.atomic():
-            # If this version is being set as current, update other versions in the SAME branch
+        # Ensure organization is consistent with document's organization
+        if hasattr(self, 'document') and self.document and not self.organization_id:
+            self.organization = self.document.organization
+        
+        # Version-specific save logic
+        if not self.pk:  # New version being created
+            # If this version is marked as current, ensure no other version in this branch is current
             if self.is_current:
+                print(f"Before update - Original version {self.version_number} is_current: {self.is_current}")
                 DocumentVersion.objects.filter(
                     document=self.document,
                     branch_name=self.branch_name,
                     is_current=True
-                ).exclude(pk=self.pk).update(is_current=False)
-
-            # Save the instance
-            super().save(*args, **kwargs)
-
-            # Refresh the instance to get the latest state
-            if self.pk:
-                self.refresh_from_db()
+                ).update(is_current=False)
+                print(f"After update - Original version {self.version_number} is_current: {self.is_current}")
+        
+        # Call parent's save method
+        super().save(*args, **kwargs)
 
     @classmethod
     def get_next_version_number(cls, document, branch_name):
         """
-        Get the next version number for a document in a specific branch.
+        Get the next available version number for a specific document branch.
         
         Args:
-            document (Document): The document instance
+            document (Document): The document
             branch_name (str): The branch name
             
         Returns:
-            int: The next version number
+            int: Next version number
         """
-        last_version = cls.objects.filter(
+        latest_version = cls.objects.filter(
             document=document,
             branch_name=branch_name
         ).order_by('-version_number').first()
         
-        return (last_version.version_number + 1) if last_version else 1
+        if latest_version:
+            return latest_version.version_number + 1
+        else:
+            return 1
 
     def _handle_branch_creation(self, branch_name, user, comment=''):
         """
-        Internal method to handle the creation of a new branch.
-        This method should be called within a transaction.
+        Internal method to handle branch creation logic.
         
-        Args:
-            branch_name (str): Name of the new branch
-            user (User): User creating the branch
-            comment (str): Optional comment for the branch creation
-            
         Returns:
             DocumentVersion: The new version in the branch
         """
-        print(f"Before update - Original version {self.pk} is_current: {self.is_current}")
-        
-        # First, set this version as not current using update to bypass save() logic
-        DocumentVersion.objects.filter(pk=self.pk).update(is_current=False)
-        
-        # Refresh the instance from the database to reflect the update
-        self.refresh_from_db()
-        
-        print(f"After update - Original version {self.pk} is_current: {self.is_current}")
-        
-        # Create the new version in the branch
-        new_version = DocumentVersion.objects.create(
-            document=self.document,
-            version_number=1,  # Always start a new branch at version 1
-            file=self.file,
-            user=user,
-            comment=comment or f'Created branch {branch_name} from {self.branch_name} version {self.version_number}',
-            branch_name=branch_name,
-            parent_version=self,
-            is_current=True  # New branch's first version is always current
+        # Get the file content from the current version
+        file_content = self.file.read()
+        temp_file = SimpleUploadedFile(
+            name=os.path.basename(self.file.name),
+            content=file_content
         )
         
-        print(f"After create - New version {new_version.pk} is_current: {new_version.is_current}")
-        print(f"After create - Original version {self.pk} is_current: {DocumentVersion.objects.get(pk=self.pk).is_current}")
-        
-        # Refresh both instances from database
-        self.refresh_from_db()
-        new_version.refresh_from_db()
-        
-        print(f"After refresh - New version {new_version.pk} is_current: {new_version.is_current}")
-        print(f"After refresh - Original version {self.pk} is_current: {self.is_current}")
+        # Create the new branch version
+        new_version = DocumentVersion(
+            document=self.document,
+            version_number=1,  # First version in the branch
+            file=temp_file,
+            user=user,
+            comment=comment or f"Created branch '{branch_name}' from {self.branch_name} version {self.version_number}",
+            is_current=True,
+            branch_name=branch_name,
+            parent_version=self,
+            organization=self.organization  # Ensure organization is set correctly
+        )
+        new_version.save()
         
         return new_version
 
@@ -279,110 +257,95 @@ class DocumentVersion(TimeStampedModel):
         Args:
             branch_name (str): Name of the new branch
             user (User): User creating the branch
-            comment (str): Optional comment for the new version
+            comment (str): Optional comment for the branch creation
             
         Returns:
-            DocumentVersion: The newly created version in the new branch
+            DocumentVersion: The new version in the branch
             
         Raises:
-            ValidationError: If a branch with the given name already exists
+            ValidationError: If a branch with the same name already exists
         """
         # Check if branch already exists
-        if DocumentVersion.objects.filter(document=self.document, branch_name=branch_name).exists():
-            raise ValidationError(f'Branch {branch_name} already exists')
-
-        # Create new version in the new branch within a transaction
+        if self.document.versions.filter(branch_name=branch_name).exists():
+            raise ValidationError(f"Branch '{branch_name}' already exists for this document")
+        
         with transaction.atomic():
-            # First, set this version as not current using update to bypass save() logic
-            DocumentVersion.objects.filter(pk=self.pk).update(is_current=False)
-            
-            # Refresh the instance from the database
-            self.refresh_from_db()
-
-            # Create the new version in the new branch
-            new_version = DocumentVersion.objects.create(
-                document=self.document,
-                version_number=1,  # Start with version 1 in the new branch
-                file=self.file,  # Copy the file from the current version
-                user=user,
-                comment=comment or f'Created branch {branch_name}',
-                is_current=True,  # This will be the current version in the new branch
-                branch_name=branch_name,
-                parent_version=self
-            )
-
-            # Ensure the new version is current and the original version is not
-            DocumentVersion.objects.filter(pk=new_version.pk).update(is_current=True)
-            DocumentVersion.objects.filter(pk=self.pk).update(is_current=False)
-
-            # Refresh both instances from the database
-            self.refresh_from_db()
-            new_version.refresh_from_db()
-
-            return new_version
-
+            return self._handle_branch_creation(branch_name, user, comment)
+    
     def merge_to(self, target_version, user, comment=''):
         """
-        Merge this version into another branch.
+        Merge this version into the target version's branch.
         
         Args:
-            target_version (DocumentVersion): Version to merge into
+            target_version (DocumentVersion): The target version to merge into
             user (User): User performing the merge
             comment (str): Optional comment for the merge
             
         Returns:
-            DocumentVersion: The new version created by the merge
+            DocumentVersion: The new version in the target branch
             
         Raises:
-            ValidationError: If versions are not from the same document
+            ValidationError: If versions are not mergeable
         """
-        if self.document != target_version.document:
-            raise ValidationError('Cannot merge versions from different documents')
-            
-        # Get the next version number for the target branch
-        next_version = 1
-        latest_version = DocumentVersion.objects.filter(
-            document=self.document,
-            branch_name=target_version.branch_name
-        ).order_by('-version_number').first()
-        if latest_version:
-            next_version = latest_version.version_number + 1
-            
-        # Create new version in the target branch
-        merged_version = DocumentVersion.objects.create(
-            document=self.document,
-            version_number=next_version,
-            file=self.file,
-            user=user,
-            comment=comment or f'Merged from {self.branch_name} version {self.version_number}',
-            branch_name=target_version.branch_name,
-            parent_version=target_version,
-            is_current=True
-        )
+        # Validate merge
+        if self.document_id != target_version.document_id:
+            raise ValidationError("Cannot merge versions from different documents")
         
-        # Update the merged_to reference
-        self.merged_to = merged_version
-        self.save()
+        if self.branch_name == target_version.branch_name:
+            raise ValidationError("Cannot merge versions in the same branch")
+
+        if self.organization_id != target_version.organization_id:
+            raise ValidationError("Cannot merge versions from different organizations")
         
-        return merged_version
+        with transaction.atomic():
+            # Get the next version number in the target branch
+            next_version = self.get_next_version_number(self.document, target_version.branch_name)
+            
+            # Get the file content from this version
+            file_content = self.file.read()
+            temp_file = SimpleUploadedFile(
+                name=os.path.basename(self.file.name),
+                content=file_content
+            )
+            
+            # Create the new merged version
+            merge_comment = comment or f"Merged from {self.branch_name} version {self.version_number}"
+            merged_version = DocumentVersion(
+                document=self.document,
+                version_number=next_version,
+                file=temp_file,
+                user=user,
+                comment=merge_comment,
+                is_current=True,
+                branch_name=target_version.branch_name,
+                parent_version=target_version,
+                organization=self.organization  # Ensure organization is set correctly
+            )
+            merged_version.save()
+            
+            # Update this version to reference the merged version
+            self.merged_to = merged_version
+            self.save(update_fields=['merged_to'])
+            
+            return merged_version
 
     def get_branch_history(self):
         """
-        Get the complete history of versions in this branch.
+        Get the history of the branch this version belongs to.
         
         Returns:
-            QuerySet: Ordered queryset of all versions in the branch
+            QuerySet: Ordered queryset of versions in this branch
         """
-        return DocumentVersion.objects.filter(
-            document=self.document,
-            branch_name=self.branch_name
+        return self.document.versions.filter(
+            branch_name=self.branch_name,
+            organization=self.organization
         ).order_by('version_number')
 
-class DocumentClassification(TimeStampedModel):
+class DocumentClassification(RBACBaseModel):
     """
     Model for classifying documents into categories.
     """
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
 
@@ -391,19 +354,26 @@ class DocumentClassification(TimeStampedModel):
         indexes = [
             models.Index(fields=['name']),
         ]
+        # Add unique_together constraint including organization
+        unique_together = ['name', 'organization']
+        # Add app_label to ensure consistency with RBAC
+        app_label = 'documents'
 
     def __str__(self):
         return self.name
 
     def clean(self):
+        # Call parent's clean method to validate organization field
+        super().clean()
+        
         if not self.name:
             raise ValidationError('Name is required')
 
-class DocumentTag(TimeStampedModel):
+class DocumentTag(RBACBaseModel):
     """
     Model for tagging documents with keywords.
     """
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, default='#000000')  # Hex color code
 
@@ -412,10 +382,19 @@ class DocumentTag(TimeStampedModel):
         indexes = [
             models.Index(fields=['name']),
         ]
+        # Add unique_together constraint including organization
+        unique_together = ['name', 'organization']
+        # Add app_label to ensure consistency with RBAC
+        app_label = 'documents'
 
     def __str__(self):
         return self.name
 
     def clean(self):
+        # Call parent's clean method to validate organization field
+        super().clean()
+        
         if not self.name:
             raise ValidationError('Name is required')
+        if len(self.color) != 7 or not self.color.startswith('#'):
+            raise ValidationError('Color must be a valid HEX color code (e.g., #FF0000)')

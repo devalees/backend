@@ -1,10 +1,11 @@
 from django.contrib import admin
 from .models import Document, DocumentVersion, DocumentClassification, DocumentTag
+from Apps.rbac.admin import OrganizationIsolationAdminMixin
 
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'status', 'user', 'updated_at')
-    list_filter = ('status', 'user', 'classification', 'tags')
+class DocumentAdmin(OrganizationIsolationAdminMixin, admin.ModelAdmin):
+    list_display = ('title', 'status', 'user', 'organization', 'updated_at')
+    list_filter = ('status', 'user', 'classification', 'tags', 'is_active')
     search_fields = ('title', 'description')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
@@ -13,6 +14,9 @@ class DocumentAdmin(admin.ModelAdmin):
         }),
         ('Classification', {
             'fields': ('classification', 'tags')
+        }),
+        ('Organization', {
+            'fields': ('organization', 'is_active')
         }),
         ('Metadata', {
             'fields': ('user', 'created_at', 'updated_at', 'is_deleted')
@@ -25,32 +29,46 @@ class DocumentAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(DocumentVersion)
-class DocumentVersionAdmin(admin.ModelAdmin):
-    list_display = ('document', 'version_number', 'user', 'created_at')
-    list_filter = ('document', 'user')
+class DocumentVersionAdmin(OrganizationIsolationAdminMixin, admin.ModelAdmin):
+    list_display = ('document', 'version_number', 'branch_name', 'user', 'organization', 'created_at')
+    list_filter = ('document', 'user', 'branch_name', 'is_current', 'is_active')
     search_fields = ('document__title', 'comment')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('document', 'version_number', 'is_current')
+            'fields': ('document', 'version_number', 'branch_name', 'is_current')
         }),
-        ('File Information', {
-            'fields': ('file_path', 'file_size', 'mime_type')
+        ('File', {
+            'fields': ('file',)
+        }),
+        ('Versioning', {
+            'fields': ('parent_version', 'merged_to')
+        }),
+        ('Organization', {
+            'fields': ('organization', 'is_active')
         }),
         ('Metadata', {
             'fields': ('user', 'comment', 'created_at', 'updated_at')
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        if not change and not hasattr(obj, 'organization'):
+            obj.organization = obj.document.organization
+        super().save_model(request, obj, form, change)
 
 @admin.register(DocumentClassification)
-class DocumentClassificationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent', 'created_at')
-    list_filter = ('parent', 'created_at')
+class DocumentClassificationAdmin(OrganizationIsolationAdminMixin, admin.ModelAdmin):
+    list_display = ('name', 'parent', 'organization', 'created_at')
+    list_filter = ('parent', 'is_active', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
             'fields': ('name', 'description', 'parent')
+        }),
+        ('Organization', {
+            'fields': ('organization', 'is_active')
         }),
         ('Metadata', {
             'fields': ('created_at', 'updated_at')
@@ -58,14 +76,17 @@ class DocumentClassificationAdmin(admin.ModelAdmin):
     )
 
 @admin.register(DocumentTag)
-class DocumentTagAdmin(admin.ModelAdmin):
-    list_display = ('name', 'color', 'created_at')
-    list_filter = ('created_at',)
+class DocumentTagAdmin(OrganizationIsolationAdminMixin, admin.ModelAdmin):
+    list_display = ('name', 'color', 'organization', 'created_at')
+    list_filter = ('is_active', 'created_at')
     search_fields = ('name', 'description')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         (None, {
             'fields': ('name', 'description', 'color')
+        }),
+        ('Organization', {
+            'fields': ('organization', 'is_active')
         }),
         ('Metadata', {
             'fields': ('created_at', 'updated_at')

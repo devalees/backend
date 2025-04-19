@@ -7,8 +7,13 @@ from django.db.models.signals import post_save
 from elasticsearch_dsl.connections import connections
 
 from Apps.documents.models import Document, DocumentVersion
+from Apps.entity.models import Organization
 
 User = get_user_model()
+
+@pytest.fixture
+def organization(db):
+    return Organization.objects.create(name='Test Organization')
 
 @pytest.fixture(autouse=True)
 def mock_elasticsearch():
@@ -33,12 +38,13 @@ def user():
     )
 
 @pytest.fixture
-def document(user):
+def document(user, organization):
     test_file = SimpleUploadedFile("test.txt", b"Test content")
     doc = Document.objects.create(
         title='Test Document',
         file=test_file,
-        user=user
+        user=user,
+        organization=organization
     )
     return doc
 
@@ -53,7 +59,8 @@ def document_versions(document, user):
             file=test_file,
             user=user,
             comment=f'Version {i+1} comment',
-            is_current=(i == 2)  # Make the last version current
+            is_current=(i == 2),  # Make the last version current
+            organization=document.organization
         )
         versions.append(version)
     return versions
@@ -91,7 +98,7 @@ class TestVersionRestoration:
         assert document.current_version == v1
         assert document.last_modified > v1.created_at
 
-    def test_restore_version_validation(self, document_versions, user):
+    def test_restore_version_validation(self, document_versions, user, organization):
         """Test validation when restoring versions"""
         v1 = document_versions[0]
         
@@ -100,7 +107,8 @@ class TestVersionRestoration:
         other_document = Document.objects.create(
             title='Other Document',
             file=test_file,
-            user=user
+            user=user,
+            organization=organization
         )
         
         other_version = DocumentVersion.objects.create(
@@ -108,7 +116,8 @@ class TestVersionRestoration:
             version_number=1,
             file=test_file,
             user=user,
-            comment='Other version'
+            comment='Other version',
+            organization=organization
         )
         
         with pytest.raises(ValueError) as exc_info:
