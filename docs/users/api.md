@@ -147,6 +147,39 @@ If 2FA is enabled:
 
 ### 4. Password Management
 
+#### Change Password
+**Endpoint:** `POST /change-password/`
+
+**Authentication Required:** Yes
+
+**Request Body:**
+```json
+{
+    "current_password": "currentpassword",
+    "new_password": "newpassword",
+    "confirm_password": "newpassword"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+    "success": "Password changed successfully"
+}
+```
+
+**Error Responses:**
+```json
+{
+    "current_password": ["Current password is incorrect."]
+}
+```
+```json
+{
+    "confirm_password": ["New password fields didn't match."]
+}
+```
+
 #### Password Reset Request
 **Endpoint:** `POST /password-reset/`
 

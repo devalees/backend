@@ -19,6 +19,7 @@ urlpatterns = [
     path('password-reset-confirm/', UserViewSet.as_view({
         'post': 'password_reset_confirm'
     }), name='password-reset-confirm'),
+    path('change-password/', UserViewSet.as_view({'post': 'change_password'}), name='change-password'),
     # 2FA endpoints
     path('verify-2fa/', UserViewSet.as_view({'post': 'verify_2fa'}), name='verify-2fa'),
     path('enable-2fa/', UserViewSet.as_view({'post': 'enable_2fa'}), name='enable-2fa'),

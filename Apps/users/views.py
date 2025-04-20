@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model, authenticate
-from .serializers import UserSerializer
+from .serializers import UserSerializer, ChangePasswordSerializer
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -109,7 +109,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ['login', 'refresh_token', 'password_reset', 'password_reset_confirm', 'register', 'verify_2fa']:
             return [AllowAny()]
             
-        if self.action in ['available_filters', 'available_aggregations']:
+        if self.action in ['available_filters', 'available_aggregations', 'change_password']:
             return [permissions.IsAuthenticated()]
             
         # For all other actions, use the custom permission class
@@ -561,4 +561,24 @@ class UserViewSet(viewsets.ModelViewSet):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token)
             }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def change_password(self, request):
+        """
+        Change password endpoint that requires current password and validates new password.
+        """
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = request.user
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            
+            # Optionally invalidate user's existing tokens by updating token_version
+            # This depends on how token validation is implemented in the application
+            
+            return Response(
+                {"success": "Password changed successfully"},
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -431,4 +431,91 @@ class TestUserViewSet:
             response = authenticated_client.post(url, {'code': '000000'})
         
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
-        assert 'Too many verification attempts' in response.data['error'] 
+        assert 'Too many verification attempts' in response.data['error']
+
+    def test_change_password_success(self, authenticated_client):
+        """Test changing password successfully."""
+        # Create user and force authenticate
+        user = UserFactory()
+        user.set_password('current_password')
+        user.save()
+        
+        authenticated_client.force_authenticate(user=user)
+        
+        url = reverse('users:users-change-password')
+        data = {
+            'current_password': 'current_password',
+            'new_password': 'new_secure_password123',
+            'confirm_password': 'new_secure_password123'
+        }
+        
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_200_OK
+        assert 'success' in response.data
+        
+        # Verify user can log in with new password
+        user.refresh_from_db()
+        assert user.check_password('new_secure_password123')
+    
+    def test_change_password_incorrect_current(self, authenticated_client):
+        """Test changing password with incorrect current password."""
+        user = UserFactory()
+        user.set_password('current_password')
+        user.save()
+        
+        authenticated_client.force_authenticate(user=user)
+        
+        url = reverse('users:users-change-password')
+        data = {
+            'current_password': 'wrong_password',
+            'new_password': 'new_secure_password123',
+            'confirm_password': 'new_secure_password123'
+        }
+        
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'current_password' in response.data
+        
+        # Verify password was not changed
+        user.refresh_from_db()
+        assert not user.check_password('new_secure_password123')
+        assert user.check_password('current_password')
+    
+    def test_change_password_mismatched_new(self, authenticated_client):
+        """Test changing password with mismatched new passwords."""
+        user = UserFactory()
+        user.set_password('current_password')
+        user.save()
+        
+        authenticated_client.force_authenticate(user=user)
+        
+        url = reverse('users:users-change-password')
+        data = {
+            'current_password': 'current_password',
+            'new_password': 'new_secure_password123',
+            'confirm_password': 'different_password'
+        }
+        
+        response = authenticated_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'confirm_password' in response.data
+        
+        # Verify password was not changed
+        user.refresh_from_db()
+        assert user.check_password('current_password')
+    
+    def test_change_password_unauthenticated(self, api_client):
+        """Test changing password while unauthenticated."""
+        url = reverse('users:users-change-password')
+        data = {
+            'current_password': 'current_password',
+            'new_password': 'new_secure_password123',
+            'confirm_password': 'new_secure_password123'
+        }
+        
+        response = api_client.post(url, data)
+        
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED 
