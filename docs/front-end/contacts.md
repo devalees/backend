@@ -1,7 +1,7 @@
 # Contacts API Documentation
 
 ## Base URL
-All endpoints are prefixed with `/api/contacts/`
+All endpoints are prefixed with `/api/v1/contacts/`
 
 ## Authentication
 All endpoints require JWT authentication. Include the JWT token in the Authorization header:
@@ -16,15 +16,15 @@ Some endpoints have rate limiting applied. The response headers will include:
 - `X-RateLimit-Reset`: Time when the rate limit resets
 
 ## Role-Based Access Control
-All endpoints now implement Role-Based Access Control (RBAC). Users can only access:
+All endpoints implement Role-Based Access Control (RBAC). Users can only access:
 - Resources belonging to organizations they have active roles in
 - Actions their role permissions allow them to perform
 
 ## Advanced Filtering
-All list endpoints now support advanced filtering capabilities using JSON-formatted filter criteria:
+All list endpoints support advanced filtering capabilities using JSON-formatted filter criteria:
 
 ```
-GET /api/contacts/contacts/?filters={"name__contains":"John","is_active":true}
+GET /api/v1/contacts/contacts/?filters={"name__contains":"John","is_active":true}
 ```
 
 ### Available Filter Operators:
@@ -46,14 +46,14 @@ GET /api/contacts/contacts/?filters={"name__contains":"John","is_active":true}
 Each resource has an endpoint to discover available filters:
 
 ```
-GET /api/contacts/contacts/available_filters/
+GET /api/v1/contacts/contacts/available_filters/
 ```
 
 ## Aggregation Support
-All list endpoints now support data aggregation with JSON-formatted criteria:
+All list endpoints support data aggregation with JSON-formatted criteria:
 
 ```
-GET /api/contacts/contacts/?aggregate={"count":"id","group_by":"organization"}
+GET /api/v1/contacts/contacts/?aggregate={"count":"id","group_by":"organization"}
 ```
 
 ### Available Aggregation Functions:
@@ -67,7 +67,7 @@ GET /api/contacts/contacts/?aggregate={"count":"id","group_by":"organization"}
 Each resource has an endpoint to discover available aggregations:
 
 ```
-GET /api/contacts/contacts/available_aggregations/
+GET /api/v1/contacts/contacts/available_aggregations/
 ```
 
 ## Available Filters and Aggregations by Model
@@ -154,6 +154,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```json
 {
     "name": "string",
+    "first_name": "string",
     "email": "string",
     "phone": "string",
     "organization": "integer",
@@ -183,11 +184,16 @@ To get the complete and up-to-date list of available filters and aggregations fo
 - **URL**: `/contacts/refresh_cache/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Query Parameters**:
+  - `organization`: Organization ID to refresh cache for
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: `{"message": "Cache refreshed for organization {organization_id}"}`
 
 ### Contact Groups
 
 #### List Contact Groups
-- **URL**: `/contact-groups/`
+- **URL**: `/groups/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Query Parameters**:
@@ -199,7 +205,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact group objects or aggregation results
 
 #### Get Available Filters for Contact Groups
-- **URL**: `/contact-groups/available_filters/`
+- **URL**: `/groups/available_filters/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -207,7 +213,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available filter fields by type
 
 #### Get Available Aggregations for Contact Groups
-- **URL**: `/contact-groups/available_aggregations/`
+- **URL**: `/groups/available_aggregations/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -215,7 +221,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available aggregation fields by type
 
 #### Get Contact Group
-- **URL**: `/contact-groups/{id}/`
+- **URL**: `/groups/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -223,7 +229,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact group object
 
 #### Create Contact Group
-- **URL**: `/contact-groups/`
+- **URL**: `/groups/`
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Data Constraints**:
@@ -238,20 +244,25 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```
 
 #### Update Contact Group
-- **URL**: `/contact-groups/{id}/`
+- **URL**: `/groups/{id}/`
 - **Method**: `PUT`/`PATCH`
 - **Auth Required**: Yes
 - **Data Constraints**: Same as create
 
 #### Delete Contact Group
-- **URL**: `/contact-groups/{id}/`
+- **URL**: `/groups/{id}/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+
+#### Hard Delete Contact Group
+- **URL**: `/groups/{id}/hard_delete/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
 ### Contact Templates
 
 #### List Contact Templates
-- **URL**: `/contact-templates/`
+- **URL**: `/templates/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Query Parameters**:
@@ -263,7 +274,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact template objects or aggregation results
 
 #### Get Available Filters for Contact Templates
-- **URL**: `/contact-templates/available_filters/`
+- **URL**: `/templates/available_filters/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -271,7 +282,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available filter fields by type
 
 #### Get Available Aggregations for Contact Templates
-- **URL**: `/contact-templates/available_aggregations/`
+- **URL**: `/templates/available_aggregations/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -279,7 +290,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available aggregation fields by type
 
 #### Get Contact Template
-- **URL**: `/contact-templates/{id}/`
+- **URL**: `/templates/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -287,7 +298,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact template object
 
 #### Create Contact Template
-- **URL**: `/contact-templates/`
+- **URL**: `/templates/`
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Data Constraints**:
@@ -307,13 +318,18 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```
 
 #### Update Contact Template
-- **URL**: `/contact-templates/{id}/`
+- **URL**: `/templates/{id}/`
 - **Method**: `PUT`/`PATCH`
 - **Auth Required**: Yes
 - **Data Constraints**: Same as create
 
 #### Delete Contact Template
-- **URL**: `/contact-templates/{id}/`
+- **URL**: `/templates/{id}/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+
+#### Hard Delete Contact Template
+- **URL**: `/templates/{id}/hard_delete/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
@@ -397,6 +413,9 @@ To get the complete and up-to-date list of available filters and aggregations fo
 - **URL**: `/communications/{id}/send/`
 - **Method**: `POST`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Updated communication object
 
 #### Schedule Communication
 - **URL**: `/communications/{id}/schedule/`
@@ -408,11 +427,27 @@ To get the complete and up-to-date list of available filters and aggregations fo
     "scheduled_at": "datetime"
 }
 ```
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Updated communication object
 
 #### Cancel Communication
 - **URL**: `/communications/{id}/cancel/`
 - **Method**: `POST`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Updated communication object
+
+#### Refresh Communication Cache
+- **URL**: `/communications/refresh_cache/`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Query Parameters**:
+  - `organization`: Organization ID to refresh cache for
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: `{"message": "Cache refreshed for organization {organization_id}"}`
 
 ### Communication Templates
 
@@ -493,11 +528,31 @@ To get the complete and up-to-date list of available filters and aggregations fo
     "metadata": "object"
 }
 ```
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Created communication object
+
+### Communication Monitoring
+
+#### List Communication Activities
+- **URL**: `/communication-activities/`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Query Parameters**:
+  - `organization`: Filter by organization ID
+  - `communication`: Filter by communication ID
+  - `user`: Filter by user ID
+  - `activity_type`: Filter by activity type
+  - `filters`: JSON-formatted filter criteria
+  - `aggregate`: JSON-formatted aggregation criteria
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: List of communication activity objects or aggregation results
 
 ### Contact Lists
 
 #### List Contact Lists
-- **URL**: `/contact-lists/`
+- **URL**: `/lists/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Query Parameters**:
@@ -509,7 +564,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact list objects or aggregation results
 
 #### Get Available Filters for Contact Lists
-- **URL**: `/contact-lists/available_filters/`
+- **URL**: `/lists/available_filters/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -517,7 +572,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available filter fields by type
 
 #### Get Available Aggregations for Contact Lists
-- **URL**: `/contact-lists/available_aggregations/`
+- **URL**: `/lists/available_aggregations/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -525,7 +580,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available aggregation fields by type
 
 #### Get Contact List
-- **URL**: `/contact-lists/{id}/`
+- **URL**: `/lists/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -533,7 +588,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact list object
 
 #### Create Contact List
-- **URL**: `/contact-lists/`
+- **URL**: `/lists/`
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Data Constraints**:
@@ -549,25 +604,25 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```
 
 #### Update Contact List
-- **URL**: `/contact-lists/{id}/`
+- **URL**: `/lists/{id}/`
 - **Method**: `PUT`/`PATCH`
 - **Auth Required**: Yes
 - **Data Constraints**: Same as create
 
 #### Delete Contact List
-- **URL**: `/contact-lists/{id}/`
+- **URL**: `/lists/{id}/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
 #### Hard Delete Contact List
-- **URL**: `/contact-lists/{id}/hard_delete/`
+- **URL**: `/lists/{id}/hard_delete/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
 ### Contact Notes
 
 #### List Contact Notes
-- **URL**: `/contact-notes/`
+- **URL**: `/notes/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Query Parameters**:
@@ -580,7 +635,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact note objects or aggregation results
 
 #### Get Available Filters for Contact Notes
-- **URL**: `/contact-notes/available_filters/`
+- **URL**: `/notes/available_filters/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -588,7 +643,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available filter fields by type
 
 #### Get Available Aggregations for Contact Notes
-- **URL**: `/contact-notes/available_aggregations/`
+- **URL**: `/notes/available_aggregations/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -596,7 +651,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Object with available aggregation fields by type
 
 #### Get Contact Note
-- **URL**: `/contact-notes/{id}/`
+- **URL**: `/notes/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -604,7 +659,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact note object
 
 #### Create Contact Note
-- **URL**: `/contact-notes/`
+- **URL**: `/notes/`
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Data Constraints**:
@@ -620,30 +675,33 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```
 
 #### Update Contact Note
-- **URL**: `/contact-notes/{id}/`
+- **URL**: `/notes/{id}/`
 - **Method**: `PUT`/`PATCH`
 - **Auth Required**: Yes
 - **Data Constraints**: Same as create
 
 #### Delete Contact Note
-- **URL**: `/contact-notes/{id}/`
+- **URL**: `/notes/{id}/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
 #### Hard Delete Contact Note
-- **URL**: `/contact-notes/{id}/hard_delete/`
+- **URL**: `/notes/{id}/hard_delete/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
 #### Download Note File
-- **URL**: `/contact-notes/{id}/download_file/`
+- **URL**: `/notes/{id}/download_file/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: File download
 
 ### Contact Note Notifications
 
 #### List Contact Note Notifications
-- **URL**: `/contact-note-notifications/`
+- **URL**: `/note-notifications/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -651,7 +709,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact note notification objects
 
 #### Get Contact Note Notification
-- **URL**: `/contact-note-notifications/{id}/`
+- **URL**: `/note-notifications/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -659,7 +717,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact note notification object
 
 #### Create Contact Note Notification
-- **URL**: `/contact-note-notifications/`
+- **URL**: `/note-notifications/`
 - **Method**: `POST`
 - **Auth Required**: Yes
 - **Data Constraints**:
@@ -675,24 +733,33 @@ To get the complete and up-to-date list of available filters and aggregations fo
 ```
 
 #### Mark Notification as Read
-- **URL**: `/contact-note-notifications/{id}/mark_read/`
+- **URL**: `/note-notifications/{id}/mark_read/`
 - **Method**: `POST`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Updated notification object
 
 #### Mark All Notifications as Read
-- **URL**: `/contact-note-notifications/mark_all_read/`
+- **URL**: `/note-notifications/mark_all_read/`
 - **Method**: `POST`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: `{"message": "All notifications marked as read"}`
 
 #### Get Unread Notifications Count
-- **URL**: `/contact-note-notifications/unread_count/`
+- **URL**: `/note-notifications/unread_count/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: `{"count": "integer"}`
 
 ### Contact Note Monitoring
 
 #### List Contact Note Monitoring
-- **URL**: `/contact-note-monitoring/`
+- **URL**: `/note-monitoring/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -700,7 +767,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: List of contact note monitoring objects
 
 #### Get Contact Note Monitoring
-- **URL**: `/contact-note-monitoring/{id}/`
+- **URL**: `/note-monitoring/{id}/`
 - **Method**: `GET`
 - **Auth Required**: Yes
 - **Success Response**:
@@ -708,14 +775,20 @@ To get the complete and up-to-date list of available filters and aggregations fo
   - **Content**: Contact note monitoring object
 
 #### Get Activity Summary
-- **URL**: `/contact-note-monitoring/activity_summary/`
+- **URL**: `/note-monitoring/activity_summary/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: Activity summary object
 
 #### Get User Activity
-- **URL**: `/contact-note-monitoring/user_activity/`
+- **URL**: `/note-monitoring/user_activity/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Success Response**:
+  - **Code**: 200 OK
+  - **Content**: User activity object
 
 ## Data Models
 
@@ -724,6 +797,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
 {
     "id": "integer",
     "name": "string",
+    "first_name": "string",
     "email": "string",
     "phone": "string",
     "organization": "integer",
@@ -734,7 +808,11 @@ To get the complete and up-to-date list of available filters and aggregations fo
     "team_name": "string",
     "is_active": "boolean",
     "created_at": "datetime",
-    "updated_at": "datetime"
+    "updated_at": "datetime",
+    "created_by": "integer",
+    "created_by_name": "string",
+    "updated_by": "integer",
+    "updated_by_name": "string"
 }
 ```
 
@@ -747,9 +825,14 @@ To get the complete and up-to-date list of available filters and aggregations fo
     "organization": "integer",
     "organization_name": "string",
     "contacts": ["Contact Object"],
+    "contact_ids": ["integer"],
     "is_active": "boolean",
     "created_at": "datetime",
-    "updated_at": "datetime"
+    "updated_at": "datetime",
+    "created_by": "integer",
+    "created_by_name": "string",
+    "updated_by": "integer",
+    "updated_by_name": "string"
 }
 ```
 
@@ -832,6 +915,7 @@ To get the complete and up-to-date list of available filters and aggregations fo
     "organization": "integer",
     "organization_name": "string",
     "contacts": ["Contact Object"],
+    "contact_ids": ["integer"],
     "is_active": "boolean",
     "metadata": "object",
     "created_at": "datetime",
@@ -924,37 +1008,37 @@ All endpoints may return the following error responses:
 
 ### Basic Filtering
 ```
-GET /api/contacts/contacts/?filters={"name__contains":"John"}
+GET /api/v1/contacts/contacts/?filters={"name__contains":"John"}
 ```
 
 ### Multiple Conditions
 ```
-GET /api/contacts/contacts/?filters={"name__contains":"John","is_active":true}
+GET /api/v1/contacts/contacts/?filters={"name__contains":"John","is_active":true}
 ```
 
 ### Filtering with Related Objects
 ```
-GET /api/contacts/contacts/?filters={"organization__name":"Acme Corp"}
+GET /api/v1/contacts/contacts/?filters={"organization__name":"Acme Corp"}
 ```
 
 ### Complex Date Filtering
 ```
-GET /api/contacts/communications/?filters={"created_at__gte":"2023-01-01","created_at__lt":"2023-12-31"}
+GET /api/v1/contacts/communications/?filters={"created_at__gte":"2023-01-01","created_at__lt":"2023-12-31"}
 ```
 
 ## Aggregation Examples
 
 ### Count Records by Organization
 ```
-GET /api/contacts/contacts/?aggregate={"count":"id","group_by":"organization"}
+GET /api/v1/contacts/contacts/?aggregate={"count":"id","group_by":"organization"}
 ```
 
 ### Multiple Aggregations
 ```
-GET /api/contacts/contacts/?aggregate={"count":"id","group_by":["organization","is_active"]}
+GET /api/v1/contacts/contacts/?aggregate={"count":"id","group_by":["organization","is_active"]}
 ```
 
 ### Combining with Filters
 ```
-GET /api/contacts/contacts/?filters={"is_active":true}&aggregate={"count":"id","group_by":"organization"}
+GET /api/v1/contacts/contacts/?filters={"is_active":true}&aggregate={"count":"id","group_by":"organization"}
 ``` 

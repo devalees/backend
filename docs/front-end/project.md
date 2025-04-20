@@ -1,12 +1,12 @@
 # Project API Documentation
 
 ## Base URL
-All endpoints are prefixed with `/api/projects/`
+All API endpoints are prefixed with `/api/v1/project/`
 
 ## Authentication
-All endpoints require JWT authentication. Include the JWT token in the Authorization header:
+All endpoints require JWT token authentication. Include the token in the Authorization header:
 ```
-Authorization: Bearer <your_jwt_token>
+Authorization: Bearer <token>
 ```
 
 ## Endpoints
@@ -16,243 +16,175 @@ Authorization: Bearer <your_jwt_token>
 #### List Projects
 - **URL**: `/projects/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
-  - `search`: Search projects by title or description
-  - `ordering`: Order projects by field (prefix with - for descending)
-    - Available fields: `created_at`, `start_date`, `end_date`, `status`, `priority`
-  - Default ordering: `-created_at`
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of project objects
-
-#### Get Project
-- **URL**: `/projects/{id}/`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Project object
+  - `search`: Search in title and description
+  - `ordering`: Order by created_at, start_date, end_date, status, priority
+  - `status`: Filter by status (new, in_progress, on_hold, completed)
+  - `priority`: Filter by priority (low, medium, high)
+- **Response**: List of projects with pagination
 
 #### Create Project
 - **URL**: `/projects/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
+- **Request Body**:
+  ```json
+  {
     "title": "string",
     "description": "string",
-    "start_date": "date",
-    "end_date": "date",
+    "start_date": "datetime",
+    "end_date": "datetime",
     "status": "string",
     "priority": "string",
-    "owner_id": "integer",
-    "team_member_ids": ["integer"],
-    "organization_id": "integer"
-}
-```
+    "organization": "integer",
+    "estimated_hours": "decimal"
+  }
+  ```
+
+#### Get Project
+- **URL**: `/projects/{id}/`
+- **Method**: `GET`
+- **Response**: Project details
 
 #### Update Project
 - **URL**: `/projects/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Project
 
 #### Delete Project
 - **URL**: `/projects/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
 
-#### Add Team Members
-- **URL**: `/projects/{id}/add_team_members/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "user_ids": ["integer"]
-}
-```
+#### Project Actions
+- **Add Team Members**
+  - **URL**: `/projects/{id}/add_team_members/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user_ids": [1, 2, 3]}`
 
-#### Remove Team Members
-- **URL**: `/projects/{id}/remove_team_members/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "user_ids": ["integer"]
-}
-```
+- **Remove Team Members**
+  - **URL**: `/projects/{id}/remove_team_members/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user_ids": [1, 2, 3]}`
+
+- **Time Entries**
+  - **URL**: `/projects/{id}/time_entries/`
+  - **Method**: `GET`
+
+- **Time Report**
+  - **URL**: `/projects/{id}/time_report/`
+  - **Method**: `GET`
+
+- **Burndown Chart**
+  - **URL**: `/projects/{id}/burndown/`
+  - **Method**: `GET`
+
+- **Time Dashboard**
+  - **URL**: `/projects/{id}/time_dashboard/`
+  - **Method**: `GET`
 
 ### Tasks
 
 #### List Tasks
 - **URL**: `/tasks/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
-  - `search`: Search tasks by title or description
-  - `ordering`: Order tasks by field (prefix with - for descending)
-    - Available fields: `created_at`, `due_date`, `status`, `priority`
-  - Default ordering: `due_date`
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of task objects
-
-#### Get Task
-- **URL**: `/tasks/{id}/`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Task object
+  - `search`: Search in title and description
+  - `ordering`: Order by created_at, due_date, status, priority
+  - `status`: Filter by status (todo, in_progress, done)
+  - `priority`: Filter by priority (low, medium, high)
+  - `project`: Filter by project ID
+  - `assigned_to`: Filter by assigned user ID
 
 #### Create Task
 - **URL**: `/tasks/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
+- **Request Body**:
+  ```json
+  {
     "title": "string",
     "description": "string",
     "due_date": "datetime",
     "status": "string",
     "priority": "string",
     "project": "integer",
-    "assigned_to_id": "integer",
-    "parent_task": "integer"
-}
-```
+    "assigned_to": "integer",
+    "parent_task": "integer",
+    "estimated_hours": "decimal"
+  }
+  ```
+
+#### Get Task
+- **URL**: `/tasks/{id}/`
+- **Method**: `GET`
 
 #### Update Task
 - **URL**: `/tasks/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
 
 #### Delete Task
 - **URL**: `/tasks/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
 
-#### Assign Task
-- **URL**: `/tasks/{id}/assign/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "user_id": "integer"
-}
-```
+#### Task Actions
+- **Assign Task**
+  - **URL**: `/tasks/{id}/assign/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user_id": 1}`
 
-#### Change Task Status
-- **URL**: `/tasks/{id}/change_status/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "status": "string"
-}
-```
+- **Change Status**
+  - **URL**: `/tasks/{id}/change_status/`
+  - **Method**: `POST`
+  - **Request Body**: `{"status": "string"}`
+
+- **Time Entries**
+  - **URL**: `/tasks/{id}/time_entries/`
+  - **Method**: `GET`
 
 ### Project Templates
 
-#### List Project Templates
+#### List Templates
 - **URL**: `/project-templates/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
-  - `search`: Search templates by title or description
-  - `ordering`: Order templates by field (prefix with - for descending)
-    - Available fields: `created_at`, `estimated_duration`
-  - Default ordering: `-created_at`
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of project template objects
+  - `search`: Search in title and description
+  - `ordering`: Order by created_at, estimated_duration
 
-#### Get Project Template
-- **URL**: `/project-templates/{id}/`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Project template object
-
-#### Create Project Template
+#### Create Template
 - **URL**: `/project-templates/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
+- **Request Body**:
+  ```json
+  {
     "title": "string",
     "description": "string",
     "estimated_duration": "integer",
     "default_status": "string",
     "default_priority": "string",
     "organization": "integer"
-}
-```
+  }
+  ```
 
-#### Update Project Template
-- **URL**: `/project-templates/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
-
-#### Delete Project Template
-- **URL**: `/project-templates/{id}/`
-- **Method**: `DELETE`
-- **Auth Required**: Yes
-
-#### Create Project from Template
-- **URL**: `/project-templates/{id}/create_project/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "start_date": "date",
-    "end_date": "date",
-    "owner_id": "integer"
-}
-```
+#### Template Actions
+- **Create Project from Template**
+  - **URL**: `/project-templates/{id}/create_project/`
+  - **Method**: `POST`
+  - **Request Body**: Project creation parameters
 
 ### Task Templates
 
-#### List Task Templates
+#### List Templates
 - **URL**: `/task-templates/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
-  - `search`: Search templates by title or description
-  - `ordering`: Order templates by field (prefix with - for descending)
-    - Available fields: `order`, `created_at`, `estimated_duration`
-  - Default ordering: `order`, `created_at`
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of task template objects
+  - `search`: Search in title and description
+  - `ordering`: Order by order, created_at, estimated_duration
+  - `project_template`: Filter by project template ID
 
-#### Get Task Template
-- **URL**: `/task-templates/{id}/`
-- **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Task template object
-
-#### Create Task Template
+#### Create Template
 - **URL**: `/task-templates/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
+- **Request Body**:
+  ```json
+  {
     "title": "string",
     "description": "string",
     "estimated_duration": "integer",
@@ -261,161 +193,227 @@ Authorization: Bearer <your_jwt_token>
     "project_template": "integer",
     "parent_task_template": "integer",
     "order": "integer"
-}
-```
+  }
+  ```
 
-#### Update Task Template
-- **URL**: `/task-templates/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+### Project Schedules
 
-#### Delete Task Template
-- **URL**: `/task-templates/{id}/`
-- **Method**: `DELETE`
-- **Auth Required**: Yes
+#### List Schedules
+- **URL**: `/schedules/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `search`: Search in description and project title
+  - `ordering`: Order by created_at, estimated_start_date, estimated_end_date, progress
 
-## Data Models
-
-### Project Object
-```json
-{
-    "id": "integer",
-    "title": "string",
+#### Create Schedule
+- **URL**: `/schedules/`
+- **Method**: `POST`
+- **Request Body**:
+  ```json
+  {
+    "project": "integer",
+    "estimated_start_date": "datetime",
+    "estimated_end_date": "datetime",
     "description": "string",
-    "start_date": "date",
-    "end_date": "date",
-    "status": "string",
-    "priority": "string",
-    "owner": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "team_members": [
-        {
-            "id": "integer",
-            "username": "string",
-            "email": "string"
-        }
-    ],
-    "organization": {
-        "id": "integer",
-        "name": "string"
-    },
-    "created_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "updated_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "tasks": ["Task Object"],
-    "task_count": "integer"
-}
-```
+    "is_baseline": "boolean",
+    "progress": "integer",
+    "estimated_hours": "decimal"
+  }
+  ```
 
-### Task Object
-```json
-{
-    "id": "integer",
-    "title": "string",
+#### Schedule Actions
+- **Set Baseline**
+  - **URL**: `/schedules/{id}/set_baseline/`
+  - **Method**: `POST`
+
+- **Get Progress**
+  - **URL**: `/schedules/{id}/progress/`
+  - **Method**: `GET`
+
+### Project Phases
+
+#### List Phases
+- **URL**: `/phases/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `search`: Search in name and description
+  - `ordering`: Order by order, start_date, end_date, progress
+  - `schedule`: Filter by schedule ID
+
+#### Create Phase
+- **URL**: `/phases/`
+- **Method**: `POST`
+- **Request Body**:
+  ```json
+  {
+    "name": "string",
     "description": "string",
+    "schedule": "integer",
+    "start_date": "datetime",
+    "end_date": "datetime",
+    "order": "integer",
+    "is_active": "boolean",
+    "progress": "integer",
+    "estimated_hours": "decimal"
+  }
+  ```
+
+#### Phase Actions
+- **Reorder**
+  - **URL**: `/phases/{id}/reorder/`
+  - **Method**: `POST`
+  - **Request Body**: `{"new_order": 1}`
+
+- **Time Entries**
+  - **URL**: `/phases/{id}/time_entries/`
+  - **Method**: `GET`
+
+### Milestones
+
+#### List Milestones
+- **URL**: `/milestones/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `search`: Search in name and description
+  - `ordering`: Order by due_date, status
+  - `schedule`: Filter by schedule ID
+  - `phase`: Filter by phase ID
+
+#### Create Milestone
+- **URL**: `/milestones/`
+- **Method**: `POST`
+- **Request Body**:
+  ```json
+  {
+    "name": "string",
+    "description": "string",
+    "schedule": "integer",
+    "phase": "integer",
     "due_date": "datetime",
     "status": "string",
-    "priority": "string",
-    "project": "integer",
-    "assigned_to": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "parent_task": "integer",
-    "created_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "updated_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "created_at": "datetime",
-    "updated_at": "datetime"
-}
-```
+    "completion_percentage": "integer",
+    "estimated_hours": "decimal"
+  }
+  ```
 
-### Project Template Object
-```json
-{
-    "id": "integer",
-    "title": "string",
-    "description": "string",
-    "estimated_duration": "integer",
-    "default_status": "string",
-    "default_priority": "string",
-    "organization": "integer",
-    "task_templates": ["Task Template Object"],
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "created_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "updated_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    }
-}
-```
+#### Milestone Actions
+- **Complete**
+  - **URL**: `/milestones/{id}/complete/`
+  - **Method**: `POST`
 
-### Task Template Object
-```json
-{
-    "id": "integer",
+- **Change Status**
+  - **URL**: `/milestones/{id}/change_status/`
+  - **Method**: `POST`
+  - **Request Body**: `{"status": "string"}`
+
+- **Time Entries**
+  - **URL**: `/milestones/{id}/time_entries/`
+  - **Method**: `GET`
+
+### Project Discussions
+
+#### List Discussions
+- **URL**: `/projects/{project_id}/discussions/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `search`: Search in title and content
+  - `ordering`: Order by created_at
+  - `is_active`: Filter by active status
+
+#### Create Discussion
+- **URL**: `/projects/{project_id}/discussions/`
+- **Method**: `POST`
+- **Request Body**:
+  ```json
+  {
     "title": "string",
-    "description": "string",
-    "estimated_duration": "integer",
-    "default_status": "string",
-    "default_priority": "string",
-    "project_template": "integer",
-    "parent_task_template": "integer",
-    "order": "integer",
-    "subtask_templates": ["Task Template Object"],
-    "created_at": "datetime",
-    "updated_at": "datetime",
-    "created_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    },
-    "updated_by": {
-        "id": "integer",
-        "username": "string",
-        "email": "string"
-    }
-}
-```
+    "content": "string",
+    "is_active": "boolean"
+  }
+  ```
+
+### Discussion Attachments
+
+#### List Attachments
+- **URL**: `/projects/{project_id}/discussions/{discussion_id}/attachments/`
+- **Method**: `GET`
+
+#### Upload Attachment
+- **URL**: `/projects/{project_id}/discussions/{discussion_id}/attachments/`
+- **Method**: `POST`
+- **Request Body**: Multipart form data with file
+
+### Discussion Notifications
+
+#### List Notifications
+- **URL**: `/user-notifications/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `is_read`: Filter by read status
+
+#### Mark Notification as Read
+- **URL**: `/user-notifications/{id}/mark_read/`
+- **Method**: `POST`
+
+#### Mark All Notifications as Read
+- **URL**: `/user-notifications/mark_all_read/`
+- **Method**: `POST`
 
 ## Error Responses
 
-All endpoints may return the following error responses:
+### 400 Bad Request
+```json
+{
+  "detail": "Error message describing the issue"
+}
+```
 
-- **Code**: 400 BAD REQUEST
-  - **Content**: `{"detail": "Error message"}`
-- **Code**: 401 UNAUTHORIZED
-  - **Content**: `{"detail": "Authentication credentials were not provided"}`
-- **Code**: 403 FORBIDDEN
-  - **Content**: `{"detail": "You do not have permission to perform this action"}`
-- **Code**: 404 NOT FOUND
-  - **Content**: `{"detail": "Not found"}`
-- **Code**: 500 INTERNAL SERVER ERROR
-  - **Content**: `{"detail": "Internal server error"}` 
+### 401 Unauthorized
+```json
+{
+  "detail": "Authentication credentials were not provided"
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "detail": "You do not have permission to perform this action"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "detail": "Not found"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "detail": "Internal server error"
+}
+```
+
+## Rate Limiting
+API requests are rate-limited to prevent abuse. The current limits are:
+- 100 requests per minute per user
+- 1000 requests per hour per user
+
+## Pagination
+List endpoints support pagination with the following parameters:
+- `page`: Page number (default: 1)
+- `page_size`: Items per page (default: 10, max: 100)
+
+Response format for paginated endpoints:
+```json
+{
+  "count": "total number of items",
+  "next": "URL for next page",
+  "previous": "URL for previous page",
+  "results": [
+    // Array of items
+  ]
+}
+``` 

@@ -43,20 +43,15 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     
-    # API v1 endpoints
-    path('api/v1/', include([
-        path('', include('Apps.core.urls')),
-        path('users/', include('Apps.users.urls', namespace='users')),
-        path('', include('Apps.entity.urls', namespace='entity')),
-        path('', include('Apps.contacts.urls')),
-        path('', include('Apps.data_transfer.urls')),
-        path('projects/', include('Apps.project.urls', namespace='project')),
-        path('time-management/', include('Apps.time_management.urls')),
-        path('automation/', include('Apps.automation.urls', namespace='automation')),
-        path('communication/', include('Apps.communication.urls', namespace='communication')),
-        path('rbac/', include('Apps.rbac.urls', namespace='rbac')),  # RBAC URLs with namespace
-        path('documents/', include('Apps.documents.urls', namespace='documents')),  # Document management URLs
-    ])),
+    # API v1 endpoints - use the central router for the API root
+    path('api/v1/', include('Apps.core.urls')),
+    
+    # Include other app URLs that don't have ViewSets or have custom endpoints
+    path('api/v1/contacts/', include('Apps.contacts.urls')),
+    path('api/v1/data-transfer/', include('Apps.data_transfer.urls')),
+    path('api/v1/time-management/', include('Apps.time_management.urls')),
+    path('api/v1/automation/', include('Apps.automation.urls', namespace='automation')),
+    path('api/v1/communication/', include('Apps.communication.urls', namespace='communication')),
     path('api/import-export/', include('Apps.data_import_export.urls', namespace='data_import_export')),
 ]
 

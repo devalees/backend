@@ -1,12 +1,12 @@
 # Time Management API Documentation
 
-## Overview
-The Time Management API provides endpoints for managing time tracking, timesheets, work schedules, and time categories. This API is designed to help users track their time, manage work schedules, and handle timesheet submissions and approvals.
+## Base URL
+All API endpoints are prefixed with `/api/v1/time-management/`
 
 ## Authentication
-All endpoints require authentication using JWT tokens. Include the token in the Authorization header:
+All endpoints require JWT token authentication. Include the token in the Authorization header:
 ```
-Authorization: Bearer <your_jwt_token>
+Authorization: Bearer <token>
 ```
 
 ## Endpoints
@@ -14,80 +14,69 @@ Authorization: Bearer <your_jwt_token>
 ### Time Categories
 
 #### List Time Categories
-```http
-GET /api/time-management/categories/
-```
-Returns a list of all time categories.
+- **URL**: `/categories/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `search`: Search in name and description
+  - `ordering`: Sort by field (e.g., name, created_at)
+  - `page`: Page number for pagination
+  - `page_size`: Number of items per page
+- **Response**: List of time categories with pagination
 
-**Response**
-```json
-[
-  {
-    "id": 1,
-    "name": "Development",
-    "description": "Software development tasks",
-    "is_billable": true,
-    "created_by": 1,
-    "created_at": "2024-04-18T10:00:00Z",
-    "updated_at": "2024-04-18T10:00:00Z"
-  }
-]
-```
+#### Get Time Category
+- **URL**: `/categories/{id}/`
+- **Method**: `GET`
+- **Response**: Time category details
 
 #### Create Time Category
-```http
-POST /api/time-management/categories/
-```
-Create a new time category.
-
-**Request Body**
+- **URL**: `/categories/`
+- **Method**: `POST`
+- **Request Body**:
 ```json
 {
   "name": "Development",
   "description": "Software development tasks",
-  "is_billable": true
+  "is_billable": true,
+  "color": "#3498db"
 }
 ```
+- **Response**: Created time category details
+
+#### Update Time Category
+- **URL**: `/categories/{id}/`
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Time Category
+- **Response**: Updated time category details
+
+#### Delete Time Category
+- **URL**: `/categories/{id}/`
+- **Method**: `DELETE`
+- **Response**: 204 No Content
 
 ### Time Entries
 
 #### List Time Entries
-```http
-GET /api/time-management/entries/
-```
-Returns a list of time entries for the authenticated user.
+- **URL**: `/entries/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `start_date`: Filter entries from this date (YYYY-MM-DD)
+  - `end_date`: Filter entries until this date (YYYY-MM-DD)
+  - `project_id`: Filter entries by project ID
+  - `search`: Search in description and project name
+  - `ordering`: Sort by field (e.g., start_time, end_time, hours)
+  - `page`: Page number for pagination
+  - `page_size`: Number of items per page
+- **Response**: List of time entries with pagination
 
-**Query Parameters**
-- `start_date`: Filter entries from this date (YYYY-MM-DD)
-- `end_date`: Filter entries until this date (YYYY-MM-DD)
-- `project_id`: Filter entries by project ID
-
-**Response**
-```json
-[
-  {
-    "id": 1,
-    "user": 1,
-    "project": 1,
-    "category": 1,
-    "description": "Feature implementation",
-    "start_time": "2024-04-18T09:00:00Z",
-    "end_time": "2024-04-18T17:00:00Z",
-    "hours": 8.0,
-    "is_billable": true,
-    "created_at": "2024-04-18T10:00:00Z",
-    "updated_at": "2024-04-18T10:00:00Z"
-  }
-]
-```
+#### Get Time Entry
+- **URL**: `/entries/{id}/`
+- **Method**: `GET`
+- **Response**: Time entry details
 
 #### Create Time Entry
-```http
-POST /api/time-management/entries/
-```
-Create a new time entry.
-
-**Request Body**
+- **URL**: `/entries/`
+- **Method**: `POST`
+- **Request Body**:
 ```json
 {
   "project": 1,
@@ -95,63 +84,61 @@ Create a new time entry.
   "description": "Feature implementation",
   "start_time": "2024-04-18T09:00:00Z",
   "end_time": "2024-04-18T17:00:00Z",
-  "is_billable": true
+  "is_billable": true,
+  "task": 1,
+  "project_phase": 1,
+  "milestone": 1
 }
 ```
+- **Response**: Created time entry details
 
-#### Get Time Entry Summary
-```http
-GET /api/time-management/entries/summary/
-```
-Returns a summary of time entries for the authenticated user.
+#### Update Time Entry
+- **URL**: `/entries/{id}/`
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Time Entry
+- **Response**: Updated time entry details
 
-**Query Parameters**
-- `start_date`: Start date for summary (YYYY-MM-DD)
-- `end_date`: End date for summary (YYYY-MM-DD)
+#### Delete Time Entry
+- **URL**: `/entries/{id}/`
+- **Method**: `DELETE`
+- **Response**: 204 No Content
 
-**Response**
-```json
-{
-  "total_hours": 40.0,
-  "billable_hours": 35.0,
-  "non_billable_hours": 5.0
-}
-```
+#### Time Entry Actions
+- **Get Time Entry Summary**
+  - **URL**: `/entries/summary/`
+  - **Method**: `GET`
+  - **Query Parameters**:
+    - `start_date`: Start date for summary (YYYY-MM-DD)
+    - `end_date`: End date for summary (YYYY-MM-DD)
+  - **Response**: Summary of time entries
+  ```json
+  {
+    "total_hours": 40.0,
+    "billable_hours": 35.0,
+    "non_billable_hours": 5.0
+  }
+  ```
 
 ### Timesheets
 
 #### List Timesheets
-```http
-GET /api/time-management/timesheets/
-```
-Returns a list of timesheets for the authenticated user.
+- **URL**: `/timesheets/`
+- **Method**: `GET`
+- **Query Parameters**:
+  - `ordering`: Sort by field (e.g., start_date, end_date, status)
+  - `page`: Page number for pagination
+  - `page_size`: Number of items per page
+- **Response**: List of timesheets with pagination
 
-**Response**
-```json
-[
-  {
-    "id": 1,
-    "user": 1,
-    "start_date": "2024-04-01",
-    "end_date": "2024-04-15",
-    "status": "draft",
-    "total_hours": 80.0,
-    "notes": "Weekly timesheet",
-    "submitted_at": null,
-    "approved_at": null,
-    "created_at": "2024-04-18T10:00:00Z",
-    "updated_at": "2024-04-18T10:00:00Z"
-  }
-]
-```
+#### Get Timesheet
+- **URL**: `/timesheets/{id}/`
+- **Method**: `GET`
+- **Response**: Timesheet details
 
 #### Create Timesheet
-```http
-POST /api/time-management/timesheets/
-```
-Create a new timesheet.
-
-**Request Body**
+- **URL**: `/timesheets/`
+- **Method**: `POST`
+- **Request Body**:
 ```json
 {
   "start_date": "2024-04-01",
@@ -159,79 +146,66 @@ Create a new timesheet.
   "notes": "Weekly timesheet"
 }
 ```
+- **Response**: Created timesheet details
 
-#### Submit Timesheet
-```http
-POST /api/time-management/timesheets/{id}/submit/
-```
-Submit a timesheet for approval.
+#### Update Timesheet
+- **URL**: `/timesheets/{id}/`
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Timesheet
+- **Response**: Updated timesheet details
 
-**Response**
-```json
-{
-  "status": "timesheet submitted"
-}
-```
+#### Delete Timesheet
+- **URL**: `/timesheets/{id}/`
+- **Method**: `DELETE`
+- **Response**: 204 No Content
 
-#### Approve Timesheet
-```http
-POST /api/time-management/timesheets/{id}/approve/
-```
-Approve a submitted timesheet.
+#### Timesheet Actions
+- **Submit Timesheet**
+  - **URL**: `/timesheets/{id}/submit/`
+  - **Method**: `POST`
+  - **Response**: Submission status
+  ```json
+  {
+    "status": "timesheet submitted"
+  }
+  ```
 
-**Response**
-```json
-{
-  "status": "timesheet approved"
-}
-```
+- **Approve Timesheet**
+  - **URL**: `/timesheets/{id}/approve/`
+  - **Method**: `POST`
+  - **Response**: Approval status
+  ```json
+  {
+    "status": "timesheet approved"
+  }
+  ```
 
-#### Reject Timesheet
-```http
-POST /api/time-management/timesheets/{id}/reject/
-```
-Reject a submitted timesheet.
-
-**Response**
-```json
-{
-  "status": "timesheet rejected"
-}
-```
+- **Reject Timesheet**
+  - **URL**: `/timesheets/{id}/reject/`
+  - **Method**: `POST`
+  - **Response**: Rejection status
+  ```json
+  {
+    "status": "timesheet rejected"
+  }
+  ```
 
 ### Timesheet Entries
 
 #### List Timesheet Entries
-```http
-GET /api/time-management/timesheet-entries/
-```
-Returns a list of timesheet entries for the authenticated user.
+- **URL**: `/timesheet-entries/`
+- **Method**: `GET`
+- **Response**: List of timesheet entries with pagination
 
-**Response**
-```json
-[
-  {
-    "id": 1,
-    "timesheet": 1,
-    "time_entry": 1,
-    "date": "2024-04-18",
-    "hours": 8.0,
-    "category": 1,
-    "description": "Feature implementation",
-    "notes": "Completed core functionality",
-    "created_at": "2024-04-18T10:00:00Z",
-    "updated_at": "2024-04-18T10:00:00Z"
-  }
-]
-```
+#### Get Timesheet Entry
+- **URL**: `/timesheet-entries/{id}/`
+- **Method**: `GET`
+- **Response**: Timesheet entry details
 
 #### Create Timesheet Entry
-```http
-POST /api/time-management/timesheet-entries/
-```
-Create a new timesheet entry.
-
-**Request Body**
+- **URL**: `/timesheet-entries/`
+- **Method**: `POST`
+- **Request Body**:
 ```json
 {
   "timesheet": 1,
@@ -243,39 +217,35 @@ Create a new timesheet entry.
   "notes": "Completed core functionality"
 }
 ```
+- **Response**: Created timesheet entry details
+
+#### Update Timesheet Entry
+- **URL**: `/timesheet-entries/{id}/`
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Timesheet Entry
+- **Response**: Updated timesheet entry details
+
+#### Delete Timesheet Entry
+- **URL**: `/timesheet-entries/{id}/`
+- **Method**: `DELETE`
+- **Response**: 204 No Content
 
 ### Work Schedules
 
 #### List Work Schedules
-```http
-GET /api/time-management/schedules/
-```
-Returns a list of work schedules for the authenticated user.
+- **URL**: `/schedules/`
+- **Method**: `GET`
+- **Response**: List of work schedules with pagination
 
-**Response**
-```json
-[
-  {
-    "id": 1,
-    "user": 1,
-    "name": "Default Schedule",
-    "start_time": "09:00:00",
-    "end_time": "17:00:00",
-    "days_of_week": [0, 1, 2, 3, 4],
-    "is_active": true,
-    "created_at": "2024-04-18T10:00:00Z",
-    "updated_at": "2024-04-18T10:00:00Z"
-  }
-]
-```
+#### Get Work Schedule
+- **URL**: `/schedules/{id}/`
+- **Method**: `GET`
+- **Response**: Work schedule details
 
 #### Create Work Schedule
-```http
-POST /api/time-management/schedules/
-```
-Create a new work schedule.
-
-**Request Body**
+- **URL**: `/schedules/`
+- **Method**: `POST`
+- **Request Body**:
 ```json
 {
   "name": "Default Schedule",
@@ -285,79 +255,164 @@ Create a new work schedule.
   "is_active": true
 }
 ```
+- **Response**: Created work schedule details
 
-#### Get Current Work Schedule
-```http
-GET /api/time-management/schedules/current/
-```
-Returns the current active work schedule for the authenticated user.
+#### Update Work Schedule
+- **URL**: `/schedules/{id}/`
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Work Schedule
+- **Response**: Updated work schedule details
 
-**Response**
+#### Delete Work Schedule
+- **URL**: `/schedules/{id}/`
+- **Method**: `DELETE`
+- **Response**: 204 No Content
+
+#### Work Schedule Actions
+- **Get Current Work Schedule**
+  - **URL**: `/schedules/current/`
+  - **Method**: `GET`
+  - **Response**: Current active work schedule details
+
+## Data Models
+
+### Time Category Object
 ```json
 {
-  "id": 1,
-  "user": 1,
-  "name": "Default Schedule",
-  "start_time": "09:00:00",
-  "end_time": "17:00:00",
-  "days_of_week": [0, 1, 2, 3, 4],
-  "is_active": true,
-  "created_at": "2024-04-18T10:00:00Z",
-  "updated_at": "2024-04-18T10:00:00Z"
+  "id": "integer",
+  "name": "string",
+  "description": "string",
+  "is_billable": "boolean",
+  "color": "string",
+  "created_by": "integer",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+### Time Entry Object
+```json
+{
+  "id": "integer",
+  "user": "integer",
+  "project": "integer",
+  "category": "integer",
+  "description": "string",
+  "start_time": "datetime",
+  "end_time": "datetime",
+  "hours": "float",
+  "is_billable": "boolean",
+  "created_at": "datetime",
+  "updated_at": "datetime",
+  "task": "integer",
+  "project_phase": "integer",
+  "milestone": "integer"
+}
+```
+
+### Timesheet Object
+```json
+{
+  "id": "integer",
+  "user": "integer",
+  "start_date": "date",
+  "end_date": "date",
+  "status": "string",
+  "total_hours": "decimal",
+  "notes": "string",
+  "submitted_at": "datetime",
+  "approved_at": "datetime",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+### Timesheet Entry Object
+```json
+{
+  "id": "integer",
+  "timesheet": "integer",
+  "time_entry": "integer",
+  "date": "date",
+  "hours": "float",
+  "category": "integer",
+  "description": "string",
+  "notes": "string",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+### Work Schedule Object
+```json
+{
+  "id": "integer",
+  "user": "integer",
+  "name": "string",
+  "start_time": "time",
+  "end_time": "time",
+  "days_of_week": "array",
+  "is_active": "boolean",
+  "created_at": "datetime",
+  "updated_at": "datetime"
 }
 ```
 
 ## Error Responses
 
-The API uses standard HTTP status codes and returns error messages in the following format:
-
+### 400 Bad Request
 ```json
 {
-  "detail": "Error message description"
+  "detail": "Error message describing the issue"
 }
 ```
 
-Common error codes:
-- 400: Bad Request - Invalid input data
-- 401: Unauthorized - Missing or invalid authentication
-- 403: Forbidden - Insufficient permissions
-- 404: Not Found - Resource not found
-- 500: Internal Server Error - Server-side error
+### 401 Unauthorized
+```json
+{
+  "detail": "Authentication credentials were not provided"
+}
+```
 
-## Data Validation
+### 403 Forbidden
+```json
+{
+  "detail": "You do not have permission to perform this action"
+}
+```
 
-### Time Entries
-- End time must be after start time
-- Hours are automatically calculated from start and end times
-- Hours cannot exceed 24 per entry
+### 404 Not Found
+```json
+{
+  "detail": "Not found"
+}
+```
 
-### Timesheets
-- End date must be after start date
-- Only one timesheet can exist for a user within a date range
-- Total hours are automatically calculated from entries
+### 500 Internal Server Error
+```json
+{
+  "detail": "Internal server error"
+}
+```
 
-### Work Schedules
-- End time must be after start time
-- Days of week must be values between 0 (Monday) and 6 (Sunday)
-- Only one active schedule can exist per user
+## Rate Limiting
+API requests are rate-limited to prevent abuse. The current limits are:
+- 100 requests per minute per user
+- 1000 requests per hour per user
 
-## Best Practices
+## Pagination
+List endpoints support pagination with the following parameters:
+- `page`: Page number (default: 1)
+- `page_size`: Items per page (default: 10, max: 100)
 
-1. **Authentication**
-   - Always include the JWT token in the Authorization header
-   - Handle token expiration and refresh appropriately
-
-2. **Time Entries**
-   - Create entries as soon as possible to ensure accuracy
-   - Use appropriate categories for better reporting
-   - Include detailed descriptions for better tracking
-
-3. **Timesheets**
-   - Submit timesheets before the deadline
-   - Review entries before submission
-   - Include notes for any special circumstances
-
-4. **Work Schedules**
-   - Keep schedules up to date
-   - Use descriptive names for different schedules
-   - Set appropriate working hours and days 
+Response format for paginated endpoints:
+```json
+{
+  "count": "total number of items",
+  "next": "URL for next page",
+  "previous": "URL for previous page",
+  "results": [
+    // Array of items
+  ]
+}
+``` 

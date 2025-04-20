@@ -1,13 +1,18 @@
 # Entity API Documentation
 
 ## Base URL
-All endpoints are prefixed with `/api/entity/`
+All endpoints are prefixed with `/api/v1/entity/`
 
 ## Authentication
 All endpoints require JWT authentication. Include the JWT token in the Authorization header:
 ```
 Authorization: Bearer <your_jwt_token>
 ```
+
+## Role-Based Access Control
+All endpoints implement Role-Based Access Control (RBAC). Users can only access:
+- Resources belonging to organizations they have active roles in
+- Actions their role permissions allow them to perform
 
 ## Endpoints
 
@@ -17,6 +22,9 @@ Authorization: Bearer <your_jwt_token>
 - **URL**: `/organizations/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Query Parameters**:
+  - `search`: Search organizations by name
+  - `ordering`: Order organizations by field (prefix with - for descending)
 - **Success Response**:
   - **Code**: 200 OK
   - **Content**: List of organization objects
@@ -53,6 +61,12 @@ Authorization: Bearer <your_jwt_token>
 - **URL**: `/organizations/{id}/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
+
+#### Hard Delete Organization
+- **URL**: `/organizations/{id}/hard_delete/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+- **Note**: This permanently deletes the organization and all its departments
 
 #### Get Organization Departments
 - **URL**: `/organizations/{id}/department/`
@@ -167,6 +181,8 @@ Authorization: Bearer <your_jwt_token>
 - **Query Parameters**:
   - `organization`: Filter by organization ID
   - `parent`: Filter by parent department ID
+  - `search`: Search departments by name
+  - `ordering`: Order departments by field (prefix with - for descending)
 - **Success Response**:
   - **Code**: 200 OK
   - **Content**: List of department objects
@@ -205,6 +221,12 @@ Authorization: Bearer <your_jwt_token>
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
+#### Hard Delete Department
+- **URL**: `/departments/{id}/hard_delete/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+- **Note**: This permanently deletes the department and all its teams
+
 #### Get Department Teams
 - **URL**: `/departments/{id}/team/`
 - **Method**: `GET`
@@ -237,6 +259,8 @@ Authorization: Bearer <your_jwt_token>
 - **Auth Required**: Yes
 - **Query Parameters**:
   - `department`: Filter by department ID
+  - `search`: Search teams by name
+  - `ordering`: Order teams by field (prefix with - for descending)
 - **Success Response**:
   - **Code**: 200 OK
   - **Content**: List of team objects
@@ -274,6 +298,12 @@ Authorization: Bearer <your_jwt_token>
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
+#### Hard Delete Team
+- **URL**: `/teams/{id}/hard_delete/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+- **Note**: This permanently deletes the team and all its members
+
 #### Get Team Members
 - **URL**: `/teams/{id}/team_member/`
 - **Method**: `GET`
@@ -291,6 +321,8 @@ Authorization: Bearer <your_jwt_token>
 - **Query Parameters**:
   - `team`: Filter by team ID
   - `user`: Filter by user ID
+  - `search`: Search team members by username
+  - `ordering`: Order team members by field (prefix with - for descending)
 - **Success Response**:
   - **Code**: 200 OK
   - **Content**: List of team member objects
@@ -316,6 +348,7 @@ Authorization: Bearer <your_jwt_token>
     "is_active": "boolean"
 }
 ```
+- **Note**: The `role` field accepts one of the following values: "admin", "member", "viewer"
 
 #### Update Team Member
 - **URL**: `/team-members/{id}/`
@@ -328,12 +361,21 @@ Authorization: Bearer <your_jwt_token>
 - **Method**: `DELETE`
 - **Auth Required**: Yes
 
+#### Hard Delete Team Member
+- **URL**: `/team-members/{id}/hard_delete/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+- **Note**: This permanently deletes the team member
+
 ### Organization Settings
 
 #### List Organization Settings
 - **URL**: `/organization-settings/`
 - **Method**: `GET`
 - **Auth Required**: Yes
+- **Query Parameters**:
+  - `organization`: Filter by organization ID
+  - `ordering`: Order settings by field (prefix with - for descending)
 - **Success Response**:
   - **Code**: 200 OK
   - **Content**: List of organization settings objects
@@ -365,6 +407,10 @@ Authorization: Bearer <your_jwt_token>
     }
 }
 ```
+- **Validation Rules**:
+  - `timezone`: Must be a valid timezone from the pytz library
+  - `time_format`: Must be either "12h" or "24h"
+  - `language`: Must be a valid language code (e.g., "en", "es", "fr")
 
 #### Update Organization Settings
 - **URL**: `/organization-settings/{id}/`
@@ -376,6 +422,12 @@ Authorization: Bearer <your_jwt_token>
 - **URL**: `/organization-settings/{id}/`
 - **Method**: `DELETE`
 - **Auth Required**: Yes
+
+#### Hard Delete Organization Settings
+- **URL**: `/organization-settings/{id}/hard_delete/`
+- **Method**: `DELETE`
+- **Auth Required**: Yes
+- **Note**: This permanently deletes the organization settings
 
 #### Get Settings by Organization
 - **URL**: `/organization-settings/get_by_organization/`
@@ -395,11 +447,13 @@ Authorization: Bearer <your_jwt_token>
     "id": "integer",
     "name": "string",
     "description": "string",
+    "status": "string",
     "is_active": "boolean",
     "created_at": "datetime",
     "updated_at": "datetime"
 }
 ```
+- **Note**: The `status` field can be one of: "active", "inactive", "suspended"
 
 ### Department Object
 ```json
@@ -450,6 +504,7 @@ Authorization: Bearer <your_jwt_token>
     "updated_at": "datetime"
 }
 ```
+- **Note**: The `role` field can be one of: "admin", "member", "viewer"
 
 ### Organization Settings Object
 ```json
@@ -479,8 +534,30 @@ All endpoints may return the following error responses:
 - **Code**: 401 UNAUTHORIZED
   - **Content**: `{"error": "Authentication credentials were not provided"}`
 - **Code**: 403 FORBIDDEN
-  - **Content**: `{"error": "You do not have permission to perform this action"}`
+  - **Content**: One of the following:
+    - `{"error": "You do not have permission to perform this action"}`
+    - `{"error": "You do not have the required role to access this resource"}`
+    - `{"error": "Your role does not have permission for this action"}`
+    - `{"error": "You can only access resources in organizations you are a member of"}`
 - **Code**: 404 NOT FOUND
   - **Content**: `{"error": "Not found"}`
 - **Code**: 500 INTERNAL SERVER ERROR
-  - **Content**: `{"error": "Internal server error"}` 
+  - **Content**: `{"error": "Internal server error"}`
+
+## Pagination
+
+All list endpoints support pagination with the following query parameters:
+- `page`: Page number (default: 1)
+- `page_size`: Number of items per page (default: 10, max: 100)
+
+Example response with pagination:
+```json
+{
+    "count": 100,
+    "next": "http://api.example.com/api/v1/entity/organizations/?page=3",
+    "previous": "http://api.example.com/api/v1/entity/organizations/?page=1",
+    "results": [
+        // List of objects
+    ]
+}
+``` 

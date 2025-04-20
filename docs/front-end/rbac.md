@@ -1,12 +1,12 @@
 # RBAC API Documentation
 
 ## Base URL
-All endpoints are prefixed with `/api/rbac/`
+All API endpoints are prefixed with `/api/v1/rbac/`
 
 ## Authentication
-All endpoints require JWT authentication. Include the JWT token in the Authorization header:
+All endpoints require JWT token authentication. Include the token in the Authorization header:
 ```
-Authorization: Bearer <your_jwt_token>
+Authorization: Bearer <token>
 ```
 
 ## Endpoints
@@ -16,28 +16,21 @@ Authorization: Bearer <your_jwt_token>
 #### List Roles
 - **URL**: `/roles/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `name`: Filter by role name
   - `is_active`: Filter by active status
   - `parent`: Filter by parent role ID
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of role objects
+- **Response**: List of roles with pagination
 
 #### Get Role
 - **URL**: `/roles/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Role object
+- **Response**: Role details
 
 #### Create Role
 - **URL**: `/roles/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "name": "string",
@@ -51,42 +44,39 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update Role
 - **URL**: `/roles/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Role
 
 #### Delete Role
 - **URL**: `/roles/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
+
+#### Role Actions
+- **Get Role Permissions**
+  - **URL**: `/roles/{id}/permissions/`
+  - **Method**: `GET`
+  - **Response**: List of permissions assigned to the role
 
 ### Permissions
 
 #### List Permissions
 - **URL**: `/permissions/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `name`: Filter by permission name
   - `code`: Filter by permission code
   - `is_active`: Filter by active status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of permission objects
+- **Response**: List of permissions with pagination
 
 #### Get Permission
 - **URL**: `/permissions/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Permission object
+- **Response**: Permission details
 
 #### Create Permission
 - **URL**: `/permissions/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "name": "string",
@@ -99,44 +89,35 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update Permission
 - **URL**: `/permissions/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Permission
 
 #### Delete Permission
 - **URL**: `/permissions/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
 
 ### User Roles
 
 #### List User Roles
 - **URL**: `/user-roles/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `user`: Filter by user ID
   - `role`: Filter by role ID
   - `organization`: Filter by organization ID
   - `is_active`: Filter by active status
   - `is_delegated`: Filter by delegation status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of user role objects
+- **Response**: List of user roles with pagination
 
 #### Get User Role
 - **URL**: `/user-roles/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: User role object
+- **Response**: User role details
 
 #### Create User Role
 - **URL**: `/user-roles/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "user": "integer",
@@ -152,9 +133,8 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update User Role
 - **URL**: `/user-roles/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Method**: `PUT/PATCH`
+- **Request Body**:
 ```json
 {
     "is_active": "boolean",
@@ -165,41 +145,28 @@ Authorization: Bearer <your_jwt_token>
 #### Delete User Role
 - **URL**: `/user-roles/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
 
-#### Activate User Role
-- **URL**: `/user-roles/{id}/activate/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: `{"status": "role activated"}`
+#### User Role Actions
+- **Activate User Role**
+  - **URL**: `/user-roles/{id}/activate/`
+  - **Method**: `POST`
+  - **Response**: `{"status": "role activated"}`
 
-#### Deactivate User Role
-- **URL**: `/user-roles/{id}/deactivate/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: `{"status": "role deactivated"}`
+- **Deactivate User Role**
+  - **URL**: `/user-roles/{id}/deactivate/`
+  - **Method**: `POST`
+  - **Response**: `{"status": "role deactivated"}`
 
-#### Delegate User Role
-- **URL**: `/user-roles/{id}/delegate/`
-- **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
-```json
-{
-    "user": "integer"
-}
-```
+- **Delegate User Role**
+  - **URL**: `/user-roles/{id}/delegate/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user": "integer"}`
 
 ### Resources
 
 #### List Resources
 - **URL**: `/resources/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `name`: Filter by resource name
   - `resource_type`: Filter by resource type
@@ -207,23 +174,17 @@ Authorization: Bearer <your_jwt_token>
   - `parent`: Filter by parent resource ID
   - `organization`: Filter by organization ID
   - `is_active`: Filter by active status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of resource objects
+- **Response**: List of resources with pagination
 
 #### Get Resource
 - **URL**: `/resources/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Resource object
+- **Response**: Resource details
 
 #### Create Resource
 - **URL**: `/resources/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "name": "string",
@@ -238,44 +199,46 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update Resource
 - **URL**: `/resources/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Resource
 
 #### Delete Resource
 - **URL**: `/resources/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
+
+#### Resource Actions
+- **Grant Access**
+  - **URL**: `/resources/{id}/grant_access/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user": "integer", "access_type": "string"}`
+
+- **Revoke Access**
+  - **URL**: `/resources/{id}/revoke_access/`
+  - **Method**: `POST`
+  - **Request Body**: `{"user": "integer", "access_type": "string"}`
 
 ### Resource Access
 
 #### List Resource Access
 - **URL**: `/resource-accesses/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `resource`: Filter by resource ID
   - `user`: Filter by user ID
   - `organization`: Filter by organization ID
   - `access_type`: Filter by access type
   - `is_active`: Filter by active status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of resource access objects
+- **Response**: List of resource access entries with pagination
 
 #### Get Resource Access
 - **URL**: `/resource-accesses/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Resource access object
+- **Response**: Resource access details
 
 #### Create Resource Access
 - **URL**: `/resource-accesses/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "resource": "integer",
@@ -289,9 +252,8 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update Resource Access
 - **URL**: `/resource-accesses/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Method**: `PUT/PATCH`
+- **Request Body**:
 ```json
 {
     "access_type": "string",
@@ -302,36 +264,37 @@ Authorization: Bearer <your_jwt_token>
 #### Delete Resource Access
 - **URL**: `/resource-accesses/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
+
+#### Resource Access Actions
+- **Activate Resource Access**
+  - **URL**: `/resource-accesses/{id}/activate/`
+  - **Method**: `POST`
+
+- **Deactivate Resource Access**
+  - **URL**: `/resource-accesses/{id}/deactivate/`
+  - **Method**: `POST`
 
 ### Organization Contexts
 
 #### List Organization Contexts
 - **URL**: `/organization-contexts/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `name`: Filter by context name
   - `organization`: Filter by organization ID
   - `parent`: Filter by parent context ID
   - `is_active`: Filter by active status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of organization context objects
+- **Response**: List of organization contexts with pagination
 
 #### Get Organization Context
 - **URL**: `/organization-contexts/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Organization context object
+- **Response**: Organization context details
 
 #### Create Organization Context
 - **URL**: `/organization-contexts/`
 - **Method**: `POST`
-- **Auth Required**: Yes
-- **Data Constraints**:
+- **Request Body**:
 ```json
 {
     "name": "string",
@@ -345,21 +308,47 @@ Authorization: Bearer <your_jwt_token>
 
 #### Update Organization Context
 - **URL**: `/organization-contexts/{id}/`
-- **Method**: `PUT`/`PATCH`
-- **Auth Required**: Yes
-- **Data Constraints**: Same as create
+- **Method**: `PUT/PATCH`
+- **Request Body**: Same as Create Organization Context
 
 #### Delete Organization Context
 - **URL**: `/organization-contexts/{id}/`
 - **Method**: `DELETE`
-- **Auth Required**: Yes
+
+#### Organization Context Actions
+- **Activate Organization Context**
+  - **URL**: `/organization-contexts/{id}/activate/`
+  - **Method**: `POST`
+
+- **Deactivate Organization Context**
+  - **URL**: `/organization-contexts/{id}/deactivate/`
+  - **Method**: `POST`
+
+- **Get Ancestors**
+  - **URL**: `/organization-contexts/{id}/ancestors/`
+  - **Method**: `GET`
+  - **Response**: List of ancestor contexts
+
+- **Get Descendants**
+  - **URL**: `/organization-contexts/{id}/descendants/`
+  - **Method**: `GET`
+  - **Response**: List of descendant contexts
+
+- **Get Children**
+  - **URL**: `/organization-contexts/{id}/children/`
+  - **Method**: `GET`
+  - **Response**: List of child contexts
+
+- **Get Parents**
+  - **URL**: `/organization-contexts/{id}/parents/`
+  - **Method**: `GET`
+  - **Response**: List of parent contexts
 
 ### Audit Logs
 
 #### List Audit Logs
 - **URL**: `/audits/`
 - **Method**: `GET`
-- **Auth Required**: Yes
 - **Query Parameters**:
   - `user`: Filter by user ID
   - `organization`: Filter by organization ID
@@ -367,17 +356,27 @@ Authorization: Bearer <your_jwt_token>
   - `resource_type`: Filter by resource type
   - `resource_id`: Filter by resource ID
   - `status`: Filter by status
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: List of audit log objects
+- **Response**: List of audit logs with pagination
 
 #### Get Audit Log
 - **URL**: `/audits/{id}/`
 - **Method**: `GET`
-- **Auth Required**: Yes
-- **Success Response**:
-  - **Code**: 200 OK
-  - **Content**: Audit log object
+- **Response**: Audit log details
+
+#### Audit Actions
+- **Compliance Report**
+  - **URL**: `/audits/compliance_report/`
+  - **Method**: `GET`
+  - **Query Parameters**:
+    - `report_type`: Type of report (comprehensive, summary, etc.)
+    - `start_date`: Start date for report
+    - `end_date`: End date for report
+  - **Response**: Compliance report data
+
+- **Cleanup Expired**
+  - **URL**: `/audits/cleanup_expired/`
+  - **Method**: `POST`
+  - **Response**: Cleanup results
 
 ## Data Models
 
@@ -558,15 +557,59 @@ Authorization: Bearer <your_jwt_token>
 
 ## Error Responses
 
-All endpoints may return the following error responses:
+### 400 Bad Request
+```json
+{
+  "detail": "Error message describing the issue"
+}
+```
 
-- **Code**: 400 BAD REQUEST
-  - **Content**: `{"detail": "Error message"}`
-- **Code**: 401 UNAUTHORIZED
-  - **Content**: `{"detail": "Authentication credentials were not provided"}`
-- **Code**: 403 FORBIDDEN
-  - **Content**: `{"detail": "You do not have permission to perform this action"}`
-- **Code**: 404 NOT FOUND
-  - **Content**: `{"detail": "Not found"}`
-- **Code**: 500 INTERNAL SERVER ERROR
-  - **Content**: `{"detail": "Internal server error"}` 
+### 401 Unauthorized
+```json
+{
+  "detail": "Authentication credentials were not provided"
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "detail": "You do not have permission to perform this action"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "detail": "Not found"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "detail": "Internal server error"
+}
+```
+
+## Rate Limiting
+API requests are rate-limited to prevent abuse. The current limits are:
+- 100 requests per minute per user
+- 1000 requests per hour per user
+
+## Pagination
+List endpoints support pagination with the following parameters:
+- `page`: Page number (default: 1)
+- `page_size`: Items per page (default: 10, max: 100)
+
+Response format for paginated endpoints:
+```json
+{
+  "count": "total number of items",
+  "next": "URL for next page",
+  "previous": "URL for previous page",
+  "results": [
+    // Array of items
+  ]
+}
+``` 
