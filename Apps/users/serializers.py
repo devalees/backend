@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.models import Permission
 
 User = get_user_model()
 
@@ -11,13 +12,19 @@ class UserSerializer(serializers.ModelSerializer):
     two_factor_enabled = serializers.BooleanField(read_only=True)
     backup_codes = serializers.ListField(read_only=True)
     created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'password', 'password2', 'first_name', 'last_name', 
                  'is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login',
-                 'two_factor_enabled', 'backup_codes', 'created_by')
+                 'two_factor_enabled', 'backup_codes', 'created_by', 'permissions')
         read_only_fields = ('id', 'date_joined', 'last_login')
+
+    def get_permissions(self, obj):
+        if obj.is_superuser:
+            return ['*']  # Superuser has all permissions
+        return list(obj.user_permissions.values_list('codename', flat=True))
 
     def validate(self, attrs):
         if 'password' in attrs and 'password2' in attrs:
