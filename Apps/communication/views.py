@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Audio
+from .models import Audio, RichTextMessage
 from .services.audio import AudioProcessingService
 from .services.transcription import TranscriptionService
 import os
@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from Apps.communication.models import EmailTemplate, EmailTracking, EmailAnalytics
-from Apps.communication.serializers import EmailTemplateSerializer, EmailTrackingSerializer, EmailAnalyticsSerializer
+from Apps.communication.serializers import EmailTemplateSerializer, EmailTrackingSerializer, EmailAnalyticsSerializer, RichTextMessageSerializer
 from Apps.communication.services.email_service import EmailService
 import base64
 import logging
@@ -248,10 +248,41 @@ def transcribe_audio(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+class RichTextMessageViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing rich text messages"""
+    queryset = RichTextMessage.objects.all()
+    serializer_class = RichTextMessageSerializer
+    
+    def perform_create(self, serializer):
+        """Set created_by and updated_by on create"""
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+    
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(
+            updated_by=self.request.user
+        )
+
 class EmailTemplateViewSet(viewsets.ModelViewSet):
     """ViewSet for managing email templates"""
     queryset = EmailTemplate.objects.all()
     serializer_class = EmailTemplateSerializer
+    
+    def perform_create(self, serializer):
+        """Set created_by and updated_by on create"""
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+    
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(
+            updated_by=self.request.user
+        )
     
     @action(detail=True, methods=['post'])
     def send_test(self, request, pk=None):

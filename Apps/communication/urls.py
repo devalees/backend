@@ -4,7 +4,8 @@ from .views import upload_audio, play_audio, compress_audio, transcribe_audio
 from Apps.communication.views import (
     EmailTemplateViewSet,
     EmailTrackingViewSet,
-    EmailAnalyticsViewSet
+    EmailAnalyticsViewSet,
+    RichTextMessageViewSet
 )
 
 app_name = 'communication'
@@ -14,6 +15,7 @@ router = DefaultRouter()
 router.register(r'email-templates', EmailTemplateViewSet)
 router.register(r'email-tracking', EmailTrackingViewSet)
 router.register(r'email-analytics', EmailAnalyticsViewSet)
+router.register(r'rich-text-messages', RichTextMessageViewSet)
 
 urlpatterns = [
     # Audio-related URLs

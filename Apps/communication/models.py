@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from bs4 import BeautifulSoup
 import uuid
+from Apps.core.models import UserTrackedModel, TimeStampedModel
 
 User = get_user_model()
 
@@ -108,7 +109,7 @@ class Audio(models.Model):
         """Return the content type of the audio file."""
         return 'audio/wav'  # Default to WAV, can be extended based on file extension 
 
-class RichTextMessage(models.Model):
+class RichTextMessage(UserTrackedModel):
     content = models.TextField()
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
     thread = models.ForeignKey(Thread, on_delete=models.CASCADE)
@@ -165,14 +166,12 @@ class RichTextMessage(models.Model):
         text = ' '.join(soup.get_text(separator=' ', strip=True).replace(':', '').split())
         return text[:max_length] + ('...' if len(text) > max_length else '')
 
-class EmailTemplate(models.Model):
+class EmailTemplate(UserTrackedModel, TimeStampedModel):
     """Model for storing email templates"""
     name = models.CharField(max_length=255, unique=True)
     subject = models.CharField(max_length=255)
     body = models.TextField()
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def render_subject(self, context):
         """Render email subject with context variables"""
@@ -189,7 +188,7 @@ class EmailTemplate(models.Model):
     def __str__(self):
         return self.name
 
-class EmailTracking(models.Model):
+class EmailTracking(UserTrackedModel):
     """Model for tracking email delivery and status"""
     STATUS_CHOICES = [
         ('sent', 'Sent'),
@@ -212,14 +211,12 @@ class EmailTracking(models.Model):
     def __str__(self):
         return f"{self.recipient_email} - {self.subject}"
 
-class EmailAnalytics(models.Model):
+class EmailAnalytics(UserTrackedModel, TimeStampedModel):
     """Model for tracking email analytics"""
     email_id = models.CharField(max_length=255, unique=True)
     opens = models.IntegerField(default=0)
     clicks = models.IntegerField(default=0)
     bounces = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def increment_opens(self):
         """Increment the number of opens"""

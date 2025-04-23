@@ -5,10 +5,14 @@ from django.core.exceptions import ValidationError
 from Apps.communication.models import EmailTemplate, EmailTracking, EmailAnalytics
 
 class RichTextMessageSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = RichTextMessage
-        fields = ['id', 'content', 'sender', 'thread', 'created_at', 'updated_at']
-        read_only_fields = ['sender', 'created_at', 'updated_at']
+        fields = ['id', 'content', 'sender', 'thread', 'created_at', 'updated_at', 
+                 'created_by', 'created_by_name', 'updated_by', 'updated_by_name']
+        read_only_fields = ['sender', 'created_at', 'updated_at', 'created_by', 'updated_by']
 
     def validate_content(self, value):
         soup = BeautifulSoup(value, 'html.parser')
@@ -52,30 +56,42 @@ class RichTextMessageSerializer(serializers.ModelSerializer):
 
 class EmailTemplateSerializer(serializers.ModelSerializer):
     """Serializer for EmailTemplate model"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = EmailTemplate
-        fields = ['id', 'name', 'subject', 'body', 'is_active', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        fields = ['id', 'name', 'subject', 'body', 'is_active', 'created_at', 'updated_at',
+                 'created_by', 'created_by_name', 'updated_by', 'updated_by_name']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
 class EmailTrackingSerializer(serializers.ModelSerializer):
     """Serializer for EmailTracking model"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = EmailTracking
         fields = [
             'id', 'tracking_id', 'recipient_email', 'subject', 'status',
-            'sent_at', 'opened_at', 'clicked_at', 'bounce_reason'
+            'sent_at', 'opened_at', 'clicked_at', 'bounce_reason',
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name'
         ]
         read_only_fields = [
             'tracking_id', 'sent_at', 'opened_at', 'clicked_at',
-            'bounce_reason'
+            'bounce_reason', 'created_by', 'updated_by'
         ]
 
 class EmailAnalyticsSerializer(serializers.ModelSerializer):
     """Serializer for EmailAnalytics model"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = EmailAnalytics
         fields = [
             'id', 'email_id', 'opens', 'clicks', 'bounces',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'created_by', 'created_by_name', 
+            'updated_by', 'updated_by_name'
         ]
-        read_only_fields = ['created_at', 'updated_at'] 
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by'] 
