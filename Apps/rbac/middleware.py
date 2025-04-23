@@ -8,6 +8,7 @@ class OrganizationIsolationMiddleware:
     """
     Middleware to enforce organization isolation in the RBAC system.
     This middleware ensures that users can only access data from organizations they belong to.
+    Superusers bypass this restriction and can access all organizations' data.
     """
     
     def __init__(self, get_response):
@@ -33,6 +34,10 @@ class OrganizationIsolationMiddleware:
         
         # Skip for unauthenticated users
         if not request.user.is_authenticated:
+            return None
+            
+        # Skip for superusers - they can access all organizations
+        if request.user.is_superuser:
             return None
         
         # Get the organization from the request

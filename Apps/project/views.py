@@ -42,6 +42,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user = self.request.user
         logger.info(f"Getting queryset for user: {user}")
         
+        # Superusers can see all projects
+        if user.is_superuser:
+            logger.info("User is a superuser")
+            return Project.objects.all()
+            
         if user.has_perm('project.view_all_projects'):
             logger.info("User has view_all_projects permission")
             return Project.objects.all()

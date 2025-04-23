@@ -22,6 +22,11 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOrganizationMember]
 
     def get_queryset(self):
+        # Superusers can access all organizations
+        if self.request.user.is_superuser:
+            return Organization.objects.all()
+        
+        # Regular users can only access organizations they are members of
         return Organization.objects.filter(
             Q(departments__teams__members__user=self.request.user)
         ).distinct()

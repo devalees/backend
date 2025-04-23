@@ -428,6 +428,10 @@ class OrganizationContextViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter organization contexts by organization"""
+        # Superusers can see all organization contexts
+        if self.request.user.is_superuser:
+            return OrganizationContext.objects.all()
+        # Regular users can only see organization contexts from their organization
         return OrganizationContext.objects.filter(organization=self.request.user.organization)
     
     def list(self, request, *args, **kwargs):

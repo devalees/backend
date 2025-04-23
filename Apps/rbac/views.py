@@ -23,6 +23,10 @@ class BaseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter queryset based on user's organization"""
+        # Superusers can see all records
+        if self.request.user.is_superuser:
+            return self.queryset
+        # Regular users can only see records from their organization
         return self.queryset.filter(organization=self.request.user.organization)
 
 class RoleViewSet(BaseViewSet):
