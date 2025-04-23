@@ -5,7 +5,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
-from Apps.core.models import BaseModel
+from Apps.core.models import BaseModel, UserTrackedModel
 from Core.models.base import TaskAwareModel
 from django.conf import settings
 from django.utils import timezone
