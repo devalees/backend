@@ -4,14 +4,23 @@ from Apps.entity.models import TeamMember
 class HasOrganizationPermission(permissions.BasePermission):
     """
     Custom permission to check if user belongs to the organization through team membership.
+    Superusers have full access to all operations.
     """
     def has_permission(self, request, view):
+        # Superusers have full access
+        if request.user.is_authenticated and request.user.is_superuser:
+            return True
+            
         # Allow all users to access list and create views
         if view.action in ['list', 'create']:
             return True
         return True  # For now, allow all access. We'll implement proper checks later
 
     def has_object_permission(self, request, view, obj):
+        # Superusers have full access
+        if request.user.is_authenticated and request.user.is_superuser:
+            return True
+            
         # Check if user belongs to the organization through team membership
         return TeamMember.objects.filter(
             user=request.user,

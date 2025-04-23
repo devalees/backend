@@ -388,6 +388,10 @@ class ContactGroupViewSet(viewsets.ModelViewSet):
         """
         queryset = ContactGroup.objects.filter(is_active=True)
         
+        # Superusers can see all contact groups
+        if self.request.user.is_superuser:
+            return queryset
+            
         # Apply filters from query parameters
         if 'filters' in self.request.query_params:
             queryset = apply_filters(queryset, self.request.query_params.get('filters'))
@@ -909,6 +913,10 @@ class ContactListViewSet(viewsets.ModelViewSet):
         # Start with only active lists
         queryset = ContactList.objects.filter(is_active=True)
         
+        # Superusers can see all contact lists
+        if self.request.user.is_superuser:
+            return queryset
+            
         # Get the user's organization
         user_org = None
         if hasattr(self.request.user, 'team_memberships'):

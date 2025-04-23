@@ -71,4 +71,22 @@ class IsOrganizationMember(permissions.BasePermission):
         # Check if user is a member of any team in the organization
         return request.user.team_memberships.filter(
             team__department__organization=organization
-        ).exists() 
+        ).exists()
+
+class SuperuserPermission(permissions.BasePermission):
+    """
+    A permission class that grants all permissions to superusers.
+    This will be used as a global permission class to ensure superusers 
+    have access to all endpoints.
+    """
+    def has_permission(self, request, view):
+        if request.user.is_authenticated and request.user.is_superuser:
+            return True
+        # For non-superusers, defer to other permission classes
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_authenticated and request.user.is_superuser:
+            return True
+        # For non-superusers, defer to other permission classes
+        return True 

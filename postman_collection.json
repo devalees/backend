@@ -1,0 +1,2695 @@
+{
+  "info": {
+    "name": "Project Management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{username}}\",\n    \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/login/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "login", ""]
+            },
+            "description": "Login to get access token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.environment.set(\"access_token\", jsonData.access);",
+                  "pm.environment.set(\"refresh_token\", jsonData.refresh);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/refresh_token/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "refresh_token", ""]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/logout/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "logout", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Entity",
+      "item": [
+        {
+          "name": "Organizations",
+          "item": [
+            {
+              "name": "List Organizations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Organization",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{organization_name}}\",\n    \"description\": \"{{organization_description}}\",\n    \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Departments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/department/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "department", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Team Members",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/team_member/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "team_member", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Analytics",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/analytics/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "analytics", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Activity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/activity/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "activity", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Performance",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/performance/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "performance", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Growth",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organizations/{{organization_id}}/growth/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organizations", "{{organization_id}}", "growth", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Departments",
+          "item": [
+            {
+              "name": "List Departments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/departments/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "departments", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Department",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{department_name}}\",\n    \"description\": \"{{department_description}}\",\n    \"organization\": {{organization_id}},\n    \"parent\": {{parent_department_id}},\n    \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/departments/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "departments", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Department Teams",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/departments/{{department_id}}/team/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "departments", "{{department_id}}", "team", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Department Team Members",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/departments/{{department_id}}/team_member/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "departments", "{{department_id}}", "team_member", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Child Departments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/departments/{{department_id}}/child_department/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "departments", "{{department_id}}", "child_department", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Teams",
+          "item": [
+            {
+              "name": "List Teams",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/teams/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "teams", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Team",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{team_name}}\",\n    \"description\": \"{{team_description}}\",\n    \"department\": {{department_id}},\n    \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/teams/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "teams", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Team Members",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/teams/{{team_id}}/team_member/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "teams", "{{team_id}}", "team_member", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Team Members",
+          "item": [
+            {
+              "name": "List Team Members",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/team-members/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "team-members", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Team Member",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"user\": {{user_id}},\n    \"team\": {{team_id}},\n    \"role\": \"{{role}}\",\n    \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/team-members/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "team-members", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Organization Settings",
+          "item": [
+            {
+              "name": "List Organization Settings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organization-settings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organization-settings", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Organization Settings by Organization",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organization-settings/get_by_organization/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organization-settings", "get_by_organization", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Organization Settings",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"organization\": {{organization_id}},\n    \"settings\": {\n        \"key\": \"value\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/organization-settings/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "organization-settings", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{email}}\",\n    \"username\": \"{{username}}\",\n    \"password\": \"{{password}}\",\n    \"password2\": \"{{password}}\",\n    \"first_name\": \"{{first_name}}\",\n    \"last_name\": \"{{last_name}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/register/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "register", ""]
+            }
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", ""]
+            }
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/{{user_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "{{user_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"old_password\": \"{{old_password}}\",\n    \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/change-password/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "change-password", ""]
+            }
+          }
+        },
+        {
+          "name": "Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"{{email}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/password-reset/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "password-reset", ""]
+            }
+          }
+        },
+        {
+          "name": "Password Reset Confirm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"uidb64\": \"{{uidb64}}\",\n    \"token\": \"{{password_reset_token}}\",\n    \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/password-reset-confirm/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "password-reset-confirm", ""]
+            }
+          }
+        },
+        {
+          "name": "Enable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/enable-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "enable-2fa", ""]
+            }
+          }
+        },
+        {
+          "name": "Confirm 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{2fa_token}}\",\n    \"secret\": \"{{2fa_secret}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/confirm-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "confirm-2fa", ""]
+            }
+          }
+        },
+        {
+          "name": "Disable 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/disable-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "disable-2fa", ""]
+            }
+          }
+        },
+        {
+          "name": "Generate Backup Codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/generate-backup-codes/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "generate-backup-codes", ""]
+            }
+          }
+        },
+        {
+          "name": "Verify Backup Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"{{backup_code}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/verify-backup-code/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "verify-backup-code", ""]
+            }
+          }
+        },
+        {
+          "name": "Verify 2FA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": \"{{user_id}}\",\n    \"token\": \"{{2fa_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/verify-2fa/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "verify-2fa", ""]
+            }
+          }
+        },
+        {
+          "name": "Available Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/available-filters/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "available-filters", ""]
+            }
+          }
+        },
+        {
+          "name": "Available Aggregations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/available-aggregations/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "available-aggregations", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RBAC",
+      "item": [
+        {
+          "name": "Roles",
+          "item": [
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rbac/roles/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rbac", "roles", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Role",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{role_name}}\",\n    \"description\": \"{{role_description}}\",\n    \"organization\": {{organization_id}},\n    \"is_active\": true,\n    \"permissions\": [{{permission_ids}}]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rbac/roles/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rbac", "roles", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Permissions",
+          "item": [
+            {
+              "name": "List Permissions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rbac/permissions/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rbac", "permissions", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/projects/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "projects", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{project_title}}\",\n    \"description\": \"{{project_description}}\",\n    \"start_date\": \"{{start_date}}\",\n    \"end_date\": \"{{end_date}}\",\n    \"status\": \"{{status}}\",\n    \"priority\": \"{{priority}}\",\n    \"owner_id\": {{owner_id}},\n    \"team_member_ids\": [{{team_member_ids}}],\n    \"organization_id\": {{organization_id}}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/projects/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "projects", ""]
+            }
+          }
+        },
+        {
+          "name": "Get Project",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "projects", "{{project_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"{{project_title}}\",\n    \"description\": \"{{project_description}}\",\n    \"start_date\": \"{{start_date}}\",\n    \"end_date\": \"{{end_date}}\",\n    \"status\": \"{{status}}\",\n    \"priority\": \"{{priority}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "projects", "{{project_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "projects", "projects", "{{project_id}}", ""]
+            }
+          }
+        },
+        {
+          "name": "Tasks",
+          "item": [
+            {
+              "name": "List Tasks",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/tasks/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "tasks", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Task",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"{{task_title}}\",\n    \"description\": \"{{task_description}}\",\n    \"status\": \"{{task_status}}\",\n    \"priority\": \"{{task_priority}}\",\n    \"due_date\": \"{{due_date}}\",\n    \"project\": {{project_id}},\n    \"assignee\": {{assignee_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/tasks/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "tasks", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Task",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/tasks/{{task_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "tasks", "{{task_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Task Time Entries",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/tasks/{{task_id}}/time_entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "tasks", "{{task_id}}", "time_entries", ""]
+                }
+              }
+            },
+            {
+              "name": "Project Tasks",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/tasks/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "tasks", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Templates",
+          "item": [
+            {
+              "name": "List Project Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/project-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "project-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Project Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{template_name}}\",\n    \"description\": \"{{template_description}}\",\n    \"organization\": {{organization_id}},\n    \"structure\": {}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/project-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "project-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "List Task Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/task-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "task-templates", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Phases",
+          "item": [
+            {
+              "name": "List Project Phases",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/phases/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "phases", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Project Phase",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{phase_name}}\",\n    \"description\": \"{{phase_description}}\",\n    \"project\": {{project_id}},\n    \"start_date\": \"{{start_date}}\",\n    \"end_date\": \"{{end_date}}\",\n    \"order\": {{order}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/phases/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "phases", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Phase Time Entries",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/phases/{{phase_id}}/time_entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "phases", "{{phase_id}}", "time_entries", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Milestones",
+          "item": [
+            {
+              "name": "List Milestones",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/milestones/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "milestones", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Milestone",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{milestone_name}}\",\n    \"description\": \"{{milestone_description}}\",\n    \"project\": {{project_id}},\n    \"due_date\": \"{{due_date}}\",\n    \"status\": \"{{status}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/milestones/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "milestones", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Milestone Time Entries",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/milestones/{{milestone_id}}/time_entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "milestones", "{{milestone_id}}", "time_entries", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Teams",
+          "item": [
+            {
+              "name": "List Project Team",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/team/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "team", ""]
+                }
+              }
+            },
+            {
+              "name": "Add Team Member",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"user\": {{user_id}},\n    \"role\": \"{{role}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/team/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "team", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Discussions",
+          "item": [
+            {
+              "name": "List Project Discussions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/discussions/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "discussions", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Discussion",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"title\": \"{{discussion_title}}\",\n    \"content\": \"{{discussion_content}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/discussions/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "discussions", ""]
+                }
+              }
+            },
+            {
+              "name": "Discussion Attachments",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/discussions/{{discussion_id}}/attachments/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "discussions", "{{discussion_id}}", "attachments", ""]
+                }
+              }
+            },
+            {
+              "name": "Discussion Notifications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/projects/projects/{{project_id}}/discussions/{{discussion_id}}/notifications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "projects", "projects", "{{project_id}}", "discussions", "{{discussion_id}}", "notifications", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Time Management",
+      "item": [
+        {
+          "name": "Time Entries",
+          "item": [
+            {
+              "name": "List Time Entries",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "entries", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Time Entry",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"project\": {{project_id}},\n    \"category\": {{category_id}},\n    \"description\": \"{{description}}\",\n    \"start_time\": \"{{start_time}}\",\n    \"end_time\": \"{{end_time}}\",\n    \"is_billable\": {{is_billable}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "entries", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Time Entry",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/entries/{{entry_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "entries", "{{entry_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Update Time Entry",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"project\": {{project_id}},\n    \"category\": {{category_id}},\n    \"description\": \"{{description}}\",\n    \"start_time\": \"{{start_time}}\",\n    \"end_time\": \"{{end_time}}\",\n    \"is_billable\": {{is_billable}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/entries/{{entry_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "entries", "{{entry_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Delete Time Entry",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/entries/{{entry_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "entries", "{{entry_id}}", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Time Categories",
+          "item": [
+            {
+              "name": "List Time Categories",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/categories/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "categories", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Time Category",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{category_name}}\",\n    \"description\": \"{{category_description}}\",\n    \"is_billable\": {{is_billable}},\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/categories/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "categories", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Timesheets",
+          "item": [
+            {
+              "name": "List Timesheets",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/timesheets/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "timesheets", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Timesheet",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"user\": {{user_id}},\n    \"start_date\": \"{{start_date}}\",\n    \"end_date\": \"{{end_date}}\",\n    \"status\": \"{{status}}\",\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/timesheets/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "timesheets", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Timesheet Entries",
+          "item": [
+            {
+              "name": "List Timesheet Entries",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/timesheet-entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "timesheet-entries", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Timesheet Entry",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"timesheet\": {{timesheet_id}},\n    \"time_entry\": {{time_entry_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/timesheet-entries/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "timesheet-entries", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Work Schedules",
+          "item": [
+            {
+              "name": "List Work Schedules",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/schedules/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "schedules", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Work Schedule",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"user\": {{user_id}},\n    \"name\": \"{{schedule_name}}\",\n    \"description\": \"{{schedule_description}}\",\n    \"schedule_data\": {\n        \"monday\": {\"start\": \"09:00\", \"end\": \"17:00\"},\n        \"tuesday\": {\"start\": \"09:00\", \"end\": \"17:00\"},\n        \"wednesday\": {\"start\": \"09:00\", \"end\": \"17:00\"},\n        \"thursday\": {\"start\": \"09:00\", \"end\": \"17:00\"},\n        \"friday\": {\"start\": \"09:00\", \"end\": \"17:00\"}\n    },\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/time-management/schedules/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "time-management", "schedules", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", ""]
+            }
+          }
+        },
+        {
+          "name": "Create Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "{{document_title}}",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "{{document_description}}",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "draft",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "classification",
+                  "value": "{{classification_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "{{tag_ids}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Automation",
+      "item": [
+        {
+          "name": "Workflows",
+          "item": [
+            {
+              "name": "List Workflows",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflows/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflows", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Workflow",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{workflow_name}}\",\n    \"description\": \"{{workflow_description}}\",\n    \"status\": \"active\",\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflows/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflows", ""]
+                }
+              }
+            },
+            {
+              "name": "Validate Workflow",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflows/{{workflow_id}}/validate/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflows", "{{workflow_id}}", "validate", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Workflow Templates",
+          "item": [
+            {
+              "name": "List Workflow Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflow-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflow-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Workflow Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{template_name}}\",\n    \"description\": \"{{template_description}}\",\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflow-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflow-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Instantiate Workflow",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/workflow-templates/{{template_id}}/instantiate/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "workflow-templates", "{{template_id}}", "instantiate", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nodes & Connections",
+          "item": [
+            {
+              "name": "List Nodes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/nodes/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "nodes", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Node",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"workflow\": {{workflow_id}},\n    \"node_type\": \"{{node_type}}\",\n    \"name\": \"{{node_name}}\",\n    \"config\": {},\n    \"position_x\": 100,\n    \"position_y\": 100\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/nodes/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "nodes", ""]
+                }
+              }
+            },
+            {
+              "name": "Update Node Position",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"position_x\": 150,\n    \"position_y\": 150\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/nodes/{{node_id}}/position/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "nodes", "{{node_id}}", "position", ""]
+                }
+              }
+            },
+            {
+              "name": "List Connections",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/connections/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "connections", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Connection",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"workflow\": {{workflow_id}},\n    \"source_node\": {{source_node_id}},\n    \"target_node\": {{target_node_id}},\n    \"source_handle\": \"output\",\n    \"target_handle\": \"input\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/connections/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "connections", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reports",
+          "item": [
+            {
+              "name": "List Reports",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/reports/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "reports", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Report",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{report_name}}\",\n    \"description\": \"{{report_description}}\",\n    \"report_type\": \"project\",\n    \"config\": {},\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/reports/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "reports", ""]
+                }
+              }
+            },
+            {
+              "name": "List Report Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/report-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "report-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "List Report Schedules",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/automation/report-schedules/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "automation", "report-schedules", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "Contacts",
+          "item": [
+            {
+              "name": "List Contacts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contact",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{contact_name}}\",\n    \"first_name\": \"{{first_name}}\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"{{phone}}\",\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", ""]
+                }
+              }
+            },
+            {
+              "name": "Get Contact",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Update Contact",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{contact_name}}\",\n    \"first_name\": \"{{first_name}}\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"{{phone}}\",\n    \"organization\": {{organization_id}}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Delete Contact",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                }
+              }
+            },
+            {
+              "name": "Hard Delete Contact",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/hard-delete/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "{{contact_id}}", "hard-delete", ""]
+                }
+              }
+            },
+            {
+              "name": "Refresh Cache",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/refresh_cache/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "refresh_cache", ""]
+                }
+              }
+            },
+            {
+              "name": "Available Filters",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/available_filters/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "available_filters", ""]
+                }
+              }
+            },
+            {
+              "name": "Available Aggregations",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/contacts/available_aggregations/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "contacts", "available_aggregations", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contact Groups",
+          "item": [
+            {
+              "name": "List Contact Groups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/groups/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "groups", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contact Group",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{group_name}}\",\n    \"description\": \"{{group_description}}\",\n    \"organization\": {{organization_id}},\n    \"contacts\": [{{contact_ids}}]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/groups/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "groups", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contact Lists",
+          "item": [
+            {
+              "name": "List Contact Lists",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/lists/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "lists", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contact List",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{list_name}}\",\n    \"description\": \"{{list_description}}\",\n    \"organization\": {{organization_id}},\n    \"contacts\": [{{contact_ids}}]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/lists/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "lists", ""]
+                }
+              }
+            },
+            {
+              "name": "Hard Delete List",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/lists/{{list_id}}/hard_delete/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "lists", "{{list_id}}", "hard_delete", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contact Notes",
+          "item": [
+            {
+              "name": "List Contact Notes",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/notes/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "notes", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Contact Note",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "contact",
+                      "value": "{{contact_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "organization",
+                      "value": "{{organization_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "content",
+                      "value": "{{note_content}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "is_private",
+                      "value": "false",
+                      "type": "text"
+                    },
+                    {
+                      "key": "file_attachment",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/notes/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "notes", ""]
+                }
+              }
+            },
+            {
+              "name": "Download File",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/notes/{{note_id}}/download/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "notes", "{{note_id}}", "download", ""]
+                }
+              }
+            },
+            {
+              "name": "Hard Delete Note",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/notes/{{note_id}}/hard-delete/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "notes", "{{note_id}}", "hard-delete", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Communications",
+          "item": [
+            {
+              "name": "List Communications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communications", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Communication",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"contact\": {{contact_id}},\n    \"organization\": {{organization_id}},\n    \"type\": \"{{type}}\",\n    \"subject\": \"{{subject}}\",\n    \"content\": \"{{content}}\",\n    \"status\": \"draft\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communications/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communications", ""]
+                }
+              }
+            },
+            {
+              "name": "Send Communication",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/send/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communications", "{{communication_id}}", "send", ""]
+                }
+              }
+            },
+            {
+              "name": "Schedule Communication",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"scheduled_time\": \"{{scheduled_time}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/schedule/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communications", "{{communication_id}}", "schedule", ""]
+                }
+              }
+            },
+            {
+              "name": "Cancel Communication",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/cancel/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communications", "{{communication_id}}", "cancel", ""]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Communication Templates",
+          "item": [
+            {
+              "name": "List Communication Templates",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communication-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communication-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Communication Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"{{template_name}}\",\n    \"description\": \"{{template_description}}\",\n    \"organization\": {{organization_id}},\n    \"type\": \"{{type}}\",\n    \"subject\": \"{{subject}}\",\n    \"content\": \"{{content}}\",\n    \"variables\": [\"{{variable_names}}\"]\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communication-templates/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communication-templates", ""]
+                }
+              }
+            },
+            {
+              "name": "Create Communication From Template",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"contact\": {{contact_id}},\n    \"variables\": {\n        \"name\": \"{{contact_name}}\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/communication-templates/{{template_id}}/create_communication/",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "communication-templates", "{{template_id}}", "create_communication", ""]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+} 
