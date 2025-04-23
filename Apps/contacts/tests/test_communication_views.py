@@ -30,8 +30,8 @@ class TestCommunicationViewSet:
             updated_by=self.user,
             organization=self.contact.organization
         )
-        self.detail_url = reverse('communication-detail', kwargs={'pk': self.communication.id})
-        self.list_url = reverse('communication-list')
+        self.detail_url = reverse('contacts:communication-detail', kwargs={'pk': self.communication.id})
+        self.list_url = reverse('contacts:communication-list')
         
         # Clear cache
         cache.clear()
@@ -297,7 +297,7 @@ class TestCommunicationViewSet:
         
     def test_hard_delete_communication(self):
         """Test hard deleting a communication"""
-        hard_delete_url = reverse('communication-hard-delete', kwargs={'pk': self.communication.id})
+        hard_delete_url = reverse('contacts:communication-hard-delete', kwargs={'pk': self.communication.id})
         
         request = self.factory.delete(hard_delete_url)
         force_authenticate(request, user=self.user)
@@ -327,7 +327,7 @@ class TestCommunicationViewSet:
         cache.delete(cache_key)
         
         # Make request to refresh cache
-        url = f"{reverse('communication-refresh-cache')}?organization={org_id}"
+        url = f"{reverse('contacts:communication-refresh-cache')}?organization={org_id}"
         request = self.factory.get(url)
         force_authenticate(request, user=self.user)
         view = CommunicationViewSet.as_view({'get': 'refresh_cache'})
@@ -347,7 +347,7 @@ class TestCommunicationViewSet:
         
     def test_refresh_cache_endpoint_missing_org(self):
         """Test refreshing cache without org param"""
-        url = reverse('communication-refresh-cache')
+        url = reverse('contacts:communication-refresh-cache')
         request = self.factory.get(url)
         force_authenticate(request, user=self.user)
         view = CommunicationViewSet.as_view({'get': 'refresh_cache'})
@@ -358,7 +358,7 @@ class TestCommunicationViewSet:
         
     def test_send_communication_endpoint(self):
         """Test sending a communication"""
-        send_url = reverse('communication-send', kwargs={'pk': self.communication.id})
+        send_url = reverse('contacts:communication-send', kwargs={'pk': self.communication.id})
         
         request = self.factory.post(send_url)
         force_authenticate(request, user=self.user)
@@ -383,7 +383,7 @@ class TestCommunicationViewSet:
         
     def test_schedule_communication_endpoint(self):
         """Test scheduling a communication"""
-        schedule_url = reverse('communication-schedule', kwargs={'pk': self.communication.id})
+        schedule_url = reverse('contacts:communication-schedule', kwargs={'pk': self.communication.id})
         future_time = (timezone.now() + datetime.timedelta(hours=1)).isoformat()
         
         data = {
@@ -421,7 +421,7 @@ class TestCommunicationViewSet:
         self.communication.scheduled_at = timezone.now() + datetime.timedelta(hours=1)
         self.communication.save()
         
-        cancel_url = reverse('communication-cancel', kwargs={'pk': self.communication.id})
+        cancel_url = reverse('contacts:communication-cancel', kwargs={'pk': self.communication.id})
         
         request = self.factory.post(cancel_url)
         force_authenticate(request, user=self.user)
@@ -465,8 +465,8 @@ class TestCommunicationTemplateViewSet:
             communication_type='email'
         )
         
-        self.detail_url = reverse('communicationtemplate-detail', kwargs={'pk': self.template.id})
-        self.list_url = reverse('communicationtemplate-list')
+        self.detail_url = reverse('contacts:communicationtemplate-detail', kwargs={'pk': self.template.id})
+        self.list_url = reverse('contacts:communicationtemplate-list')
         
     def test_list_templates(self):
         """Test listing templates"""
@@ -564,7 +564,7 @@ class TestCommunicationTemplateViewSet:
         
     def test_create_communication_from_template(self):
         """Test creating a communication from a template"""
-        create_comm_url = reverse('communicationtemplate-create-communication', kwargs={'pk': self.template.id})
+        create_comm_url = reverse('contacts:communicationtemplate-create-communication', kwargs={'pk': self.template.id})
         
         data = {
             'contact': self.contact.id
@@ -616,8 +616,8 @@ class TestCommunicationMonitoringViewSet:
             activity_type='view'
         )
         
-        self.detail_url = reverse('communicationmonitoring-detail', kwargs={'pk': self.activity.id})
-        self.list_url = reverse('communicationmonitoring-list')
+        self.detail_url = reverse('contacts:communicationmonitoring-detail', kwargs={'pk': self.activity.id})
+        self.list_url = reverse('contacts:communicationmonitoring-list')
         
     def test_list_activities(self):
         """Test listing monitoring activities"""

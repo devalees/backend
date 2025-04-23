@@ -39,8 +39,8 @@ class TestContactListViewSet:
             updated_by=self.user,
             organization=self.organization
         )
-        self.detail_url = reverse('contactlist-detail', kwargs={'pk': self.contact_list.id})
-        self.list_url = reverse('contactlist-list')
+        self.detail_url = reverse('contacts:contactlist-detail', kwargs={'pk': self.contact_list.id})
+        self.list_url = reverse('contacts:contactlist-list')
         
         # Clear cache
         cache.clear()
@@ -189,7 +189,7 @@ class TestContactListViewSet:
     def test_hard_delete_contact_list(self):
         """Test hard deleting a contact list"""
         # Use the correct URL format for actions
-        hard_delete_url = reverse('contactlist-hard-delete', kwargs={'pk': self.contact_list.id})
+        hard_delete_url = reverse('contacts:contactlist-hard-delete', kwargs={'pk': self.contact_list.id})
         
         request = self.factory.delete(hard_delete_url)
         force_authenticate(request, user=self.user)
@@ -243,7 +243,7 @@ class TestContactListViewSet:
         other_list = ContactListFactory(organization=other_org, created_by=other_user)
         
         # The main test user should not have access to this list
-        other_detail_url = reverse('contactlist-detail', kwargs={'pk': other_list.id})
+        other_detail_url = reverse('contacts:contactlist-detail', kwargs={'pk': other_list.id})
         request = self.factory.get(other_detail_url)
         force_authenticate(request, user=self.user)
         view = ContactListViewSet.as_view({'get': 'retrieve'})

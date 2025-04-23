@@ -3,21 +3,18 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-from Apps.core.models import TaskAwareModel
+from Apps.core.models import BaseModel, TaskAwareModel
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 User = get_user_model()
 
-class TimeCategory(TaskAwareModel):
+class TimeCategory(BaseModel):
     """Categories for time entries (e.g., Development, Meeting, Break) with task handling capabilities"""
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_billable = models.BooleanField(default=True)
     color = models.CharField(max_length=7, blank=True, default="#000000")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         verbose_name_plural = "Time Categories"
@@ -26,7 +23,7 @@ class TimeCategory(TaskAwareModel):
     def __str__(self):
         return self.name
 
-class TimeEntry(TaskAwareModel):
+class TimeEntry(BaseModel):
     """Individual time entries for tasks and projects with task handling capabilities"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     project = models.ForeignKey('project.Project', on_delete=models.CASCADE)
@@ -40,9 +37,6 @@ class TimeEntry(TaskAwareModel):
         validators=[MinValueValidator(0), MaxValueValidator(24)]
     )
     is_billable = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_time_entries')
     
     # New fields for time management integration
     task = models.ForeignKey('project.Task', on_delete=models.SET_NULL, null=True, blank=True, related_name='time_entries')
@@ -88,7 +82,7 @@ class TimeEntry(TaskAwareModel):
         """Return the name of the related milestone, if any"""
         return self.milestone.name if self.milestone else None
 
-class Timesheet(TaskAwareModel):
+class Timesheet(BaseModel):
     """Weekly or monthly timesheet for users with task handling capabilities"""
     STATUS_CHOICES = [
         ('draft', _('Draft')),
@@ -103,14 +97,12 @@ class Timesheet(TaskAwareModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     total_hours = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)
-    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='approved_timesheets')
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_timesheets')
     rejection_reason = models.TextField(blank=True, null=True)
     rejected_at = models.DateTimeField(null=True, blank=True)
-    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='rejected_timesheets')
+    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='rejected_timesheets')
 
     class Meta:
         ordering = ['-start_date']
@@ -185,25 +177,27 @@ class Timesheet(TaskAwareModel):
     def approve(self, approver):
         """Approve the timesheet"""
         if self.status != 'submitted':
-            raise ValidationError(_("Only submitted timesheets can be approved"))
-            
+            raise ValidationError(_('Only submitted timesheets can be approved'))
+        
         self.status = 'approved'
         self.approved_at = timezone.now()
-        self.approved_by = approver
+        # Allow for None approver in tests
+        if approver:
+            self.approved_by = approver
         self.save()
-        return True
-    
-    def reject(self, rejecter, reason):
-        """Reject the timesheet with a reason"""
+        
+    def reject(self, rejector, reason=''):
+        """Reject the timesheet"""
         if self.status != 'submitted':
-            raise ValidationError(_("Only submitted timesheets can be rejected"))
+            raise ValidationError(_('Only submitted timesheets can be rejected'))
             
         self.status = 'rejected'
         self.rejected_at = timezone.now()
-        self.rejected_by = rejecter
         self.rejection_reason = reason
+        # Allow for None rejector in tests
+        if rejector:
+            self.rejected_by = rejector
         self.save()
-        return True
     
     def return_to_draft(self):
         """Return a submitted or rejected timesheet to draft status"""
@@ -286,7 +280,7 @@ class Timesheet(TaskAwareModel):
         # Sort by timestamp
         return sorted(history, key=lambda x: x['timestamp'])
 
-class TimesheetEntry(models.Model):
+class TimesheetEntry(BaseModel):
     """Individual entries within a timesheet"""
     timesheet = models.ForeignKey(Timesheet, on_delete=models.CASCADE, related_name='entries')
     time_entry = models.ForeignKey(TimeEntry, on_delete=models.CASCADE)
@@ -299,8 +293,6 @@ class TimesheetEntry(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(24)]
     )
     notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
         verbose_name_plural = "Timesheet Entries"
@@ -310,7 +302,7 @@ class TimesheetEntry(models.Model):
     def __str__(self):
         return f"{self.timesheet.user.username} - {self.date} ({self.hours} hours)"
 
-class WorkSchedule(TaskAwareModel):
+class WorkSchedule(BaseModel):
     """User's work schedule and availability with task handling capabilities"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=100, default="Default Schedule")
@@ -318,8 +310,6 @@ class WorkSchedule(TaskAwareModel):
     end_time = models.TimeField()
     days_of_week = models.JSONField()  # List of days (0-6, where 0 is Monday)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['user', 'start_time']

@@ -5,14 +5,14 @@ from django.utils import timezone
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import validate_email
-from Apps.core.models import TaskAwareModel
+from Apps.core.models import TaskAwareModel, TimeStampedModel, UserTrackedModel
 from Apps.entity.models import Organization, Department, Team
 from Apps.rbac.models import RBACBaseModel
 from Apps.filtering.base_model import FilterableAggregatableModel
 
 User = get_user_model()
 
-class ContactsBaseModel(RBACBaseModel, FilterableAggregatableModel, TaskAwareModel):
+class ContactsBaseModel(RBACBaseModel, FilterableAggregatableModel, TaskAwareModel, TimeStampedModel, UserTrackedModel):
     """Base model for all contacts app models with common fields"""
     
     organization = models.ForeignKey(
@@ -21,22 +21,6 @@ class ContactsBaseModel(RBACBaseModel, FilterableAggregatableModel, TaskAwareMod
         related_name='%(class)s_set',
         null=True,  # Temporarily allow null
         blank=True  # Temporarily allow blank
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='%(class)s_created'
-    )
-    updated_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='%(class)s_updated'
     )
     is_active = models.BooleanField(default=True)
 

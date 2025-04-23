@@ -2137,9 +2137,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", ""]
+                  "path": ["api", "v1", "contacts", "contacts", ""]
                 }
               }
             },
@@ -2162,9 +2162,9 @@
                   "raw": "{\n    \"name\": \"{{contact_name}}\",\n    \"first_name\": \"{{first_name}}\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"{{phone}}\",\n    \"organization\": {{organization_id}}\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", ""]
+                  "path": ["api", "v1", "contacts", "contacts", ""]
                 }
               }
             },
@@ -2179,9 +2179,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/{{contact_id}}/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "{{contact_id}}", ""]
                 }
               }
             },
@@ -2204,9 +2204,9 @@
                   "raw": "{\n    \"name\": \"{{contact_name}}\",\n    \"first_name\": \"{{first_name}}\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"{{phone}}\",\n    \"organization\": {{organization_id}}\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/{{contact_id}}/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "{{contact_id}}", ""]
                 }
               }
             },
@@ -2221,9 +2221,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/{{contact_id}}/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "{{contact_id}}", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "{{contact_id}}", ""]
                 }
               }
             },
@@ -2238,9 +2238,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/{{contact_id}}/hard-delete/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/{{contact_id}}/hard-delete/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "{{contact_id}}", "hard-delete", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "{{contact_id}}", "hard-delete", ""]
                 }
               }
             },
@@ -2255,9 +2255,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/refresh_cache/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/refresh_cache/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "refresh_cache", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "refresh_cache", ""]
                 }
               }
             },
@@ -2272,9 +2272,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/available_filters/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/available_filters/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "available_filters", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "available_filters", ""]
                 }
               }
             },
@@ -2289,9 +2289,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/contacts/available_aggregations/",
+                  "raw": "{{base_url}}/api/v1/contacts/contacts/available_aggregations/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "contacts", "available_aggregations", ""]
+                  "path": ["api", "v1", "contacts", "contacts", "available_aggregations", ""]
                 }
               }
             }
@@ -2311,9 +2311,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/groups/",
+                  "raw": "{{base_url}}/api/v1/contacts/groups/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "groups", ""]
+                  "path": ["api", "v1", "contacts", "groups", ""]
                 }
               }
             },
@@ -2336,9 +2336,9 @@
                   "raw": "{\n    \"name\": \"{{group_name}}\",\n    \"description\": \"{{group_description}}\",\n    \"organization\": {{organization_id}},\n    \"contacts\": [{{contact_ids}}]\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/groups/",
+                  "raw": "{{base_url}}/api/v1/contacts/groups/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "groups", ""]
+                  "path": ["api", "v1", "contacts", "groups", ""]
                 }
               }
             }
@@ -2358,9 +2358,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/lists/",
+                  "raw": "{{base_url}}/api/v1/contacts/lists/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "lists", ""]
+                  "path": ["api", "v1", "contacts", "lists", ""]
                 }
               }
             },
@@ -2383,9 +2383,9 @@
                   "raw": "{\n    \"name\": \"{{list_name}}\",\n    \"description\": \"{{list_description}}\",\n    \"organization\": {{organization_id}},\n    \"contacts\": [{{contact_ids}}]\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/lists/",
+                  "raw": "{{base_url}}/api/v1/contacts/lists/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "lists", ""]
+                  "path": ["api", "v1", "contacts", "lists", ""]
                 }
               }
             },
@@ -2400,9 +2400,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/lists/{{list_id}}/hard_delete/",
+                  "raw": "{{base_url}}/api/v1/contacts/lists/{{list_id}}/hard_delete/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "lists", "{{list_id}}", "hard_delete", ""]
+                  "path": ["api", "v1", "contacts", "lists", "{{list_id}}", "hard_delete", ""]
                 }
               }
             }
@@ -2422,9 +2422,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/notes/",
+                  "raw": "{{base_url}}/api/v1/contacts/notes/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "notes", ""]
+                  "path": ["api", "v1", "contacts", "notes", ""]
                 }
               }
             },
@@ -2469,9 +2469,9 @@
                   ]
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/notes/",
+                  "raw": "{{base_url}}/api/v1/contacts/notes/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "notes", ""]
+                  "path": ["api", "v1", "contacts", "notes", ""]
                 }
               }
             },
@@ -2486,9 +2486,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/notes/{{note_id}}/download/",
+                  "raw": "{{base_url}}/api/v1/contacts/notes/{{note_id}}/download/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "notes", "{{note_id}}", "download", ""]
+                  "path": ["api", "v1", "contacts", "notes", "{{note_id}}", "download", ""]
                 }
               }
             },
@@ -2503,9 +2503,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/notes/{{note_id}}/hard-delete/",
+                  "raw": "{{base_url}}/api/v1/contacts/notes/{{note_id}}/hard-delete/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "notes", "{{note_id}}", "hard-delete", ""]
+                  "path": ["api", "v1", "contacts", "notes", "{{note_id}}", "hard-delete", ""]
                 }
               }
             }
@@ -2525,9 +2525,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communications/",
+                  "raw": "{{base_url}}/api/v1/contacts/communications/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communications", ""]
+                  "path": ["api", "v1", "contacts", "communications", ""]
                 }
               }
             },
@@ -2550,9 +2550,9 @@
                   "raw": "{\n    \"contact\": {{contact_id}},\n    \"organization\": {{organization_id}},\n    \"type\": \"{{type}}\",\n    \"subject\": \"{{subject}}\",\n    \"content\": \"{{content}}\",\n    \"status\": \"draft\"\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communications/",
+                  "raw": "{{base_url}}/api/v1/contacts/communications/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communications", ""]
+                  "path": ["api", "v1", "contacts", "communications", ""]
                 }
               }
             },
@@ -2567,9 +2567,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/send/",
+                  "raw": "{{base_url}}/api/v1/contacts/communications/{{communication_id}}/send/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communications", "{{communication_id}}", "send", ""]
+                  "path": ["api", "v1", "contacts", "communications", "{{communication_id}}", "send", ""]
                 }
               }
             },
@@ -2592,9 +2592,9 @@
                   "raw": "{\n    \"scheduled_time\": \"{{scheduled_time}}\"\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/schedule/",
+                  "raw": "{{base_url}}/api/v1/contacts/communications/{{communication_id}}/schedule/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communications", "{{communication_id}}", "schedule", ""]
+                  "path": ["api", "v1", "contacts", "communications", "{{communication_id}}", "schedule", ""]
                 }
               }
             },
@@ -2609,9 +2609,9 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communications/{{communication_id}}/cancel/",
+                  "raw": "{{base_url}}/api/v1/contacts/communications/{{communication_id}}/cancel/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communications", "{{communication_id}}", "cancel", ""]
+                  "path": ["api", "v1", "contacts", "communications", "{{communication_id}}", "cancel", ""]
                 }
               }
             }
@@ -2681,9 +2681,9 @@
                   "raw": "{\n    \"contact\": {{contact_id}},\n    \"variables\": {\n        \"name\": \"{{contact_name}}\"\n    }\n}"
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/communication-templates/{{template_id}}/create_communication/",
+                  "raw": "{{base_url}}/api/v1/contacts/communication-templates/{{template_id}}/create_communication/",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "communication-templates", "{{template_id}}", "create_communication", ""]
+                  "path": ["api", "v1", "contacts", "communication-templates", "{{template_id}}", "create_communication", ""]
                 }
               }
             }

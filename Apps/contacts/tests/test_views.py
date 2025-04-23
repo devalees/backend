@@ -37,8 +37,8 @@ class TestContactViewSet:
             organization=self.organization
         )
         
-        self.detail_url = reverse('contact-detail', kwargs={'pk': self.contact.id})
-        self.list_url = reverse('contact-list')
+        self.detail_url = reverse('contacts:contact-detail', kwargs={'pk': self.contact.id})
+        self.list_url = reverse('contacts:contact-list')
         
         # Set up RBAC permissions for the user
         # Create permissions for contacts
@@ -340,7 +340,7 @@ class TestContactViewSet:
             metadata={'test': 'hard_delete_test'}
         )
         
-        url = reverse('contact-hard-delete', kwargs={'pk': self.contact.id})
+        url = reverse('contacts:contact-hard-delete', kwargs={'pk': self.contact.id})
         request = self.factory.delete(url)
         force_authenticate(request, user=self.user)
         view = ContactViewSet.as_view({'delete': 'hard_delete'})
@@ -385,7 +385,7 @@ class TestContactViewSet:
         
     def test_refresh_cache_endpoint_missing_org(self):
         """Test the refresh cache endpoint with missing organization parameter"""
-        url = reverse('contact-refresh-cache')
+        url = reverse('contacts:contact-refresh-cache')
         request = self.factory.get(url)
         force_authenticate(request, user=self.user)
         view = ContactViewSet.as_view({'get': 'refresh_cache'})
@@ -447,7 +447,7 @@ class TestContactViewSet:
         )
         
         # Try to access the contact with our main test user (who belongs to a different organization)
-        url = reverse('contact-detail', kwargs={'pk': other_contact.id})
+        url = reverse('contacts:contact-detail', kwargs={'pk': other_contact.id})
         request = self.factory.get(url)
         force_authenticate(request, user=self.user)
         view = ContactViewSet.as_view({'get': 'retrieve'})

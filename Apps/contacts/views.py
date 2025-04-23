@@ -418,6 +418,17 @@ class ContactGroupViewSet(viewsets.ModelViewSet):
         # Standard list response
         return super().list(request, *args, **kwargs)
         
+    def perform_create(self, serializer):
+        """Set created_by and updated_by on create"""
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(updated_by=self.request.user)
+        
     @action(detail=False, methods=['get'])
     def available_filters(self, request):
         """Return the available filters for ContactGroup model"""

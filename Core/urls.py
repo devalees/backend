@@ -47,9 +47,14 @@ urlpatterns = [
     path('api/v1/', include('Apps.core.urls')),
     
     # Include other app URLs that don't have ViewSets or have custom endpoints
-    path('api/v1/contacts/', include('Apps.contacts.urls')),
-    path('api/v1/data-transfer/', include('Apps.data_transfer.urls')),
-    path('api/v1/time-management/', include('Apps.time_management.urls')),
+    path('api/v1/contacts/', include('Apps.contacts.urls', namespace='contacts')),
+    path('api/v1/data-transfer/', include('Apps.data_transfer.urls', namespace='data_transfer')),
+    path('api/v1/time-management/', include('Apps.time_management.urls', namespace='time_management')),
+    path('api/v1/users/', include('Apps.users.urls', namespace='users')),
+    path('api/v1/entity/', include('Apps.entity.urls', namespace='entity')),
+    path('api/v1/project/', include('Apps.project.urls', namespace='project')),
+    path('api/v1/rbac/', include('Apps.rbac.urls', namespace='rbac')),
+    path('api/v1/documents/', include('Apps.documents.urls', namespace='documents')),
     path('api/v1/automation/', include('Apps.automation.urls', namespace='automation')),
     path('api/v1/communication/', include('Apps.communication.urls', namespace='communication')),
     path('api/import-export/', include('Apps.data_import_export.urls', namespace='data_import_export')),

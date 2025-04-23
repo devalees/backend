@@ -112,25 +112,58 @@ class BaseModelManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(is_active=True)
 
-class BaseModel(ImportExportMixin, TaskAwareModel):
-    """Base model with common fields, methods, and task handling capabilities"""
-    
+class TimeStampedModel(models.Model):
+    """
+    An abstract base class model that provides self-updating
+    created_at and updated_at fields.
+    """
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class UserTrackedModel(models.Model):
+    """
+    An abstract base class model that provides self-managed created_by and 
+    updated_by fields to track the user who created or updated a record.
+    """
     created_by = models.ForeignKey(
-        User,
+        'users.User',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='%(class)s_created'
     )
     updated_by = models.ForeignKey(
-        User,
+        'users.User',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name='%(class)s_updated'
     )
+
+    class Meta:
+        abstract = True
+        
+    def save(self, *args, **kwargs):
+        """
+        Save method that automatically sets created_by and updated_by
+        if not already set and if current user is available.
+        """
+        user = get_current_user()
+        
+        if user and user.is_authenticated:
+            if not self.pk and not self.created_by:  # New instance and created_by not set
+                self.created_by = user
+            
+            self.updated_by = user  # Always update the updated_by field
+        
+        super().save(*args, **kwargs)
+
+class BaseModel(ImportExportMixin, TaskAwareModel, TimeStampedModel, UserTrackedModel):
+    """Base model with common fields, methods, and task handling capabilities"""
+    
     is_active = models.BooleanField(default=True)
 
     objects = BaseModelManager()
@@ -181,15 +214,25 @@ def set_current_user(user):
 
 @receiver(pre_save)
 def set_user_fields(sender, instance, **kwargs):
-    """Set created_by and updated_by fields before saving"""
-    if not isinstance(instance, BaseModel):
+    """Set created_by and updated_by fields before saving if not already set"""
+    # Check if model has UserTrackedModel in its inheritance hierarchy
+    if not isinstance(instance, UserTrackedModel):
         return
 
     user = get_current_user()
     if user and user.is_authenticated:
-        if not instance.pk:  # New instance
+        # Only set created_by if this is a new instance and created_by not already set
+        if not instance.pk and not instance.created_by:
             instance.created_by = user
-        instance.updated_by = user 
+            
+        # Only set updated_by if not already set in this save operation
+        if not instance.updated_by or (hasattr(instance, '_original_updated_by') and 
+                                      instance.updated_by == instance._original_updated_by):
+            instance.updated_by = user
+    
+    # Store original updated_by for next comparison
+    if hasattr(instance, 'updated_by'):
+        instance._original_updated_by = instance.updated_by
 
 class Config(BaseModel):
     """Model for storing system-wide configuration settings"""
@@ -231,15 +274,4 @@ class Config(BaseModel):
         """Prevent deletion of non-editable configurations"""
         if not self.is_editable:
             raise ValidationError("This configuration setting cannot be deleted")
-        super().delete(*args, **kwargs)
-
-class TimeStampedModel(models.Model):
-    """
-    An abstract base class model that provides self-updating
-    created_at and updated_at fields.
-    """
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True 
+        super().delete(*args, **kwargs) 

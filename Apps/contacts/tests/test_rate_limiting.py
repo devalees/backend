@@ -89,7 +89,7 @@ class TestRateLimiting:
     def test_contacts_list_rate_limit(self, api_client, test_user, test_organization, test_team, team_member):
         """Test rate limiting for contacts list endpoint"""
         api_client.force_authenticate(user=test_user)
-        url = reverse('contact-list')
+        url = reverse('contacts:contact-list')
         
         # Reset throttle
         cache.clear()
@@ -122,7 +122,7 @@ class TestRateLimiting:
     def test_contact_create_rate_limit(self, api_client, test_user, test_organization, test_team, team_member):
         """Test rate limiting for contact creation endpoint"""
         api_client.force_authenticate(user=test_user)
-        url = reverse('contact-list')
+        url = reverse('contacts:contact-list')
         
         # Reset throttle
         cache.clear()
@@ -154,7 +154,7 @@ class TestRateLimiting:
     def test_rate_limit_reset(self, api_client, test_user, test_organization, test_team, team_member):
         """Test that rate limits reset after the time window"""
         api_client.force_authenticate(user=test_user)
-        url = reverse('contact-list')
+        url = reverse('contacts:contact-list')
         
         # Reset throttle
         cache.clear()
@@ -201,8 +201,8 @@ class TestRateLimiting:
             updated_by=test_user
         )
         
-        list_url = reverse('contact-list')
-        detail_url = reverse('contact-detail', args=[contact.id])
+        list_url = reverse('contacts:contact-list')
+        detail_url = reverse('contacts:contact-detail', args=[contact.id])
         
         # Hit rate limit on list endpoint
         throttle_key = f"throttle_contact_{test_user.pk}"
@@ -222,7 +222,7 @@ class TestRateLimiting:
     def test_rate_limit_headers(self, api_client, test_user, test_organization, test_team, team_member):
         """Test rate limit response headers"""
         api_client.force_authenticate(user=test_user)
-        url = reverse('contact-list')
+        url = reverse('contacts:contact-list')
         
         # Reset throttle
         cache.clear()

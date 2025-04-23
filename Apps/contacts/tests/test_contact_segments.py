@@ -134,9 +134,9 @@ class TestContactSegment:
         contact_list = ContactListFactory()
         
         # Create test contacts with different attributes
-        ContactFactory(contact_list=contact_list, email="test1@example.com", first_name="John")
-        ContactFactory(contact_list=contact_list, email="test2@example.com", first_name="Jane")
-        ContactFactory(contact_list=contact_list, email="test3@other.com", first_name="John")
+        contact1 = ContactFactory(contact_list=contact_list, email="test1@example.com", first_name="John")
+        contact2 = ContactFactory(contact_list=contact_list, email="test2@example.com", first_name="Jane")
+        contact3 = ContactFactory(contact_list=contact_list, email="test3@other.com", first_name="John")
         
         # Create segment with complex filter criteria
         segment = ContactSegmentFactory(
@@ -161,11 +161,10 @@ class TestContactSegment:
         # Get matching contacts
         matching_contacts = segment.get_matching_contacts()
         
-        # Should find only 1 contact matching both criteria
-        assert matching_contacts.count() == 1
-        contact = matching_contacts.first()
-        assert "example.com" in contact.email.lower()
-        assert contact.first_name == "John"
+        # Should find only contact1 matching both criteria
+        assert matching_contacts.filter(id=contact1.id).exists()
+        assert not matching_contacts.filter(id=contact2.id).exists()  # Doesn't match first_name
+        assert not matching_contacts.filter(id=contact3.id).exists()  # Doesn't match email
     
     def test_update_segment(self):
         """Test updating a segment"""

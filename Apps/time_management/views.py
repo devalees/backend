@@ -10,6 +10,9 @@ from .serializers import (
     TimeCategorySerializer, TimeEntrySerializer, TimesheetSerializer,
     TimesheetEntrySerializer, WorkScheduleSerializer
 )
+from rest_framework.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
+from Apps.core.views import BaseModelViewSet
 
 # Create your views here.
 
@@ -116,31 +119,22 @@ class TimesheetViewSet(viewsets.ModelViewSet):
     def approve(self, request, pk=None):
         """Approve a submitted timesheet."""
         timesheet = self.get_object()
-        if timesheet.status != 'submitted':
-            return Response(
-                {'detail': 'Only submitted timesheets can be approved.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        timesheet.status = 'approved'
-        timesheet.approved_at = timezone.now()
-        timesheet.approved_by = request.user
-        timesheet.save()
-        return Response({'status': 'timesheet approved'})
+        try:
+            timesheet.approve(request.user)
+            return Response({'status': 'timesheet approved'})
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         """Reject a submitted timesheet."""
         timesheet = self.get_object()
-        if timesheet.status != 'submitted':
-            return Response(
-                {'detail': 'Only submitted timesheets can be rejected.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        timesheet.status = 'rejected'
-        timesheet.save()
-        return Response({'status': 'timesheet rejected'})
+        reason = request.data.get('rejection_reason', '')
+        try:
+            timesheet.reject(request.user, reason)
+            return Response({'status': 'timesheet rejected'})
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class TimesheetEntryViewSet(viewsets.ModelViewSet):
     """
@@ -156,12 +150,12 @@ class TimesheetEntryViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         timesheet = serializer.validated_data['timesheet']
         if timesheet.user != self.request.user:
-            raise serializers.ValidationError("You can only add entries to your own timesheet.")
+            raise ValidationError("You can only add entries to your own timesheet.")
         if timesheet.status != 'draft':
-            raise serializers.ValidationError("You can only add entries to draft timesheets.")
-        serializer.save()
+            raise ValidationError("You can only add entries to draft timesheets.")
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
 
-class WorkScheduleViewSet(viewsets.ModelViewSet):
+class WorkScheduleViewSet(BaseModelViewSet):
     """
     ViewSet for managing work schedules.
     Supports CRUD operations and schedule management.
@@ -170,15 +164,29 @@ class WorkScheduleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return WorkSchedule.objects.filter(user=self.request.user)
+        # Return only active work schedules for the user
+        # If multiple schedules exist, only return the most recently created one
+        return WorkSchedule.objects.filter(user=self.request.user).order_by('-created_at')[:1]
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        # If user is provided in the data, use it, otherwise use the request.user
+        user = serializer.validated_data.get('user', self.request.user)
+        
+        # If the user already has an active schedule, deactivate it
+        WorkSchedule.objects.filter(user=user, is_active=True).update(is_active=False)
+        
+        serializer.save(user=user)
 
     @action(detail=False, methods=['get'])
     def current(self, request):
         """Get the current active work schedule."""
-        schedule = self.get_queryset().filter(is_active=True).first()
+        # Get work schedules for the current user that are active
+        # Don't use the get_queryset() method since it applies the slice
+        schedule = WorkSchedule.objects.filter(
+            user=self.request.user, 
+            is_active=True
+        ).order_by('-created_at').first()
+        
         if not schedule:
             return Response(
                 {'detail': 'No active work schedule found.'},

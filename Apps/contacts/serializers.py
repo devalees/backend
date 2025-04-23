@@ -6,26 +6,33 @@ class ContactSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(source='organization.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True)
     team_name = serializers.CharField(source='team.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         from .models import Contact
         model = Contact
         fields = ('id', 'name', 'email', 'phone', 'organization', 'organization_name',
-                 'department', 'department_name', 'team', 'team_name', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+                 'department', 'department_name', 'team', 'team_name', 'is_active', 
+                 'created_at', 'updated_at', 'created_by', 'created_by_name', 
+                 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 class ContactGroupSerializer(serializers.ModelSerializer):
     """Serializer for ContactGroup model"""
     organization_name = serializers.CharField(source='organization.name', read_only=True)
     contacts = ContactSerializer(many=True, read_only=True)
     contact_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         from .models import ContactGroup
         model = ContactGroup
         fields = ('id', 'name', 'description', 'organization', 'organization_name',
-                 'contacts', 'contact_ids', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+                 'contacts', 'contact_ids', 'is_active', 'created_at', 'updated_at',
+                 'created_by', 'created_by_name', 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
     def create(self, validated_data):
         contact_ids = validated_data.pop('contact_ids', [])

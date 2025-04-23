@@ -6,8 +6,8 @@ from Apps.project.models import Project
 class TimeCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeCategory
-        fields = ['id', 'name', 'description', 'is_billable', 'color', 'created_by', 'created_at', 'updated_at']
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'is_billable', 'color', 'created_by', 'updated_by', 'created_at', 'updated_at', 'is_active']
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
 class TimeEntrySerializer(serializers.ModelSerializer):
     hours = serializers.FloatField(read_only=True)
@@ -15,8 +15,9 @@ class TimeEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeEntry
         fields = ['id', 'user', 'project', 'category', 'description', 'start_time', 'end_time', 
-                 'hours', 'is_billable', 'created_at', 'updated_at', 'task', 'project_phase', 'milestone']
-        read_only_fields = ['created_at', 'updated_at']
+                 'hours', 'is_billable', 'created_at', 'updated_at', 'created_by', 'updated_by',
+                 'task', 'project_phase', 'milestone', 'is_active']
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         if data.get('end_time') and data.get('start_time'):
@@ -39,8 +40,9 @@ class TimesheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Timesheet
         fields = ['id', 'user', 'start_date', 'end_date', 'status', 'total_hours', 
-                 'notes', 'submitted_at', 'approved_at', 'created_at', 'updated_at']
-        read_only_fields = ['total_hours', 'submitted_at', 'approved_at', 'created_at', 'updated_at']
+                 'notes', 'submitted_at', 'approved_at', 'created_by', 'updated_by', 
+                 'created_at', 'updated_at', 'is_active']
+        read_only_fields = ['total_hours', 'submitted_at', 'approved_at', 'created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         if data.get('end_date') and data.get('start_date'):
@@ -56,8 +58,9 @@ class TimesheetEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimesheetEntry
-        fields = ['id', 'timesheet', 'time_entry', 'date', 'hours', 'category', 'description', 'notes', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        fields = ['id', 'timesheet', 'time_entry', 'date', 'hours', 'category', 'description', 
+                 'notes', 'created_by', 'updated_by', 'created_at', 'updated_at', 'is_active']
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate_hours(self, value):
         if value < 0:
@@ -77,8 +80,8 @@ class WorkScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkSchedule
         fields = ['id', 'user', 'name', 'start_time', 'end_time', 'days_of_week', 'is_active', 
-                 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+                 'created_by', 'updated_by', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         if data.get('end_time') and data.get('start_time'):

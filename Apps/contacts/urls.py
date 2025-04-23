@@ -8,6 +8,9 @@ from .views import (
     ContactNoteMonitoringViewSet
 )
 
+# Define the app name for namespacing
+app_name = 'contacts'
+
 # Main contacts router
 router = DefaultRouter()
 router.register(r'contacts', ContactViewSet)

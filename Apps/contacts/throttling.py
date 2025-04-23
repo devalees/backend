@@ -27,11 +27,15 @@ class ContactRateThrottle(UserRateThrottle):
         if request.user.is_staff:  # Staff users are not rate limited
             return True
             
+        # Initialize history attribute if it doesn't exist yet
+        if not hasattr(self, 'history'):
+            self.history = []
+            
         return super().allow_request(request, view)
     
     def wait(self):
         """Return the number of seconds to wait before the next request"""
-        if self.history:
+        if hasattr(self, 'history') and self.history:
             oldest_timestamp = self.history[-1]
             return max(0, 60 - (timezone.now().timestamp() - oldest_timestamp))
         return 0
@@ -52,6 +56,17 @@ def get_rate_limit_headers(request, view):
     if not throttle.allow_request(request, view):
         wait = throttle.wait()
         raise Throttled(wait=wait)
+    
+    # Initialize history if not set
+    if not hasattr(throttle, 'history'):
+        throttle.history = []
+    
+    # Check if num_requests is defined
+    if not hasattr(throttle, 'num_requests'):
+        # Default to rate limit from the rate string
+        rate = getattr(throttle, 'rate', '100/minute')
+        num_requests = int(rate.split('/')[0])
+        throttle.num_requests = num_requests
     
     # Return as a dictionary that will be set individually in the view
     return {
