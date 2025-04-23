@@ -35,14 +35,14 @@ class NodeViewSet(viewsets.ModelViewSet):
         if workflow.created_by != self.request.user:
             raise ValidationError("You don't have permission to add nodes to this workflow")
             
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
         # Validate node ownership through workflow
         instance = self.get_object()
         if instance.workflow.created_by != self.request.user:
             raise ValidationError("You don't have permission to modify this node")
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['patch'])
     def position(self, request, pk=None):
@@ -61,7 +61,6 @@ class NodeViewSet(viewsets.ModelViewSet):
         if position_y is not None:
             node.position_y = position_y
 
-        node.updated_by = request.user
         node.save()
         serializer = self.get_serializer(node)
         return Response(serializer.data)
@@ -97,13 +96,13 @@ class ConnectionViewSet(viewsets.ModelViewSet):
         if target_node.workflow.created_by != self.request.user:
             raise ValidationError("You don't have permission to use this target node")
             
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
         instance = self.get_object()
         if instance.workflow.created_by != self.request.user:
             raise ValidationError("You don't have permission to modify this connection")
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
 class WorkflowTemplateViewSet(viewsets.ModelViewSet):
     """
@@ -163,10 +162,10 @@ class WorkflowTemplateViewSet(viewsets.ModelViewSet):
             if connection['to'] not in node_names:
                 raise ValidationError(f"Connection references non-existent target node: {connection['to']}")
         
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def instantiate(self, request, pk=None):
@@ -305,10 +304,10 @@ class ReportTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def generate_report(self, request, pk=None):
@@ -391,10 +390,10 @@ class ReportViewSet(viewsets.ModelViewSet):
         return Report.objects.filter(created_by=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def retry(self, request, pk=None):
@@ -413,10 +412,10 @@ class ReportScheduleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):

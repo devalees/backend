@@ -4,7 +4,6 @@ from .models import Node, Connection, WorkflowTemplate, Workflow, ReportTemplate
 
 class NodeSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = Node
@@ -12,10 +11,9 @@ class NodeSerializer(serializers.ModelSerializer):
             'id', 'name', 'workflow', 'node_type', 'configuration',
             'position_x', 'position_y', 'is_active', 
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         # For partial updates, only validate fields that are present
@@ -87,17 +85,15 @@ class NodeSerializer(serializers.ModelSerializer):
 
 class ConnectionSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = Connection
         fields = [
             'id', 'name', 'workflow', 'source_node', 'target_node', 'configuration',
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         # Validate configuration is a JSON object
@@ -144,17 +140,15 @@ class ConnectionSerializer(serializers.ModelSerializer):
 
 class WorkflowTemplateSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = WorkflowTemplate
         fields = [
             'id', 'name', 'description', 'configuration',
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
     def validate(self, data):
         # Validate configuration is a JSON object
@@ -224,45 +218,39 @@ class WorkflowTemplateSerializer(serializers.ModelSerializer):
 
 class ReportTemplateSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = ReportTemplate
         fields = [
             'id', 'name', 'description', 'query', 'format', 'is_active',
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
 
 class ReportSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = Report
         fields = [
             'id', 'template', 'parameters', 'status', 'output_path', 'error_message',
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'status', 'output_path', 'error_message']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'status', 'output_path', 'error_message']
 
 class ReportScheduleSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True)
 
     class Meta:
         model = ReportSchedule
         fields = [
             'id', 'name', 'template', 'schedule', 'parameters', 'last_run', 'next_run', 'is_active',
             'created_by', 'created_by_name',
-            'updated_by', 'updated_by_name',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'last_run', 'next_run']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'last_run', 'next_run']
 
 class ReportAnalyticsSerializer(serializers.ModelSerializer):
     class Meta:
