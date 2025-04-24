@@ -4,19 +4,25 @@ from Apps.users.models import User
 from Apps.project.models import Project
 
 class TimeCategorySerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = TimeCategory
-        fields = ['id', 'name', 'description', 'is_billable', 'color', 'created_by', 'updated_by', 'created_at', 'updated_at', 'is_active']
+        fields = ['id', 'name', 'description', 'is_billable', 'color', 'created_by', 'created_by_name', 
+                 'updated_by', 'updated_by_name', 'created_at', 'updated_at', 'is_active']
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
 class TimeEntrySerializer(serializers.ModelSerializer):
     hours = serializers.FloatField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = TimeEntry
         fields = ['id', 'user', 'project', 'category', 'description', 'start_time', 'end_time', 
-                 'hours', 'is_billable', 'created_at', 'updated_at', 'created_by', 'updated_by',
-                 'task', 'project_phase', 'milestone', 'is_active']
+                 'hours', 'is_billable', 'created_at', 'updated_at', 'created_by', 'created_by_name',
+                 'updated_by', 'updated_by_name', 'task', 'project_phase', 'milestone', 'is_active']
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):
@@ -36,12 +42,14 @@ class TimeEntrySerializer(serializers.ModelSerializer):
 
 class TimesheetSerializer(serializers.ModelSerializer):
     total_hours = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = Timesheet
         fields = ['id', 'user', 'start_date', 'end_date', 'status', 'total_hours', 
-                 'notes', 'submitted_at', 'approved_at', 'created_by', 'updated_by', 
-                 'created_at', 'updated_at', 'is_active']
+                 'notes', 'submitted_at', 'approved_at', 'created_by', 'created_by_name', 
+                 'updated_by', 'updated_by_name', 'created_at', 'updated_at', 'is_active']
         read_only_fields = ['total_hours', 'submitted_at', 'approved_at', 'created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):
@@ -55,11 +63,14 @@ class TimesheetSerializer(serializers.ModelSerializer):
 class TimesheetEntrySerializer(serializers.ModelSerializer):
     hours = serializers.FloatField()
     category = serializers.PrimaryKeyRelatedField(queryset=TimeCategory.objects.all(), required=False)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = TimesheetEntry
         fields = ['id', 'timesheet', 'time_entry', 'date', 'hours', 'category', 'description', 
-                 'notes', 'created_by', 'updated_by', 'created_at', 'updated_at', 'is_active']
+                 'notes', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 
+                 'created_at', 'updated_at', 'is_active']
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate_hours(self, value):
@@ -77,10 +88,14 @@ class TimesheetEntrySerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 class WorkScheduleSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = WorkSchedule
         fields = ['id', 'user', 'name', 'start_time', 'end_time', 'days_of_week', 'is_active', 
-                 'created_by', 'updated_by', 'created_at', 'updated_at']
+                 'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
+                 'created_at', 'updated_at']
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
     def validate(self, data):

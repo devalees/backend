@@ -254,17 +254,10 @@ class RichTextMessageViewSet(viewsets.ModelViewSet):
     serializer_class = RichTextMessageSerializer
     
     def perform_create(self, serializer):
-        """Set created_by and updated_by on create"""
-        serializer.save(
-            created_by=self.request.user,
-            updated_by=self.request.user
-        )
+        serializer.save(created_by=self.request.user)
     
     def perform_update(self, serializer):
-        """Set updated_by on update"""
-        serializer.save(
-            updated_by=self.request.user
-        )
+        serializer.save()
 
 class EmailTemplateViewSet(viewsets.ModelViewSet):
     """ViewSet for managing email templates"""
@@ -274,15 +267,12 @@ class EmailTemplateViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set created_by and updated_by on create"""
         serializer.save(
-            created_by=self.request.user,
-            updated_by=self.request.user
+            created_by=self.request.user
         )
     
     def perform_update(self, serializer):
         """Set updated_by on update"""
-        serializer.save(
-            updated_by=self.request.user
-        )
+        serializer.save()
     
     @action(detail=True, methods=['post'])
     def send_test(self, request, pk=None):

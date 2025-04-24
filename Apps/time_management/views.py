@@ -30,7 +30,10 @@ class TimeCategoryViewSet(viewsets.ModelViewSet):
     ordering = ['name']
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
 class TimeEntryViewSet(viewsets.ModelViewSet):
     """
@@ -60,7 +63,10 @@ class TimeEntryViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user, created_by=self.request.user)
+        serializer.save(user=self.request.user, created_by=self.request.user, updated_by=self.request.user)
+        
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -98,7 +104,10 @@ class TimesheetViewSet(viewsets.ModelViewSet):
         return Timesheet.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(user=self.request.user, created_by=self.request.user, updated_by=self.request.user)
+        
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
     @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
