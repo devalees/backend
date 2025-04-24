@@ -2,10 +2,6 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 
 # Import ViewSets from different apps
-from Apps.entity.views import (
-    OrganizationViewSet, DepartmentViewSet, TeamViewSet, 
-    TeamMemberViewSet, OrganizationSettingsViewSet
-)
 from Apps.users.views import UserViewSet
 from Apps.project.views import (
     ProjectViewSet, TaskViewSet, ProjectTemplateViewSet, 
@@ -24,13 +20,6 @@ from Apps.documents.views import (
 
 # Create a central router
 api_router = DefaultRouter()
-
-# Register entity app ViewSets
-api_router.register(r'organizations', OrganizationViewSet, basename='organization')
-api_router.register(r'departments', DepartmentViewSet, basename='department')
-api_router.register(r'teams', TeamViewSet, basename='team')
-api_router.register(r'team-members', TeamMemberViewSet, basename='team_members')
-api_router.register(r'organization-settings', OrganizationSettingsViewSet, basename='organizationsettings')
 
 # Register users app ViewSets
 api_router.register(r'users', UserViewSet, basename='user')

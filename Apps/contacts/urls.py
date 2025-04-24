@@ -40,15 +40,11 @@ urlpatterns = [
          ContactNoteViewSet.as_view({'delete': 'hard_delete'}),
          name='contact-note-hard-delete'),
     
-    # API v1 endpoints
-    path('api/v1/', include((router.urls, 'api-v1'))),
-    path('api/v1/', include((notes_router.urls, 'api-v1-notes'))),
-    
     # Note notification and monitoring endpoints
-    path('api/v1/note-notifications/', 
+    path('note-notifications/', 
          ContactNoteNotificationViewSet.as_view({'get': 'list', 'post': 'create'}),
          name='contact-note-notifications-api'),
-    path('api/v1/note-monitoring/', 
+    path('note-monitoring/', 
          ContactNoteMonitoringViewSet.as_view({'get': 'list'}),
          name='contact-note-monitoring-api'),
 ] 

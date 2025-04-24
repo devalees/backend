@@ -108,7 +108,8 @@ class TestOrganizationViewSet:
         client.force_login(admin_user)
         
         # Create an organization
-        response = client.post('/api/v1/entity/organizations/', {
+        url = reverse('entity:organization-list')
+        response = client.post(url, {
             'name': 'Test Organization',
             'description': 'Test Description',
             'is_active': True
@@ -141,7 +142,8 @@ class TestOrganizationViewSet:
         client.force_login(admin_user)
         
         # Update the organization
-        response = client.patch(f'/api/v1/entity/organizations/{organization.id}/', {
+        url = reverse('entity:organization-detail', kwargs={'pk': organization.id})
+        response = client.patch(url, {
             'description': 'Updated Description'
         }, content_type='application/json')
         

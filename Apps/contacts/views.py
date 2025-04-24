@@ -158,6 +158,10 @@ class ContactViewSet(viewsets.ModelViewSet):
         return super().get_throttles()
 
     def get_queryset(self):
+        # Superusers can access all organizations
+        if self.request.user.is_superuser:
+            return Contact.objects.all()
+
         """
         Filter contacts by organization and apply filtering capabilities.
         Uses cache when appropriate.

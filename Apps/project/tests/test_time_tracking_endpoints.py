@@ -280,8 +280,8 @@ class TestProjectTimeReport:
         response = api_client.get(url)
         
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['total_entries'] == 1  # Only entries from the last 2 days (the test is counting just one)
-        assert float(response.data['total_hours']) == 4.0  # Hours from the day -1 entry
+        assert response.data['total_entries'] == 2  # Entries from the last 2 days
+        assert float(response.data['total_hours']) == 7.0  # Hours from day -1 (4.0) + day -2 (3.0) entries
 
 @pytest.mark.django_db
 class TestProjectBurndownChart:
