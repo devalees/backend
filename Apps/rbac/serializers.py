@@ -18,6 +18,13 @@ class JsonApiSerializerMixin:
         """Convert the resource object into a JSON:API formatted dict"""
         representation = super().to_representation(instance)
         
+        # Add user tracking fields if they exist in the model
+        if hasattr(instance, 'created_by') and instance.created_by:
+            representation['created_by_name'] = instance.created_by.username if instance.created_by else None
+        
+        if hasattr(instance, 'updated_by') and instance.updated_by:
+            representation['updated_by_name'] = instance.updated_by.username if instance.updated_by else None
+        
         # Extract fields that should be at root level
         root_fields = {
             'id': str(instance.pk),
@@ -111,15 +118,20 @@ class UserRoleSerializer(serializers.ModelSerializer):
         allow_null=True,
         resource_name='user_roles'
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = UserRole
         fields = [
             'id', 'user', 'role', 'organization', 'assigned_by',
             'delegated_by', 'is_active', 'is_delegated', 'deactivated_at',
-            'notes', 'created_at', 'updated_at'
+            'notes', 'created_at', 'updated_at', 'created_by', 'updated_by',
+            'created_by_name', 'updated_by_name'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at', 'created_by', 'updated_by']
 
     def validate(self, data):
         """Validate the user role assignment"""
@@ -191,15 +203,18 @@ class RoleSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
         queryset=Organization.objects.all(),
         resource_name='organizations'
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Role
         resource_name = 'roles'
         fields = [
             'id', 'name', 'description', 'organization', 'parent',
-            'is_active', 'permissions', 'created_at', 'updated_at'
+            'is_active', 'permissions', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
     def validate_name(self, value):
         """Validate role name"""
@@ -267,14 +282,22 @@ class RoleSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
 
 class PermissionSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
     """Serializer for Permission model"""
+    organization = JsonApiRelatedField(
+        queryset=Organization.objects.all(),
+        resource_name='organizations'
+    )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = Permission
         resource_name = 'permissions'
         fields = [
             'id', 'name', 'description', 'code', 'organization',
-            'is_active', 'created_at', 'updated_at'
+            'is_active', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
     def validate_name(self, value):
         """Validate permission name"""
@@ -356,15 +379,18 @@ class ResourceSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
         queryset=Organization.objects.all(),
         resource_name='organizations'
     )
-    
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = Resource
         resource_name = 'resources'
         fields = [
             'id', 'name', 'resource_type', 'owner', 'parent',
-            'organization', 'is_active', 'metadata', 'created_at', 'updated_at'
+            'organization', 'is_active', 'metadata', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
     
     def validate_name(self, value):
         """Validate resource name"""
@@ -412,15 +438,18 @@ class ResourceAccessSerializer(JsonApiSerializerMixin, serializers.ModelSerializ
         queryset=Organization.objects.all(),
         resource_name='organizations'
     )
-    
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = ResourceAccess
         resource_name = 'resource_accesses'
         fields = [
             'id', 'resource', 'user', 'organization', 'access_type',
-            'is_active', 'deactivated_at', 'notes', 'created_at', 'updated_at'
+            'is_active', 'deactivated_at', 'notes', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at', 'created_by', 'updated_by']
     
     def validate_access_type(self, value):
         """Validate access type"""
@@ -496,15 +525,18 @@ class OrganizationContextSerializer(JsonApiSerializerMixin, serializers.ModelSer
         allow_null=True,
         resource_name='organization_contexts'
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = OrganizationContext
         resource_name = 'organization_contexts'
         fields = [
             'id', 'name', 'description', 'organization', 'parent',
-            'is_active', 'deactivated_at', 'metadata', 'created_at', 'updated_at'
+            'is_active', 'deactivated_at', 'metadata', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'deactivated_at']
+        read_only_fields = ['created_at', 'updated_at', 'deactivated_at', 'created_by', 'updated_by']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -666,6 +698,8 @@ class AuditSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
         queryset=Organization.objects.all(),
         resource_name='organizations'
     )
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    updated_by = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Audit
@@ -673,9 +707,10 @@ class AuditSerializer(JsonApiSerializerMixin, serializers.ModelSerializer):
         fields = [
             'id', 'user', 'organization', 'action', 'resource_type', 'resource_id',
             'details', 'status', 'timestamp', 'ip_address', 'user_agent', 'session_id',
-            'retention_period', 'created_at', 'updated_at'
+            'retention_period', 'created_at', 'updated_at',
+            'created_by', 'updated_by'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
     def validate_retention_period(self, value):
         """Validate retention period"""

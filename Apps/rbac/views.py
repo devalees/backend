@@ -28,6 +28,19 @@ class BaseViewSet(viewsets.ModelViewSet):
             return self.queryset
         # Regular users can only see records from their organization
         return self.queryset.filter(organization=self.request.user.organization)
+        
+    def perform_create(self, serializer):
+        """Set created_by and updated_by fields on create"""
+        kwargs = {
+            'organization': self.request.user.organization,
+            'created_by': self.request.user,
+            'updated_by': self.request.user
+        }
+        serializer.save(**kwargs)
+    
+    def perform_update(self, serializer):
+        """Set updated_by field on update"""
+        serializer.save(updated_by=self.request.user)
 
 class RoleViewSet(BaseViewSet):
     """ViewSet for managing roles"""
@@ -92,7 +105,9 @@ class UserRoleViewSet(BaseViewSet):
                 organization=user_role.organization,
                 assigned_by=request.user,
                 delegated_by=user_role,
-                is_delegated=True
+                is_delegated=True,
+                created_by=request.user,
+                updated_by=request.user
             )
             serializer = self.get_serializer(delegated_role)
             return Response(serializer.data)
@@ -106,7 +121,3 @@ class UserRoleViewSet(BaseViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-    def perform_create(self, serializer):
-        """Set organization from request user"""
-        serializer.save(organization=self.request.user.organization)

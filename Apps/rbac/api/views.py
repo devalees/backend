@@ -5,7 +5,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from ..models import Role, Permission, UserRole, Resource, ResourceAccess, OrganizationContext, Audit
-from ..serializers import RoleSerializer, PermissionSerializer, ResourceSerializer, ResourceAccessSerializer, ResourceAccessUpdateSerializer, OrganizationContextSerializer, AuditSerializer
+from ..serializers import RoleSerializer, PermissionSerializer, ResourceSerializer, ResourceAccessSerializer, ResourceAccessUpdateSerializer, OrganizationContextSerializer, AuditSerializer, UserRoleSerializer
 from .pagination import RBACPagination
 from .response_formatters import BaseResponseFormatter
 from django.contrib.auth import get_user_model
@@ -13,7 +13,23 @@ from django.utils import timezone
 
 User = get_user_model()
 
-class RoleViewSet(viewsets.ModelViewSet):
+class UserTrackedViewSet(viewsets.ModelViewSet):
+    """Base ViewSet that automatically sets created_by and updated_by fields"""
+    
+    def perform_create(self, serializer):
+        """Set created_by and updated_by on create"""
+        serializer.save(
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+    
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(
+            updated_by=self.request.user
+        )
+
+class RoleViewSet(UserTrackedViewSet):
     """ViewSet for Role model"""
     
     queryset = Role.objects.all()
@@ -85,7 +101,7 @@ class RoleViewSet(viewsets.ModelViewSet):
         formatter = BaseResponseFormatter(request, serializer_class=PermissionSerializer)
         return formatter.format_list_response(serializer.data)
 
-class PermissionViewSet(viewsets.ModelViewSet):
+class PermissionViewSet(UserTrackedViewSet):
     """ViewSet for Permission model"""
     
     queryset = Permission.objects.all()
@@ -148,7 +164,7 @@ class PermissionViewSet(viewsets.ModelViewSet):
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         return formatter.format_detail_response({}, status=status.HTTP_204_NO_CONTENT)
 
-class ResourceViewSet(viewsets.ModelViewSet):
+class ResourceViewSet(UserTrackedViewSet):
     """ViewSet for Resource model"""
     
     queryset = Resource.objects.all()
@@ -333,7 +349,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-class ResourceAccessViewSet(viewsets.ModelViewSet):
+class ResourceAccessViewSet(UserTrackedViewSet):
     """ViewSet for ResourceAccess model"""
     
     queryset = ResourceAccess.objects.all()
@@ -418,7 +434,7 @@ class ResourceAccessViewSet(viewsets.ModelViewSet):
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         return formatter.format_detail_response({'message': 'Resource access deactivated'})
 
-class OrganizationContextViewSet(viewsets.ModelViewSet):
+class OrganizationContextViewSet(UserTrackedViewSet):
     """ViewSet for OrganizationContext model"""
     
     queryset = OrganizationContext.objects.all()
@@ -569,7 +585,7 @@ class OrganizationContextViewSet(viewsets.ModelViewSet):
         formatter = BaseResponseFormatter(request, serializer_class=self.serializer_class)
         return formatter.format_list_response(serializer.data)
 
-class AuditViewSet(viewsets.ModelViewSet):
+class AuditViewSet(UserTrackedViewSet):
     """ViewSet for Audit model"""
     
     queryset = Audit.objects.all()

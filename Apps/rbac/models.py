@@ -8,8 +8,9 @@ from Apps.entity.models import TeamMember
 from django.conf import settings
 from .managers import OrganizationIsolationManager
 from datetime import timedelta
+from Apps.core.models import UserTrackedModel
 
-class RBACBaseModel(models.Model):
+class RBACBaseModel(UserTrackedModel, models.Model):
     """
     Abstract base model for RBAC implementation with organization isolation support.
     Provides common fields and methods for all RBAC-related models.
