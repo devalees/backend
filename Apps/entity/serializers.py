@@ -15,28 +15,38 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
 class OrganizationSerializer(serializers.ModelSerializer):
     """Serializer for Organization model"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = Organization
-        fields = ('id', 'name', 'description', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'description', 'is_active', 'created_at', 'updated_at', 
+                  'created_by', 'created_by_name', 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 class DepartmentSerializer(serializers.ModelSerializer):
     """Serializer for Department model"""
     organization_name = serializers.CharField(source='organization.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = Department
-        fields = ('id', 'name', 'description', 'organization', 'organization_name', 'parent', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'description', 'organization', 'organization_name', 'parent', 'is_active', 
+                  'created_at', 'updated_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 class TeamSerializer(serializers.ModelSerializer):
     """Serializer for Team model"""
     department_name = serializers.CharField(source='department.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = Team
-        fields = ('id', 'name', 'description', 'department', 'department_name', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'description', 'department', 'department_name', 'is_active', 
+                  'created_at', 'updated_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 class TeamMemberSerializer(serializers.ModelSerializer):
     """Serializer for TeamMember model"""
@@ -46,11 +56,14 @@ class TeamMemberSerializer(serializers.ModelSerializer):
         write_only=True
     )
     team_name = serializers.CharField(source='team.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = TeamMember
-        fields = ('id', 'user', 'user_id', 'team', 'team_name', 'role', 'is_active', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'user', 'user_id', 'team', 'team_name', 'role', 'is_active', 
+                  'created_at', 'updated_at', 'created_by', 'created_by_name', 'updated_by', 'updated_by_name')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
     def validate(self, data):
         """Validate that a user is not already a member of the team"""
@@ -76,6 +89,9 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
 class OrganizationSettingsSerializer(serializers.ModelSerializer):
     """Serializer for OrganizationSettings model"""
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = OrganizationSettings
         fields = [
@@ -87,9 +103,13 @@ class OrganizationSettingsSerializer(serializers.ModelSerializer):
             'language',
             'notification_preferences',
             'created_at',
-            'updated_at'
+            'updated_at',
+            'created_by',
+            'created_by_name',
+            'updated_by',
+            'updated_by_name'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by', 'updated_by']
 
     def validate_timezone(self, value):
         """Validate timezone"""

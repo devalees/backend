@@ -2,14 +2,19 @@ import pytest
 from django.core.exceptions import ValidationError
 from Apps.entity.serializers import (
     OrganizationSerializer, DepartmentSerializer,
-    TeamSerializer, TeamMemberSerializer
+    TeamSerializer, TeamMemberSerializer,
+    OrganizationSettingsSerializer
 )
 from Apps.entity.tests.factories import (
     OrganizationFactory, DepartmentFactory,
     TeamFactory, TeamMemberFactory
 )
 from Apps.users.tests.factories import UserFactory
-from Apps.entity.models import TeamMember
+from Apps.entity.models import TeamMember, Organization, Department, Team, OrganizationSettings
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+
+User = get_user_model()
 
 @pytest.mark.django_db
 class TestOrganizationSerializer:
@@ -47,6 +52,33 @@ class TestOrganizationSerializer:
         
         assert not serializer.is_valid()
         assert 'name' in serializer.errors
+
+    def test_organization_serializer_includes_user_tracking_fields(self):
+        """Test that OrganizationSerializer includes user tracking fields"""
+        # Create a test user
+        user = UserFactory()
+        
+        # Create an organization with user tracking
+        organization = OrganizationFactory()
+        organization.created_by = user
+        organization.updated_by = user
+        organization.save()
+        
+        # Serialize the organization
+        serializer = OrganizationSerializer(organization)
+        data = serializer.data
+        
+        # Check that user tracking fields are included
+        assert 'created_by' in data
+        assert 'created_by_name' in data
+        assert 'updated_by' in data
+        assert 'updated_by_name' in data
+        
+        # Check that user tracking fields have the correct values
+        assert data['created_by'] == user.id
+        assert data['created_by_name'] == user.username
+        assert data['updated_by'] == user.id
+        assert data['updated_by_name'] == user.username
 
 @pytest.mark.django_db
 class TestDepartmentSerializer:

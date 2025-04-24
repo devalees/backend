@@ -12,10 +12,11 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
 from .permissions import IsOrganizationMember
+from Apps.core.views import BaseModelViewSet
 
 # Create your views here.
 
-class OrganizationViewSet(viewsets.ModelViewSet):
+class OrganizationViewSet(BaseModelViewSet):
     """ViewSet for Organization model"""
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
@@ -201,7 +202,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-class DepartmentViewSet(viewsets.ModelViewSet):
+class DepartmentViewSet(BaseModelViewSet):
     """ViewSet for Department model"""
     queryset = Department.all_objects.all()
     serializer_class = DepartmentSerializer
@@ -244,7 +245,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         serializer = DepartmentSerializer(child_departments, many=True)
         return Response(serializer.data)
 
-class TeamViewSet(viewsets.ModelViewSet):
+class TeamViewSet(BaseModelViewSet):
     """ViewSet for Team model"""
     queryset = Team.all_objects.all()
     serializer_class = TeamSerializer
@@ -271,7 +272,7 @@ class TeamViewSet(viewsets.ModelViewSet):
         serializer = TeamMemberSerializer(members, many=True)
         return Response(serializer.data)
 
-class TeamMemberViewSet(viewsets.ModelViewSet):
+class TeamMemberViewSet(BaseModelViewSet):
     """ViewSet for TeamMember model"""
     queryset = TeamMember.all_objects.all()
     serializer_class = TeamMemberSerializer
@@ -293,7 +294,7 @@ class TeamMemberViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-class OrganizationSettingsViewSet(viewsets.ModelViewSet):
+class OrganizationSettingsViewSet(BaseModelViewSet):
     """ViewSet for OrganizationSettings model"""
     queryset = OrganizationSettings.objects.all()
     serializer_class = OrganizationSettingsSerializer

@@ -17,13 +17,16 @@ class TaskSerializer(serializers.ModelSerializer):
     )
     created_by = UserSerializer(read_only=True)
     updated_by = UserSerializer(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = Task
         fields = [
             'id', 'title', 'description', 'due_date', 'status', 'priority',
             'project', 'assigned_to', 'assigned_to_id', 'parent_task',
-            'created_by', 'updated_by', 'created_at', 'updated_at'
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name', 
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
@@ -56,6 +59,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     )
     created_by = UserSerializer(read_only=True)
     updated_by = UserSerializer(read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     tasks = TaskSerializer(many=True, read_only=True)
     task_count = serializers.SerializerMethodField()
     
@@ -65,8 +70,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'start_date', 'end_date',
             'status', 'priority', 'owner', 'owner_id', 'team_members',
             'team_member_ids', 'organization', 'organization_id',
-            'created_by', 'updated_by', 'created_at', 'updated_at',
-            'tasks', 'task_count'
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name',
+            'created_at', 'updated_at', 'tasks', 'task_count'
         ]
         read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at']
 
@@ -81,6 +86,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class TaskTemplateSerializer(serializers.ModelSerializer):
     subtask_templates = serializers.SerializerMethodField()
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = TaskTemplate
@@ -88,7 +95,8 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'estimated_duration',
             'default_status', 'default_priority', 'project_template',
             'parent_task_template', 'order', 'subtask_templates',
-            'created_at', 'updated_at', 'created_by', 'updated_by'
+            'created_at', 'updated_at', 'created_by', 'created_by_name',
+            'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
@@ -98,6 +106,8 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
 
 class ProjectTemplateSerializer(serializers.ModelSerializer):
     task_templates = TaskTemplateSerializer(many=True, read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = ProjectTemplate
@@ -105,7 +115,7 @@ class ProjectTemplateSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'estimated_duration',
             'default_status', 'default_priority', 'organization',
             'task_templates', 'created_at', 'updated_at',
-            'created_by', 'updated_by'
+            'created_by', 'created_by_name', 'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by']
 
@@ -159,12 +169,16 @@ class ProjectTemplateSerializer(serializers.ModelSerializer):
         return task 
 
 class MilestoneSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+    
     class Meta:
         model = Milestone
         fields = [
             'id', 'name', 'description', 'schedule', 'phase',
             'due_date', 'status', 'completion_date', 'created_at',
-            'updated_at', 'created_by', 'updated_by'
+            'updated_at', 'created_by', 'created_by_name', 
+            'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'completion_date']
 
@@ -203,13 +217,16 @@ class MilestoneSerializer(serializers.ModelSerializer):
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
     milestones = MilestoneSerializer(many=True, read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = ProjectPhase
         fields = [
             'id', 'name', 'description', 'schedule', 'start_date',
             'end_date', 'order', 'is_active', 'progress', 'milestones',
-            'created_at', 'updated_at', 'created_by', 'updated_by'
+            'created_at', 'updated_at', 'created_by', 'created_by_name', 
+            'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'progress']
 
@@ -242,13 +259,16 @@ class ProjectScheduleSerializer(serializers.ModelSerializer):
     phases = ProjectPhaseSerializer(many=True, read_only=True)
     milestones = MilestoneSerializer(many=True, read_only=True)
     duration = serializers.SerializerMethodField()
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = ProjectSchedule
         fields = [
             'id', 'project', 'estimated_start_date', 'estimated_end_date',
             'description', 'is_baseline', 'progress', 'phases', 'milestones',
-            'duration', 'created_at', 'updated_at', 'created_by', 'updated_by'
+            'duration', 'created_at', 'updated_at', 'created_by', 
+            'created_by_name', 'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'updated_by', 'progress']
 
@@ -284,13 +304,14 @@ class ProjectDiscussionSerializer(serializers.ModelSerializer):
     """
     created_by_name = serializers.SerializerMethodField()
     attachment_count = serializers.SerializerMethodField()
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = ProjectDiscussion
         fields = [
             'id', 'project', 'title', 'content', 'is_active',
             'created_at', 'created_by', 'created_by_name',
-            'updated_at', 'updated_by', 'attachment_count'
+            'updated_at', 'updated_by', 'updated_by_name', 'attachment_count'
         ]
         read_only_fields = ['id', 'created_at', 'created_by', 'updated_at', 'updated_by', 'attachment_count']
         extra_kwargs = {
@@ -375,13 +396,16 @@ class DiscussionAttachmentSerializer(serializers.ModelSerializer):
     Serializer for the DiscussionAttachment model.
     """
     file_url = serializers.SerializerMethodField()
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
     
     class Meta:
         model = DiscussionAttachment
         fields = [
             'id', 'discussion', 'file', 'filename', 'description', 
             'file_size', 'content_type', 'created_at', 'created_by',
-            'updated_at', 'updated_by', 'file_url'
+            'created_by_name', 'updated_at', 'updated_by', 'updated_by_name', 
+            'file_url'
         ]
         read_only_fields = ['id', 'created_at', 'created_by', 'updated_at', 'updated_by', 
                            'file_size', 'content_type', 'filename', 'file_url']
@@ -423,14 +447,16 @@ class DiscussionNotificationSerializer(serializers.ModelSerializer):
     discussion_title = serializers.SerializerMethodField()
     project_id = serializers.SerializerMethodField()
     notification_text = serializers.SerializerMethodField()
-    
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    updated_by_name = serializers.CharField(source='updated_by.username', read_only=True, allow_null=True)
+
     class Meta:
         model = DiscussionNotification
         fields = [
             'id', 'discussion', 'discussion_title', 'project_id',
             'user', 'notification_type', 'notification_text',
-            'is_read', 'read_at', 'created_at', 
-            'updated_at'
+            'is_read', 'read_at', 'created_at', 'created_by', 'created_by_name',
+            'updated_at', 'updated_by', 'updated_by_name'
         ]
         read_only_fields = ['created_at', 'created_by', 'updated_at', 'updated_by', 
                            'discussion_title', 'project_id', 'notification_text']

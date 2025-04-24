@@ -102,6 +102,58 @@ class TestOrganizationViewSet:
         org.refresh_from_db()
         assert not org.is_active
 
+    def test_organization_create_sets_user_tracking(self, client, admin_user):
+        """Test that creating an organization sets created_by and updated_by fields"""
+        # Authenticate as admin
+        client.force_login(admin_user)
+        
+        # Create an organization
+        response = client.post('/api/v1/entity/organizations/', {
+            'name': 'Test Organization',
+            'description': 'Test Description',
+            'is_active': True
+        }, content_type='application/json')
+        
+        # Check that the request was successful
+        assert response.status_code == 201
+        
+        # Get the organization ID from the response
+        organization_id = response.data['id']
+        
+        # Retrieve the organization
+        organization = Organization.objects.get(id=organization_id)
+        
+        # Check that user tracking fields are set
+        assert organization.created_by == admin_user
+        assert organization.updated_by == admin_user
+
+    def test_organization_update_sets_updated_by(self, client, admin_user):
+        """Test that updating an organization sets updated_by field"""
+        # Create an organization
+        organization = Organization.objects.create(
+            name='Test Organization',
+            description='Test Description'
+        )
+        organization.created_by = admin_user
+        organization.save()
+        
+        # Authenticate as admin
+        client.force_login(admin_user)
+        
+        # Update the organization
+        response = client.patch(f'/api/v1/entity/organizations/{organization.id}/', {
+            'description': 'Updated Description'
+        }, content_type='application/json')
+        
+        # Check that the request was successful
+        assert response.status_code == 200
+        
+        # Refresh the organization
+        organization.refresh_from_db()
+        
+        # Check that updated_by field is set
+        assert organization.updated_by == admin_user
+
 @pytest.mark.django_db
 class TestDepartmentViewSet:
     def test_list_departments(self, authenticated_client):
